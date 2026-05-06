@@ -21,6 +21,13 @@ bool wifiSettingsChanged(struct settings_t* newSettings);
 #include <Network.h>
 #include <esp_wifi_types_generic.h>
 
+void wifiUpdate();
+void wifiUpdateSettings();
+bool wifiSoftApOn(const char* fileName, uint32_t lineNumber);
+bool wifiSoftApOff(const char* fileName, uint32_t lineNumber);
+IPAddress wifiSoftApGetIpAddress();
+const char* wifiSoftApGetSsid();
+
 // Class to simplify WiFi handling
 class RTK_WIFI {
   private:

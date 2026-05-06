@@ -366,7 +366,7 @@ int packetRSSI;
 RTK_WIFI wifi(false); // wifi(false); is non-verbose. For verbose, change to wifi(true);
 
 const char* wifiSoftApSsid = "RTK Config";
-const char* wifiSoftApPassword = nullptr;
+const char* wifiSoftApPassword = "123456789";
 const char* wifiSoftApName = "Soft AP";
 WIFI_CHANNEL_t wifiChannel; // Current WiFi channel number
 bool wifiSoftApSsidSet;     // Set when the WiFi soft AP SSID string exists
@@ -374,6 +374,15 @@ bool wifiStationRestart;    // Restart Wifi station
 bool wifiStationSsidSet;    // Set when one or more SSID strings exist
 
 static struct settings_t* wifiPreviousSettings;
+
+//*********************************************************************
+// Run periodic WiFi maintenance
+void
+wifiUpdate() {
+    if (settings.enableCaptivePortal && online_devices.wifi.wifiSoftApRunning) {
+        dnsServer.processNextRequest();
+    }
+}
 
 //*********************************************************************
 // Set WiFi credentials

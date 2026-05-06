@@ -2,6 +2,7 @@
 #include "esp32-hal.h"
 #include "esp_heap_caps.h"
 #include "mcu_settings.h"
+#include "myWebServer.h"
 
 static uint32_t lastHeapReport = 0;
 

@@ -1,9 +1,10 @@
 #include "HAL.h"
-#include <stdnoreturn.h>
+#include "Bluetooth.h"
 #include "HAL_Config.h"
 #include "HardwareSerial.h"
-#include "freertos/idf_additions.h"
-
+#include "mcu_settings.h"
+#include "myWIFI.h"
+#include "myWebServer.h"
 // Display boot times
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 #define MAX_BOOT_TIME_ENTRIES 41
@@ -85,6 +86,11 @@ HAL_Update(void* e) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     while (1) {
         System_Update();
+
+        bluetoothUpdate();
+
+        webServerUpdate();
+
         vTaskDelayUntil(&xLastWakeTime, 10);
     }
 }
@@ -114,6 +120,13 @@ HAL_Init() {
     // Init Bluetooth
     DMW_b("Bluetooth_Init");
     Bluetooth_Init();
+
+    DMW_b("wifiUpdateSettings");
+    wifiUpdateSettings();
+    if (settings.wifiConfigOverAP) {
+        DMW_b("WebServer_Start");
+        webServerStart();
+    }
 
     showBootTimes();
 

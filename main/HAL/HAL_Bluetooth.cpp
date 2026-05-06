@@ -36,8 +36,8 @@ constexpr uint8_t kResponseError = 0x05;
 constexpr size_t kBluetoothRxBufferSize = 512;
 constexpr size_t kBluetoothMaxPayload = 256;
 constexpr size_t kBluetoothTxBufferSize = sizeof(SEMP_CUSTOM_HEADER) + kBluetoothMaxPayload + sizeof(uint32_t);
-constexpr uint32_t kBluetoothParserBufferSize = 1024 * 3;
-constexpr uint32_t kBluetoothReadTaskStack = 4096;
+constexpr uint32_t kBluetoothParserBufferSize = 1024 * 2;
+constexpr uint32_t kBluetoothReadTaskStack = 2048;
 
 enum BluetoothParserType : uint16_t {
     BluetoothAPPType = 0,
@@ -639,22 +639,23 @@ btReadTask(void* e) {
     if (settings.printTaskStartStop) {
         systemPrintln("Task: btReadTask started");
     }
+    int rxBytes = 0;
     TickType_t xLastWakeTime = xTaskGetTickCount();
     while (!btReadTaskStopRequest) {
-        bluetoothUpdate();
         if (bluetoothGetState() == BT_CONNECTED) {
             while (bluetoothRxDataAvailable() > 0) {
-                const int rxBytes = bluetoothRead(bluetoothRxBuffer, sizeof(bluetoothRxBuffer));
+                rxBytes = bluetoothRead(bluetoothRxBuffer, sizeof(bluetoothRxBuffer));
                 if (rxBytes <= 0) {
                     break;
                 }
-
                 for (int index = 0; index < rxBytes; index++) {
                     sempParseNextByte(btParser, bluetoothRxBuffer[index]);
                 }
             }
+            vTaskDelayUntil(&xLastWakeTime, 2);
+        } else {
+            vTaskDelayUntil(&xLastWakeTime, 10);
         }
-        vTaskDelayUntil(&xLastWakeTime, 2);
     }
 
     sempStopParser(&btParser);
