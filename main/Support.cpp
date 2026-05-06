@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "HardwareSerial.h"
 #include "Support.h"
+#include "mcu_settings.h"
 
 /**
  * @brief Check if data is available for reading
@@ -465,108 +466,96 @@ stringHumanReadableSize(String& returnText, uint64_t bytes) {
     returnText = String(readableSize);
 }
 
-// void
-// verifyTable() {
-//     // Verify the measurement scales
-//     if (measurementScaleEntries != MEASUREMENT_UNITS_MAX) {
-//         reportFatalError("Fix measurementScaleTable to match measurementUnits");
-//     }
+// Print the error message every 15 seconds
+void
+reportFatalError(const char* errorMsg) {
+    // Empty the FIFO of any incoming data
+    while (Serial.available()) {
+        Serial.read();
+    }
+    while (1) {
+        // Allow carriage return to reset the system
+        if (Serial.available() && (Serial.read() == '\r')) {
+            Serial.println("System reset");
+            Serial.flush();
+            esp_restart();
+        }
 
-//     tasksValidateTables();
+        // Periodically display the halted message
+        systemPrint("HALTED: ");
+        systemPrint(errorMsg);
+        systemPrintln();
+        sleep(15);
+    }
+}
 
-//     present.button_function = true;
-//     present.antennaPhaseCenter_mm = 116.5;
-//     present.gnss_um980 = true;
-//     present.charger_mp2762a = true;
-//     present.fuelgauge_bq40z50 = true;
-//     present.microSd = true;
-//     present.radio_lora = true;
-//     present.galileoHasCapable = true;
-//     present.laraPowerControl = true;
-//     present.gnss_to_uart1 = true;
-//     present.gnss_to_uart3 = true;
-//     present.minCno = true;
-//     present.minElevation = true;
-//     present.dynamicModel = true;
-//     // if (CORR_NUM >= (int)('h' - 'a'))
-//     //   reportFatalError("Too many correction sources");
-// }
+// Free memory to PSRAM when available
+void
+rtkFree(void* data, const char* text) {
+    if (settings.debugMalloc) {
+        systemPrintf("%p: Freeing %s\r\n", data, text);
+    }
+    free(data);
+}
 
-// void
-// checkGNSSArrayDefaults() {
-//     bool defaultsApplied = false;
+// Allocate memory from PSRAM when available
+void*
+rtkMalloc(size_t sizeInBytes, const char* text) {
+    const char* area;
+    void* data;
 
-//     if (present.gnss_um980) {
-//         if (settings.dynamicModel == 254) {
-//             settings.dynamicModel = UM980_DYN_MODEL_SURVEY;
-//         }
+    if (online_devices.psram == true) {
+        area = "PSRAM";
+        data = ps_malloc(sizeInBytes);
+    } else {
+        area = "RAM";
+        data = malloc(sizeInBytes);
+    }
 
-//         if (settings.um980Constellations[0] == 254) {
-//             defaultsApplied = true;
-//             systemPrintf("UM980 Constellations\r\n");
-//             // Reset constellations to defaults
-//             for (int x = 0; x < MAX_UM980_CONSTELLATIONS; x++) {
-//                 settings.um980Constellations[x] = 1;
-//             }
-//         }
+    // Display the allocation
+    if (data) {
+        if (settings.debugMalloc) {
+            systemPrintf("%p, %s %d bytes allocated: %s\r\n", data, area, sizeInBytes, text);
+        }
+    } else {
+        systemPrintf("Error: Failed to allocate %d bytes from %s: %s\r\n", sizeInBytes, area, text);
+    }
 
-//         if (settings.um980MessageRatesNMEA[0] == 254) {
-//             defaultsApplied = true;
-//             systemPrintf("UM980 um980MessageRatesNMEA\r\n");
-//             // Reset rates to defaults
-//             for (int x = 0; x < MAX_UM980_NMEA_MSG; x++) {
-//                 settings.um980MessageRatesNMEA[x] = umMessagesNMEA[x].msgDefaultRate;
-//             }
-//         }
+    // If you are trying to trace "CORRUPT HEAP Bad tail" issues, add the tail address here:
+    const uint32_t badTail = 0; // E.g. 0x3f80135c which was being allocated to the oled
+    if (badTail) {
+        union {
+            void* ptr;
+            uint32_t address;
+        } ptr2address;
 
-//         if (settings.um980MessageRatesRTCMRover[0] == 254) {
-//             defaultsApplied = true;
-//             systemPrintf("UM980 um980MessageRatesRTCMRover\r\n");
-//             // For rovers, RTCM should be zero by default.
-//             for (int x = 0; x < MAX_UM980_RTCM_MSG; x++) {
-//                 settings.um980MessageRatesRTCMRover[x] = 0;
-//             }
-//         }
+        ptr2address.ptr = data;
+        // Align sizeInBytes to multiples of 4: 0->0; 1->4; 4->4; 5->8; 4001->4004
+        uint32_t alignedSize = (sizeInBytes + 3) & (~3);
+        // Look for address == badTail - alignedSize (ignore the canary)
+        if (ptr2address.address == badTail - alignedSize) {
+            systemPrintf("rtkMalloc: tail 0x%08x length 0x%04X (%ld) allocated to %s\r\n", badTail, sizeInBytes,
+                         sizeInBytes, text);
+        }
+    }
 
-//         if (settings.um980MessageRatesRTCMBase[0] == 254) {
-//             defaultsApplied = true;
-//             systemPrintf("UM980 um980MessageRatesRTCMBase\r\n");
-//             // Reset RTCM rates to defaults
-//             for (int x = 0; x < MAX_UM980_RTCM_MSG; x++) {
-//                 settings.um980MessageRatesRTCMBase[x] = umMessagesRTCM[x].msgDefaultRate;
-//             }
-//         }
-//     }
+    // If you are trying to trace "CORRUPT HEAP Bad head" issues, add the head address here:
+    const uint32_t badHead = 0; // E.g. 0x3f808ff4 (identifed that 0x3f808048 was allocated to AuthCoPro)
+    if (badHead) {
+        union {
+            void* ptr;
+            uint32_t address;
+        } ptr2address;
 
-//     if (defaultsApplied == true) {
-//         if (present.gnss_um980) {
-//             systemPrintf("UM980 Defaults Applied\r\n");
-//             settings.minCNO = 10;                    // Default 10 degrees
-//             settings.surveyInStartingAccuracy = 2.0; // Default 2m
-//                                                      // settings.measurementRateMs = 500;        // Default 2Hz.
-//         }
-//     }
-// }
+        ptr2address.ptr = data;
+        // Align sizeInBytes to multiples of 4: 0->0; 1->4; 4->4; 5->8; 4001->4004
+        uint32_t alignedSize = (sizeInBytes + 3) & (~3);
+        // Look for badHead == address + alignedSize + two 4-byte canaries:
+        if (badHead == ptr2address.address + alignedSize + 8) {
+            systemPrintf("rtkMalloc: head 0x%08x length 0x%04X (%ld) allocated to %s\r\n", ptr2address.address,
+                         sizeInBytes, sizeInBytes, text);
+        }
+    }
 
-// void
-// checkTaskStatus() {
-//     char InfoBuffer[512] = {0};
-//     memset(InfoBuffer, 0, 512); // 信息缓冲区清零
-//     vTaskList((char*)&InfoBuffer);
-//     systemPrintf("任务名  任务状态  优先级  剩余栈  任务序号  cpu核\r\n");
-//     systemPrintf("\r\n%s\r\n", InfoBuffer);
-
-// #if 1
-//     char CPU_RunInfo[400] = {0}; // 保存任务运行时间信息
-//     memset(CPU_RunInfo, 0, 400); // 信息缓冲区清零
-//     vTaskGetRunTimeStats((char*)&CPU_RunInfo);
-//     systemPrintf("任务名       运行计数         使用率\r\n");
-//     systemPrintf("%s", CPU_RunInfo);
-//     systemPrintf("---------------------------------------------\r\n\n");
-// #endif
-
-//     // 打印剩余ram和堆容量
-//     systemPrintf("IDLE: ****free internal ram %d  all heap size: %d Bytes****\n",
-//                  heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_free_size(MALLOC_CAP_8BIT));
-//     systemPrintf("IDLE: ****free SPIRAM size: %d Bytes****\n", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-// }
+    return data;
+}

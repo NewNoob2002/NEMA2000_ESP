@@ -35,7 +35,7 @@ void BleBufferedSerial::begin(const char* name, int led_pin)
 	started = true;
 
 	char _taskName[20]; // Store random task name
-	snprintf(_taskName, sizeof(_taskName), "BLEFlushTask_%04X", esp_random() & 0xFFFF);
+	snprintf(_taskName, sizeof(_taskName), "BLEFlushTask_%04X", static_cast<unsigned int>(esp_random() & 0xFFFF));
 	xTaskCreate(flushTaskEntry, _taskName, 4096, this, 1, nullptr);
 }
 
@@ -53,7 +53,7 @@ void BleBufferedSerial::begin(const char* name, const char* service_uuid, const 
 	started = true;
 
 	char _taskName[20]; // Store random task name
-	snprintf(_taskName, sizeof(_taskName), "BLEFlushTask_%04X", esp_random() & 0xFFFF);
+	snprintf(_taskName, sizeof(_taskName), "BLEFlushTask_%04X", static_cast<unsigned int>(esp_random() & 0xFFFF));
 	xTaskCreate(flushTaskEntry, _taskName, 4096, this, 1, nullptr);
 }
 

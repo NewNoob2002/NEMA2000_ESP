@@ -6,6 +6,7 @@ productProperties_t productPropertiesTable[] = {
 };
 const int productPropertiesEntries = sizeof(productPropertiesTable) / sizeof(productPropertiesTable[0]);
 
+ProductVariant productType = RTK_S20;
 // Online devices
 online_devices_t online_devices;
 

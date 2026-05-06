@@ -7,6 +7,7 @@ extern "C" {
 #endif
 
 extern productProperties_t productPropertiesTable[];
+extern ProductVariant productType;
 
 extern online_devices_t online_devices;
 extern settings_t settings;

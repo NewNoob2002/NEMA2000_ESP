@@ -14,6 +14,8 @@
 
 #pragma once
 #include <Arduino.h>
+#include <BLECharacteristic.h>
+#include <BLEService.h>
 
 #include "BleSerialConstants.h"
 #include "ByteRingBuffer.h"

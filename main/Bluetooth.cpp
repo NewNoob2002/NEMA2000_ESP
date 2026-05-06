@@ -143,22 +143,22 @@ bluetoothStart() {
     if (!online_devices.bluetooth) {
         bluetoothState = BT_OFF;
         char productName[12] = {0};
-        strncpy(productName, productPropertiesTable[RTK_S20].name, sizeof(productName));
+        strncpy_s(productName, productPropertiesTable[productType].name, sizeof(productName));
 
         // BLE is limited to ~28 characters in the device name. Shorten
         // platformPrefix if needed.
         if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE || bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
-            strncpy(productName, "E1-Lite*Ble", sizeof(productName));
+            strncpy_s(productName, "E1-Lite*Ble", sizeof(productName));
         }
 
-        snprintf(productPropertiesTable[RTK_S20].displayName, sizeof(productPropertiesTable[RTK_S20].displayName),
-                 "%s-%s", productName, productPropertiesTable[RTK_S20].productPlanUID);
+        snprintf(productPropertiesTable[productType].displayName, sizeof(productPropertiesTable[RTK_S20].displayName),
+                 "%s-%s", productName, productPropertiesTable[productType].productPlanUID);
 
-        if (strlen(productPropertiesTable[RTK_S20].displayName) > 28) {
+        if (strlen(productPropertiesTable[productType].displayName) > 28) {
             systemPrintf("Warning! The Bluetooth device name '%s' is %d characters "
                          "long. It may not work in BLE mode.\r\n",
-                         productPropertiesTable[RTK_S20].displayName,
-                         strlen(productPropertiesTable[RTK_S20].displayName));
+                         productPropertiesTable[productType].displayName,
+                         strlen(productPropertiesTable[productType].displayName));
         }
 
         // Select Bluetooth setup

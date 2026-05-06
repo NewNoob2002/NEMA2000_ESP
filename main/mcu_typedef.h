@@ -8,6 +8,17 @@
 #define INCHES_IN_A_METER               (float)39.37007874
 #define FEET_IN_A_METER                 (float)3.280839895
 
+#define HOURS_IN_A_DAY                  24L
+#define MINUTES_IN_AN_HOUR              60L
+#define SECONDS_IN_A_MINUTE             60L
+#define MILLISECONDS_IN_A_SECOND        1000L
+#define MILLISECONDS_IN_A_MINUTE        (SECONDS_IN_A_MINUTE * MILLISECONDS_IN_A_SECOND)
+#define MILLISECONDS_IN_AN_HOUR         (MINUTES_IN_AN_HOUR * MILLISECONDS_IN_A_MINUTE)
+#define MILLISECONDS_IN_A_DAY           (HOURS_IN_A_DAY * MILLISECONDS_IN_AN_HOUR)
+
+#define SECONDS_IN_AN_HOUR              (MINUTES_IN_AN_HOUR * SECONDS_IN_A_MINUTE)
+#define SECONDS_IN_A_DAY                (HOURS_IN_A_DAY * SECONDS_IN_AN_HOUR)
+
 // Define the index values into the parserTable
 #define RTK_NMEA_PARSER_INDEX           0
 #define RTK_UNICORE_HASH_PARSER_INDEX   1
@@ -186,6 +197,16 @@ typedef enum SemaphoreFunction_e {
     FUNCTION_FILE_DUMP,
 } SemaphoreFunction_e;
 
+typedef struct online_wifi_t {
+    bool wifiEspNowOnline;    // ESP-NOW started successfully
+    bool wifiEspNowRunning;   // False: stopped, True: starting, running, stopping
+    bool wifiSoftApOnline;    // WiFi soft AP started successfully
+    bool wifiSoftApRunning;   // False: stopped, True: starting, running, stopping
+    bool wifiSoftApConnected; // False: no client connected, True: client connected
+    bool wifiStationOnline;   // WiFi station started successfully
+    bool wifiStationRunning;  // False: stopped, True: starting, running, stopping
+} online_wifi_t;
+
 typedef struct online_devices_t {
     bool i2c = false;
     bool littlefs = false;
@@ -194,6 +215,7 @@ typedef struct online_devices_t {
     bool psram = false;
     bool bq40z50 = false;
     bool mp2762a = false;
+    online_wifi_t wifi;
 } online_devices_t;
 
 // This is all the settings that can be set on RTK Product. It's recorded to NVM and the config file.
