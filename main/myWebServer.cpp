@@ -1,9 +1,4 @@
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-WebServer.ino
-
-  Start and stop the web-server, provide the form and handle browser input.
-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-#include "WebServer.h"
+#include "myWebServer.h"
 #ifdef COMPILE_WEBSERVER
 
 //----------------------------------------
