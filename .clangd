@@ -1,2 +1,12 @@
 CompileFlags:
-    Remove: [-f*, -m*]
+  CompilationDatabase: build
+  Compiler: C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-g++.exe
+  Remove:
+    - -mlongcalls
+    - -fno-builtin-*
+    - -fno-shrink-wrap
+    - -fstrict-volatile-bitfields
+    - -fno-tree-switch-conversion
+
+Index:
+  Background: Build

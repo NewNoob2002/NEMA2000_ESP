@@ -1,5 +1,6 @@
 #include "Bluetooth.h"
 #include <cstdio>
+#include <cstring>
 #include <stdio.h>
 #include "Support.h"
 #include "mcu_settings.h"
@@ -143,16 +144,22 @@ bluetoothStart() {
     if (!online_devices.bluetooth) {
         bluetoothState = BT_OFF;
         char productName[12] = {0};
-        strncpy_s(productName, productPropertiesTable[productType].name, sizeof(productName));
+        strncpy(productName, productPropertiesTable[productType].name, sizeof(productName));
+        productName[sizeof(productName) - 1] = '\0';
 
         // BLE is limited to ~28 characters in the device name. Shorten
         // platformPrefix if needed.
         if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE || bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
-            strncpy_s(productName, "E1-Lite*Ble", sizeof(productName));
+            strncpy(productName, "E1-Lite*Ble", sizeof(productName));
+            productName[sizeof(productName) - 1] = '\0';
         }
 
-        snprintf(productPropertiesTable[productType].displayName, sizeof(productPropertiesTable[RTK_S20].displayName),
-                 "%s-%s", productName, productPropertiesTable[productType].productPlanUID);
+        char productPlanUID[sizeof(productPropertiesTable[productType].productPlanUID)] = {0};
+        strncpy(productPlanUID, productPropertiesTable[productType].productPlanUID, sizeof(productPlanUID));
+        productPlanUID[sizeof(productPlanUID) - 1] = '\0';
+
+        snprintf(productPropertiesTable[productType].displayName,
+                 sizeof(productPropertiesTable[productType].displayName), "%s-%s", productName, productPlanUID);
 
         if (strlen(productPropertiesTable[productType].displayName) > 28) {
             systemPrintf("Warning! The Bluetooth device name '%s' is %d characters "

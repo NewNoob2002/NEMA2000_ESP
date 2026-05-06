@@ -1128,6 +1128,7 @@ wifiStationUpdate() {
             //          |
             //          | Fall through
             //          V
+            [[fallthrough]];
 
         // Perform the restart delay
         case WIFI_STATION_STATE_RESTART_DELAY:
@@ -1154,6 +1155,7 @@ wifiStationUpdate() {
             //          |
             //          | Fall through
             //          V
+            [[fallthrough]];
 
         // At least one consumer is requesting a network
         case WIFI_STATION_STATE_STARTING:
@@ -1321,7 +1323,7 @@ wifiUpdateSettings() {
 
     // If we are connected over WiFi, and settings change, restart connection
     // Check to see if WiFi settings have been changed, then clear memory
-    bool wifiChanged = wifiSettingsChangedAndFree();
+    wifiSettingsChangedAndFree();
     // if (wifiChanged == true && networkInterfaceHasInternet(NETWORK_WIFI_STATION) == true) {
     // Restart network
     {
@@ -1457,7 +1459,6 @@ RTK_WIFI::displayComponents(const char* text, WIFI_ACTION_t components) {
 //   Returns true if the modes were successfully configured
 bool
 RTK_WIFI::enable(bool enableESPNow, bool enableSoftAP, bool enableStation, const char* fileName, int lineNumber) {
-    int authIndex;
     bool startOrStopSomething;
     WIFI_ACTION_t starting;
     bool status;
@@ -1581,8 +1582,6 @@ RTK_WIFI::espNowOnline() {
 // Handle the WiFi event
 void
 RTK_WIFI::eventHandler(arduino_event_id_t event, arduino_event_info_t info) {
-    bool success;
-
     if (settings.debugWifiState) {
         systemPrintf("event: %d (%s)\r\n", event, Network.eventName(event));
     }
@@ -1629,6 +1628,8 @@ RTK_WIFI::eventHandler(arduino_event_id_t event, arduino_event_info_t info) {
         case ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED:
         case ARDUINO_EVENT_WIFI_AP_PROBEREQRECVED:
         case ARDUINO_EVENT_WIFI_AP_GOT_IP6: softApEventHandler(event, info); break;
+
+        default: break;
     }
 }
 
@@ -1903,6 +1904,8 @@ RTK_WIFI::softApEventHandler(arduino_event_id_t event, arduino_event_info_t info
             }
             online_devices.wifi.wifiSoftApConnected = false;
             break;
+
+        default: break;
     }
 }
 
@@ -2166,10 +2169,7 @@ RTK_WIFI::stationDisconnect() {
 // Handle the WiFi station events
 void
 RTK_WIFI::stationEventHandler(arduino_event_id_t event, arduino_event_info_t info) {
-    WIFI_CHANNEL_t channel;
-    IPAddress ipAddress;
     char ssid[sizeof(info.wifi_sta_connected.ssid) + 1];
-    bool success;
     int type;
 
     //------------------------------
@@ -2211,6 +2211,7 @@ RTK_WIFI::stationEventHandler(arduino_event_id_t event, arduino_event_info_t inf
             //      |
             //      |
             //      V
+            [[fallthrough]];
 
         case ARDUINO_EVENT_WIFI_STA_STOP:
         case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
@@ -2223,6 +2224,7 @@ RTK_WIFI::stationEventHandler(arduino_event_id_t event, arduino_event_info_t inf
             //      |
             //      |
             //      V
+            [[fallthrough]];
 
         case ARDUINO_EVENT_WIFI_SCAN_DONE:
         case ARDUINO_EVENT_WIFI_STA_AUTHMODE_CHANGE:
@@ -2236,6 +2238,7 @@ RTK_WIFI::stationEventHandler(arduino_event_id_t event, arduino_event_info_t inf
             //      |
             //      |
             //      V
+            [[fallthrough]];
 
         case ARDUINO_EVENT_WIFI_STA_LOST_IP:
             if (event == ARDUINO_EVENT_WIFI_STA_LOST_IP) {
@@ -2283,6 +2286,8 @@ RTK_WIFI::stationEventHandler(arduino_event_id_t event, arduino_event_info_t inf
             }
             // networkInterfaceEventInternetAvailable(NETWORK_WIFI_STATION);
             break;
+
+        default: break;
     } // End of switch
 }
 
@@ -2347,7 +2352,6 @@ RTK_WIFI::stationOnline() {
 int16_t
 RTK_WIFI::stationScanForAPs(WIFI_CHANNEL_t channel) {
     int16_t apCount = 0;
-    int16_t status = 0;
 
     do {
         // Determine if the WiFi scan is already running
@@ -2489,10 +2493,8 @@ RTK_WIFI::stationSsid() {
 bool
 RTK_WIFI::stopStart(WIFI_ACTION_t stopping, WIFI_ACTION_t starting) {
     const WIFI_ACTION_t allOnline = WIFI_AP_ONLINE | WIFI_EN_ESP_NOW_ONLINE | WIFI_STA_ONLINE;
-    int authIndex;
     WIFI_CHANNEL_t channel;
     bool defaultChannel;
-    WIFI_ACTION_t delta;
     WIFI_ACTION_t expected;
     WIFI_ACTION_t mask;
     WIFI_ACTION_t notStarted;
