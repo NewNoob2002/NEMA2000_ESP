@@ -627,8 +627,8 @@ typedef struct settings_t {
     uint16_t httpPort = 80;
 
     // WiFi
-    bool debugWebServer = false;
-    bool debugWifiState = false;
+    bool debugWebServer = true;
+    bool debugWifiState = true;
     bool enableCaptivePortal = true;
     uint8_t wifiChannel = 1;      //Valid channels are 1 to 14
     bool wifiConfigOverAP = true; // Configure device over Access Point or have it connect to WiFi
