@@ -105,11 +105,12 @@ HAL_Init() {
     DMW_b("Power_OnCheck");
     Power_OnCheck();
     // Initialize the i2c modules after the switched peripherals are powered.
+#ifdef COMPILE_I2C
     DMW_b("I2C_Init");
     I2C_Init();
     DMW_b("I2C_Scan");
     I2C_Scan(nullptr);
-
+#endif
     DMW_b("FileSystem_Init");
     FileSystem_Init();
     // Init GNSS Module

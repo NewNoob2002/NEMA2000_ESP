@@ -489,6 +489,11 @@ reportFatalError(const char* errorMsg) {
     }
 }
 
+const char*
+getTimeStamp() {
+    return "xx-xx-xxxx xx:xx:xx"; // TODO: Implement RTC and return actual timestamp
+}
+
 // Free memory to PSRAM when available
 void
 rtkFree(void* data, const char* text) {

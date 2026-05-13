@@ -12,9 +12,3 @@ online_devices_t online_devices;
 
 // Settings
 settings_t settings;
-
-// System state
-volatile SystemState_t systemState = STATE_NOT_SET;
-volatile SystemState_t lastSystemState = STATE_NOT_SET;
-volatile SystemState_t requestedSystemState = STATE_NOT_SET;
-bool newSystemStateRequested = false;

@@ -41,5 +41,8 @@ void reportFatalError(const char* errorMsg);
 void reportHeapNow(bool alwaysPrint);
 void reportHeap();
 
+// Get the timestamp
+const char* getTimeStamp();
+
 void rtkFree(void* data, const char* text);
 void* rtkMalloc(size_t sizeInBytes, const char* text);

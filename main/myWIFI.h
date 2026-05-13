@@ -1,8 +1,6 @@
 #pragma once
 
-#ifndef COMPILE_WIFI
-// #define COMPILE_WIFI
-#endif
+#include "mcu_settings.h"
 
 //****************************************
 // WiFi class
@@ -11,8 +9,82 @@
 #ifdef COMPILE_WIFI
 
 #include <stdint.h>
+
+//****************************************
+// Constants
+//****************************************
+
+// Radio operations
+#define WIFI_AP_SET_MODE                (1 << 0)
+#define WIFI_EN_SET_MODE                (1 << 1)
+#define WIFI_STA_SET_MODE               (1 << 2)
+#define WIFI_AP_SET_PROTOCOLS           (1 << 3)
+#define WIFI_EN_SET_PROTOCOLS           (1 << 4)
+#define WIFI_STA_SET_PROTOCOLS          (1 << 5)
+#define WIFI_STA_START_SCAN             (1 << 6)
+#define WIFI_STA_SELECT_REMOTE_AP       (1 << 7)
+#define WIFI_AP_SELECT_CHANNEL          (1 << 8)
+#define WIFI_EN_SELECT_CHANNEL          (1 << 9)
+#define WIFI_STA_SELECT_CHANNEL         (1 << 10)
+
+// Soft AP
+#define WIFI_AP_SET_SSID_PASSWORD       (1 << 11)
+#define WIFI_AP_SET_IP_ADDR             (1 << 12)
+#define WIFI_AP_SET_HOST_NAME           (1 << 13)
+#define WIFI_AP_START_DNS_SERVER        (1 << 14)
+#define WIFI_AP_ONLINE                  (1 << 15)
+
+// WiFi station
+#define WIFI_STA_SET_HOST_NAME          (1 << 16)
+#define WIFI_STA_DISABLE_AUTO_RECONNECT (1 << 17)
+#define WIFI_STA_CONNECT_TO_REMOTE_AP   (1 << 18)
+#define WIFI_STA_ONLINE                 (1 << 19)
+
+// WIFI_MAX_START must be the last value in the define list
+#define WIFI_MAX_START                  (1 << 20)
+
+#define WIFI_START_SOFT_AP                                                                                             \
+    (WIFI_AP_SET_MODE | WIFI_AP_SET_PROTOCOLS | WIFI_AP_SELECT_CHANNEL | WIFI_AP_SET_SSID_PASSWORD                     \
+     | WIFI_AP_SET_IP_ADDR | WIFI_AP_SET_HOST_NAME | WIFI_AP_START_DNS_SERVER | WIFI_AP_ONLINE)
+
+#define WIFI_START_STATION                                                                                             \
+    (WIFI_STA_SET_MODE | WIFI_STA_SET_PROTOCOLS | WIFI_STA_START_SCAN | WIFI_STA_SELECT_CHANNEL                        \
+     | WIFI_STA_SELECT_REMOTE_AP | WIFI_STA_SET_HOST_NAME | WIFI_STA_DISABLE_AUTO_RECONNECT                            \
+     | WIFI_STA_CONNECT_TO_REMOTE_AP | WIFI_STA_ONLINE)
+
+#define WIFI_STA_RECONNECT                                                                                             \
+    (WIFI_STA_START_SCAN | WIFI_STA_SELECT_CHANNEL | WIFI_STA_SELECT_REMOTE_AP | WIFI_STA_SET_HOST_NAME                \
+     | WIFI_STA_DISABLE_AUTO_RECONNECT | WIFI_STA_CONNECT_TO_REMOTE_AP | WIFI_STA_ONLINE)
+
+#define WIFI_SELECT_CHANNEL (WIFI_AP_SELECT_CHANNEL | WIFI_EN_SELECT_CHANNEL | WIFI_STA_SELECT_CHANNEL)
+
+#define WIFI_STA_NO_REMOTE_AP                                                                                          \
+    (WIFI_STA_SELECT_CHANNEL | WIFI_STA_SET_HOST_NAME | WIFI_STA_DISABLE_AUTO_RECONNECT                                \
+     | WIFI_STA_CONNECT_TO_REMOTE_AP | WIFI_STA_ONLINE)
+
+#define WIFI_STA_FAILED_SCAN         (WIFI_STA_START_SCAN | WIFI_STA_SELECT_REMOTE_AP | WIFI_STA_NO_REMOTE_AP)
+
+#define WIFI_MAX_TIMEOUT             (15 * 60 * 1000) // Timeout in milliseconds
+#define WIFI_MIN_TIMEOUT             (15 * 1000)      // Timeout in milliseconds
+
+#define WIFI_DEFAULT_CHANNEL         1
+#define WIFI_IP_ADDRESS_TIMEOUT_MSEC (15 * MILLISECONDS_IN_A_SECOND)
+#define WIFI_CONNECTION_STABLE_MSEC  (15 * MILLISECONDS_IN_A_MINUTE)
+
 typedef uint8_t WIFI_CHANNEL_t;
 typedef uint32_t WIFI_ACTION_t;
+
+typedef enum WIFI_STATION_STATES_T {
+    WIFI_STATION_STATE_OFF,
+    WIFI_STATION_STATE_WAIT_NO_USERS,
+    WIFI_STATION_STATE_RESTART_DELAY,
+    WIFI_STATION_STATE_STARTING,
+    WIFI_STATION_STATE_ONLINE,
+    WIFI_STATION_STATE_STABLE,
+    // The following line must be the last in the list
+    WIFI_STATION_STATE_MAX
+} WIFI_STATION_STATES_T;
+
 bool wifiSettingsChangedAndFree();
 bool wifiSettingsChanged(struct settings_t* newSettings);
 

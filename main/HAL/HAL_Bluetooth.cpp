@@ -462,8 +462,8 @@ void
 handleShutdown(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHeader, const uint8_t* payload,
                const uint16_t payloadLength) {
     if (requestHeader.messageType == kMsgSetType && payload && (payloadLength >= 1) && payload[0] == 0x01) {
-        requestedSystemState = STATE_SHUTDOWN;
-        newSystemStateRequested = true;
+        // requestedSystemState = STATE_SHUTDOWN;
+        // newSystemStateRequested = true;
     }
     ack(response, requestHeader, (payload && (payloadLength >= 1)) ? 1 : kResponseError);
 }

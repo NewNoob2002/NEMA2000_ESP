@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "CompileConfig.h"
 #include "FreeRTOSConfig.h"
 
 #define PIN_UNDEFINED                   0xFF
@@ -70,25 +71,26 @@ typedef enum SystemState_t {
     STATE_BASE_FIXED_NOT_STARTED,   // 13
     STATE_BASE_FIXED_TRANSMITTING,  // 14
 
-    STATE_DISPLAY_SETUP,               // 15
     STATE_WEB_CONFIG_NOT_STARTED,      // 16
     STATE_WEB_CONFIG_WAIT_FOR_NETWORK, // 17
     STATE_WEB_CONFIG,                  // 18
     STATE_PROFILE,                     // 19
-
-    STATE_KEYS_REQUESTED, // 20
-
-    STATE_ESPNOW_PAIRING_NOT_STARTED, // 21
-    STATE_ESPNOW_PAIRING,             // 22
-
+#ifdef COMPILE_NTP
     STATE_NTPSERVER_NOT_STARTED, // 23
     STATE_NTPSERVER_NO_SYNC,     // 24
     STATE_NTPSERVER_SYNC,        // 25
-
+#endif
     STATE_SHUTDOWN, // 26
 
     STATE_NOT_SET, // 27, Must be last on list
 } SystemState_t;
+
+// RTK mode structure
+typedef struct RTK_MODE_ENTRY_T {
+    const char* modeName;
+    SystemState_t first;
+    SystemState_t last;
+} RTK_MODE_ENTRY_T;
 
 // Product Variant used as part of device ID and whitelists. Do not reorder.
 typedef enum {
@@ -215,6 +217,7 @@ typedef struct online_devices_t {
     bool psram = false;
     bool bq40z50 = false;
     bool mp2762a = false;
+    bool rtc = false;
     online_wifi_t wifi;
 } online_devices_t;
 

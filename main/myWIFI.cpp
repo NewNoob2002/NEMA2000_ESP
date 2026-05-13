@@ -11,16 +11,6 @@ Wifi.ino
 #include <WiFi.h>
 #include "Support.h"
 #include "esp_wifi.h"
-#include "mcu_settings.h"
-#include "mcu_typedef.h"
-
-//****************************************
-// Constants
-//****************************************
-
-#define WIFI_DEFAULT_CHANNEL         1
-#define WIFI_IP_ADDRESS_TIMEOUT_MSEC (15 * MILLISECONDS_IN_A_SECOND)
-#define WIFI_CONNECTION_STABLE_MSEC  (15 * MILLISECONDS_IN_A_MINUTE)
 
 static const char* wifiAuthorizationName[] = {
     "Open",
@@ -46,17 +36,6 @@ static const char* wifiAuthorizationName[] = {
 };
 static const int wifiAuthorizationNameEntries = sizeof(wifiAuthorizationName) / sizeof(wifiAuthorizationName[0]);
 
-enum WIFI_STATION_STATES {
-    WIFI_STATION_STATE_OFF,
-    WIFI_STATION_STATE_WAIT_NO_USERS,
-    WIFI_STATION_STATE_RESTART_DELAY,
-    WIFI_STATION_STATE_STARTING,
-    WIFI_STATION_STATE_ONLINE,
-    WIFI_STATION_STATE_STABLE,
-    // The following line must be the last in the list
-    WIFI_STATION_STATE_MAX
-};
-
 uint8_t wifiStationState;
 
 const char* wifiStationStateName[] = {
@@ -64,236 +43,6 @@ const char* wifiStationStateName[] = {
     "WIFI_STATION_STATE_STARTING", "WIFI_STATION_STATE_ONLINE",        "WIFI_STATION_STATE_STABLE",
 };
 const int wifiStationStateNameEntries = sizeof(wifiStationStateName) / sizeof(wifiStationStateName[0]);
-
-//----------------------------------------------------------------------
-// ESP-NOW bringup from example 4_9_ESP_NOW
-//   1. Set station mode
-//   2. Create nowSerial as new ESP_NOW_Serial_Class
-//   3. nowSerial.begin
-// ESP-NOW bringup from RTK
-//   1. Get WiFi mode
-//   2. Set WiFi station mode if necessary
-//   3. Get WiFi station protocols
-//   4. Set WIFI_PROTOCOL_LR protocol
-//   5. Call esp_now_init
-//   6. Call esp_wifi_set_promiscuous(true)
-//   7. Set promiscuous receive callback [esp_wifi_set_promiscuous_rx_cb(promiscuous_rx_cb)]
-//      to get RSSI of action frames
-//   8. Assign a channel if necessary, call RTK_WIFI::espNowSetChannel
-//   9. Set receive callback [esp_now_register_recv_cb(espNowOnDataReceived)]
-//  10. Add peers from settings
-//      A. If no peers exist
-//          i.   Determine if broadcast peer exists, call esp_now_is_peer_exist
-//          ii.  Add broadcast peer if necessary, call espNowAddPeer
-//          iii. Set ESP-NOW state, call espNowSetState(ESPNOW_BROADCASTING)
-//      B. If peers exist,
-//          i.  Set ESP-NOW state, call espNowSetState(ESPNOW_PAIRED)
-//          ii. Loop through peers listed in settings, for each
-//              a. Determine if peer exists, call esp_now_is_peer_exist
-//              b. Add peer if necessary, call espNowAddPeer
-//
-// In espNowOnDataReceived
-//  11. Save ESP-NOW RSSI
-//  12. Set espNowLastRssiUpdate = millis()
-//  13. If in ESPNOW_PAIRING state
-//      A. Validate message CRC
-//      B. If valid CRC
-//          i.  Save peer MAC address
-//          ii. espNowSetState(ESPNOW_MAC_RECEIVED)
-//  14. Else if ESPNOW_MAC_RECEIVED state
-//      A. If ESP-NOW is corrections source, correctionLastSeen(CORR_ESPNOW)
-//          i.  gnss->pushRawData
-//  15. Set espNowIncomingRTCM
-//
-// ESP-NOW shutdown from RTK
-//   1. esp_wifi_set_promiscuous(false)
-//   2. esp_wifi_set_promiscuous_rx_cb(nullptr)
-//   3. esp_now_unregister_recv_cb()
-//   4. Remove all peers by calling espNowRemovePeer
-//   5. Get WiFi mode
-//   6. Set WiFi station mode if necessary
-//   7. esp_wifi_get_protocol
-//   8. Turn off long range protocol if necessary, call esp_wifi_set_protocol
-//   9. Turn off ESP-NOW. call esp_now_deinit
-//  10. Set ESP-NOW state, call espNowSetState(ESPNOW_OFF)
-//  11. Restart WiFi if necessary
-//----------------------------------------------------------------------
-
-//----------------------------------------------------------------------
-// Soft AP startup from example 4_11
-//  1. Get mode
-//  2. Start WiFi event handler
-//  3. Set SSID and password, call softApCreate
-//  4. Set IP addresses, call softApConfiguration
-//  5. esp_wifi_get_protocol
-//  6. Set AP protocols, call esp_wifi_set_protocol(b, g, n)
-//  7. Set AP mode
-//  8. Set host name
-//  9. Set mDNS
-//
-// Soft AP shutdown from example 4_11
-//  1. Stop mDNS
-//  2. Get mode
-//  3. Disable AP mode
-//  4. Stop WiFi event handler
-//----------------------------------------------------------------------
-
-//----------------------------------------------------------------------
-// WiFi station startup from example 4_8
-//  1. Get mode
-//  2. Start WiFi event handler
-//  3. Set WiFi station mode
-//  4. Start Wifi scan
-//
-// In WiFi event handler for scan complete
-//  5. Select AP and channel
-//  6. Get mode
-//  7. Start WiFi station mode
-//  8. Set host name
-//  9. Disable auto reconnect
-// 10. Connect to AP
-//
-// In WiFi event handler for station connected
-// 11. Set stationConnected
-//
-// In WiFi event handler for GOT_IP or GOT_IP6
-// 12. Set stationHasIp
-// 13. Save IP address
-// 14. Save IP address type
-// 15. Display IP address
-// 16. Start mDNS
-//
-// In WiFi event handler for LOST_IP
-//  1. Clear stationHasIp
-//  2. Display IP address
-//
-// In WiFi event handler for all other WiFi station events except
-// GOT_IP, GOT_IP6 or LOST_IP
-//  1. Clear WiFi channel
-//  2. Clear stationConnected
-//  3. Clear stationHasIp
-//  4. For STOP
-//      A. Clear timer
-//     Else for DISCONNECTED
-//      A. Start timer (set to non-zero value)
-//
-// In wifiUpdate
-//  5. When timer fires
-//      A. Start scan
-//
-// WiFi station shutdown from example 4-8
-//  1. Get mode
-//  2. Exit if WiFi station is not running
-//  3. Stop mDNS
-//  4. Disconnect from remote AP
-//  5. Stop WiFi station mode
-//  6. Stop the event handler
-//----------------------------------------------------------------------
-
-//----------------------------------------------------------------------
-// Combining Soft AP shutdown with WiFi shutdown
-//  1. Stop mDNS
-//  2. Get mode
-//  3. Disconnect from remote AP
-//  4. Stop necessary modes (AP and station)
-//  5. Stop the event handler
-//----------------------------------------------------------------------
-
-//----------------------------------------------------------------------
-// Combining soft AP starting with WiFi station starting, do the following
-// synchronously:
-//  1. Get mode
-//  2. Start WiFi event handler
-//  3. Set AP SSID and password, call softApCreate
-//  4. Set AP IP addresses, call softApConfiguration
-//  5. Get the AP protocols, call esp_wifi_get_protocol
-//  6. Set AP protocols, call esp_wifi_set_protocol(b, g, n)
-//  7. Set the necessary WiFi modes
-//  8. Set AP host name
-//  9. If starting AP
-//          Start mDNS
-// 10. If starting WiFi station
-//          Start Wifi scan
-//
-// The rest of the startup is handled asynchronously by the WiFi
-// event handler:
-//
-// For SCAN_COMPLETE
-// 11. Select AP and channel
-// 12. Set station host name
-// 13. Disable auto reconnect
-// 14. Connect to AP
-//
-// For STA_CONNECTED
-// 15. Set stationConnected
-//
-// For GOT_IP or GOT_IP6
-// 16. Set stationHasIp
-// 17. Save IP address
-// 18. Save IP address type
-// 19. Display IP address
-// 20. If AP mode not running
-//      Start mDNS
-//
-// For LOST_IP
-//  1. Clear stationHasIp
-//  2. Display IP address
-//
-// In WiFi event handler for all other WiFi station events except
-// STA_GOT_IP, STA_GOT_IP6 or STA_LOST_IP
-//  1. If ESP-NOW and soft AP not running
-//      Clear WiFi channel
-//  2. Clear stationConnected
-//  3. Clear stationHasIp
-//  4. For STA_STOP
-//      A. Clear timer
-//     Else for STA_DISCONNECTED
-//      A. Start timer (set to non-zero value)
-//
-// In wifiUpdate
-//  5. When timer fires
-//      A. Start scan
-//----------------------------------------------------------------------
-
-//****************************************
-// Constants
-//****************************************
-
-// Radio operations
-#define WIFI_AP_SET_MODE                (1 << 0)
-#define WIFI_EN_SET_MODE                (1 << 1)
-#define WIFI_STA_SET_MODE               (1 << 2)
-#define WIFI_AP_SET_PROTOCOLS           (1 << 3)
-#define WIFI_EN_SET_PROTOCOLS           (1 << 4)
-#define WIFI_STA_SET_PROTOCOLS          (1 << 5)
-#define WIFI_STA_START_SCAN             (1 << 6)
-#define WIFI_STA_SELECT_REMOTE_AP       (1 << 7)
-#define WIFI_AP_SELECT_CHANNEL          (1 << 8)
-#define WIFI_EN_SELECT_CHANNEL          (1 << 9)
-#define WIFI_STA_SELECT_CHANNEL         (1 << 10)
-
-// Soft AP
-#define WIFI_AP_SET_SSID_PASSWORD       (1 << 11)
-#define WIFI_AP_SET_IP_ADDR             (1 << 12)
-#define WIFI_AP_SET_HOST_NAME           (1 << 13)
-#define WIFI_AP_START_DNS_SERVER        (1 << 14)
-#define WIFI_AP_ONLINE                  (1 << 15)
-
-// WiFi station
-#define WIFI_STA_SET_HOST_NAME          (1 << 16)
-#define WIFI_STA_DISABLE_AUTO_RECONNECT (1 << 17)
-#define WIFI_STA_CONNECT_TO_REMOTE_AP   (1 << 18)
-#define WIFI_STA_ONLINE                 (1 << 19)
-
-// ESP-NOW
-#define WIFI_EN_SET_CHANNEL             (1 << 20)
-#define WIFI_EN_SET_PROMISCUOUS_MODE    (1 << 21)
-#define WIFI_EN_PROMISCUOUS_RX_CALLBACK (1 << 22)
-#define WIFI_EN_START_ESP_NOW           (1 << 23)
-#define WIFI_EN_ESP_NOW_ONLINE          (1 << 24)
-
-// WIFI_MAX_START must be the last value in the define list
-#define WIFI_MAX_START                  (1 << 25)
 
 const char* const wifiStartNames[] = {
     "WIFI_AP_SET_MODE",
@@ -319,42 +68,9 @@ const char* const wifiStartNames[] = {
     "WIFI_STA_CONNECT_TO_REMOTE_AP",
     "WIFI_STA_ONLINE",
 
-    "WIFI_EN_SET_CHANNEL",
-    "WIFI_EN_SET_PROMISCUOUS_MODE",
-    "WIFI_EN_PROMISCUOUS_RX_CALLBACK",
-    "WIFI_EN_START_ESP_NOW",
-    "WIFI_EN_ESP_NOW_ONLINE",
+    "WIFI_MAX_START",
 };
-const int wifiStartNamesEntries = sizeof(wifiStartNames) / sizeof(wifiStartNames[0]);
-
-#define WIFI_START_ESP_NOW                                                                                             \
-    (WIFI_EN_SET_MODE | WIFI_EN_SET_PROTOCOLS | WIFI_EN_SELECT_CHANNEL | WIFI_EN_SET_CHANNEL                           \
-     | WIFI_EN_PROMISCUOUS_RX_CALLBACK | WIFI_EN_SET_PROMISCUOUS_MODE | WIFI_EN_START_ESP_NOW                          \
-     | WIFI_EN_ESP_NOW_ONLINE)
-
-#define WIFI_START_SOFT_AP                                                                                             \
-    (WIFI_AP_SET_MODE | WIFI_AP_SET_PROTOCOLS | WIFI_AP_SELECT_CHANNEL | WIFI_AP_SET_SSID_PASSWORD                     \
-     | WIFI_AP_SET_IP_ADDR | WIFI_AP_SET_HOST_NAME | WIFI_AP_START_DNS_SERVER | WIFI_AP_ONLINE)
-
-#define WIFI_START_STATION                                                                                             \
-    (WIFI_STA_SET_MODE | WIFI_STA_SET_PROTOCOLS | WIFI_STA_START_SCAN | WIFI_STA_SELECT_CHANNEL                        \
-     | WIFI_STA_SELECT_REMOTE_AP | WIFI_STA_SET_HOST_NAME | WIFI_STA_DISABLE_AUTO_RECONNECT                            \
-     | WIFI_STA_CONNECT_TO_REMOTE_AP | WIFI_STA_ONLINE)
-
-#define WIFI_STA_RECONNECT                                                                                             \
-    (WIFI_STA_START_SCAN | WIFI_STA_SELECT_CHANNEL | WIFI_STA_SELECT_REMOTE_AP | WIFI_STA_SET_HOST_NAME                \
-     | WIFI_STA_DISABLE_AUTO_RECONNECT | WIFI_STA_CONNECT_TO_REMOTE_AP | WIFI_STA_ONLINE)
-
-#define WIFI_SELECT_CHANNEL (WIFI_AP_SELECT_CHANNEL | WIFI_EN_SELECT_CHANNEL | WIFI_STA_SELECT_CHANNEL)
-
-#define WIFI_STA_NO_REMOTE_AP                                                                                          \
-    (WIFI_STA_SELECT_CHANNEL | WIFI_STA_SET_HOST_NAME | WIFI_STA_DISABLE_AUTO_RECONNECT                                \
-     | WIFI_STA_CONNECT_TO_REMOTE_AP | WIFI_STA_ONLINE)
-
-#define WIFI_STA_FAILED_SCAN (WIFI_STA_START_SCAN | WIFI_STA_SELECT_REMOTE_AP | WIFI_STA_NO_REMOTE_AP)
-
-#define WIFI_MAX_TIMEOUT     (15 * 60 * 1000) // Timeout in milliseconds
-#define WIFI_MIN_TIMEOUT     (15 * 1000)      // Timeout in milliseconds
+const uint8_t wifiStartNamesEntries = sizeof(wifiStartNames) / sizeof(wifiStartNames[0]);
 
 //****************************************
 // Locals
@@ -365,7 +81,7 @@ static DNSServer dnsServer;
 int packetRSSI;
 RTK_WIFI wifi(false); // wifi(false); is non-verbose. For verbose, change to wifi(true);
 
-const char* wifiSoftApSsid = "RTK Config";
+const char* wifiSoftApSsid = "S20 Config";
 const char* wifiSoftApPassword = "123456789";
 const char* wifiSoftApName = "Soft AP";
 WIFI_CHANNEL_t wifiChannel; // Current WiFi channel number
@@ -568,36 +284,36 @@ wifiDisplaySoftApStatus() {
 // Display the WiFi state
 void
 wifiDisplayState() {
-    // systemPrintf("WiFi: %s\r\n", networkInterfaceHasInternet(NETWORK_WIFI_STATION) ? "Online" : "Offline");
-    // systemPrintf("    MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\r\n", wifiMACAddress[0], wifiMACAddress[1],
-    //              wifiMACAddress[2], wifiMACAddress[3], wifiMACAddress[4], wifiMACAddress[5]);
-    // if (networkInterfaceHasInternet(NETWORK_WIFI_STATION)) {
-    //     // Get the DNS addresses
-    //     IPAddress dns1 = WiFi.STA.dnsIP(0);
-    //     IPAddress dns2 = WiFi.STA.dnsIP(1);
-    //     IPAddress dns3 = WiFi.STA.dnsIP(2);
+    systemPrintf("WiFi: %s\r\n", networkInterfaceHasInternet(NETWORK_WIFI_STATION) ? "Online" : "Offline");
+    systemPrintf("    MAC Address: %02X:%02X:%02X:%02X:%02X:%02X\r\n", wifiMACAddress[0], wifiMACAddress[1],
+                 wifiMACAddress[2], wifiMACAddress[3], wifiMACAddress[4], wifiMACAddress[5]);
+    if (networkInterfaceHasInternet(NETWORK_WIFI_STATION)) {
+        // Get the DNS addresses
+        IPAddress dns1 = WiFi.STA.dnsIP(0);
+        IPAddress dns2 = WiFi.STA.dnsIP(1);
+        IPAddress dns3 = WiFi.STA.dnsIP(2);
 
-    //     // Get the WiFi status
-    //     wl_status_t wifiStatus = WiFi.status();
+        // Get the WiFi status
+        wl_status_t wifiStatus = WiFi.status();
 
-    //     const char* wifiStatusString = wifiPrintState(wifiStatus);
+        const char* wifiStatusString = wifiPrintState(wifiStatus);
 
-    //     // Display the WiFi state
-    //     systemPrintf("    SSID: %s\r\n", WiFi.STA.SSID());
-    //     systemPrintf("    IP Address: %s\r\n", WiFi.STA.localIP().toString().c_str());
-    //     systemPrintf("    Subnet Mask: %s\r\n", WiFi.STA.subnetMask().toString().c_str());
-    //     systemPrintf("    Gateway Address: %s\r\n", WiFi.STA.gatewayIP().toString().c_str());
-    //     if ((uint32_t)dns3) {
-    //         systemPrintf("    DNS Address: %s, %s, %s\r\n", dns1.toString().c_str(), dns2.toString().c_str(),
-    //                      dns3.toString().c_str());
-    //     } else if ((uint32_t)dns3) {
-    //         systemPrintf("    DNS Address: %s, %s\r\n", dns1.toString().c_str(), dns2.toString().c_str());
-    //     } else {
-    //         systemPrintf("    DNS Address: %s\r\n", dns1.toString().c_str());
-    //     }
-    //     systemPrintf("    WiFi Strength: %d dBm\r\n", WiFi.RSSI());
-    //     systemPrintf("    WiFi Status: %d (%s)\r\n", wifiStatus, wifiStatusString);
-    // }
+        // Display the WiFi state
+        systemPrintf("    SSID: %s\r\n", WiFi.STA.SSID());
+        systemPrintf("    IP Address: %s\r\n", WiFi.STA.localIP().toString().c_str());
+        systemPrintf("    Subnet Mask: %s\r\n", WiFi.STA.subnetMask().toString().c_str());
+        systemPrintf("    Gateway Address: %s\r\n", WiFi.STA.gatewayIP().toString().c_str());
+        if ((uint32_t)dns3) {
+            systemPrintf("    DNS Address: %s, %s, %s\r\n", dns1.toString().c_str(), dns2.toString().c_str(),
+                         dns3.toString().c_str());
+        } else if ((uint32_t)dns3) {
+            systemPrintf("    DNS Address: %s, %s\r\n", dns1.toString().c_str(), dns2.toString().c_str());
+        } else {
+            systemPrintf("    DNS Address: %s\r\n", dns1.toString().c_str());
+        }
+        systemPrintf("    WiFi Strength: %d dBm\r\n", WiFi.RSSI());
+        systemPrintf("    WiFi Status: %d (%s)\r\n", wifiStatus, wifiStatusString);
+    }
 }
 
 //*********************************************************************
