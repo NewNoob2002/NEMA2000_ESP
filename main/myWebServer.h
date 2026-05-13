@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef COMPILE_WEBSERVER
-#define COMPILE_WEBSERVER
+// #define COMPILE_WEBSERVER
 #endif
 
 #ifdef COMPILE_WEBSERVER

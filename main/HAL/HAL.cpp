@@ -89,7 +89,7 @@ HAL_Update(void* e) {
 
         bluetoothUpdate();
 
-        webServerUpdate();
+        // webServerUpdate();
 
         vTaskDelayUntil(&xLastWakeTime, 10);
     }
@@ -121,12 +121,12 @@ HAL_Init() {
     DMW_b("Bluetooth_Init");
     Bluetooth_Init();
 
-    DMW_b("wifiUpdateSettings");
-    wifiUpdateSettings();
-    if (settings.wifiConfigOverAP) {
-        DMW_b("WebServer_Start");
-        webServerStart();
-    }
+    // DMW_b("wifiUpdateSettings");
+    // wifiUpdateSettings();
+    // if (settings.wifiConfigOverAP) {
+    //     DMW_b("WebServer_Start");
+    //     webServerStart();
+    // }
 
     showBootTimes();
 
