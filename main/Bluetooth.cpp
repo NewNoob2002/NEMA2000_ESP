@@ -7,6 +7,7 @@
 
 static BluetoothRadioType_e bluetoothRadioType = BLUETOOTH_RADIO_SPP;
 static volatile BTState_e bluetoothState = BT_OFF;
+static bool bluetoothEnded = false;
 
 BTSerialInterface* bluetoothSerialSpp = nullptr;
 BTSerialInterface* bluetoothSerialBle = nullptr;
@@ -135,11 +136,34 @@ bluetoothUpdate() {
     }
 }
 
+// Begin Bluetooth
 void
 bluetoothStart() {
+    bluetoothStart(true); // Do an online check before (re)starting
+}
+
+void
+bluetoothStartSkipOnlineCheck() {
+    bluetoothStart(false); // Skip the online check, (re)start Bluetooth
+}
+
+void
+bluetoothStart(bool onlineCheck) {
+    if (settings.bluetoothRadioType == BLUETOOTH_RADIO_OFF) {
+        return;
+    }
+
     if (bluetoothRadioType == BLUETOOTH_RADIO_OFF) {
         return;
     }
+
+    if (onlineCheck == true) {
+        if (online_devices.bluetooth) {
+            return; // No need to mess with Bluetooth, it's already online.
+        }
+    }
+
+    bluetoothState = BT_OFF; // Indicate to tasks that BT is unavailable
 
     if (!online_devices.bluetooth) {
         bluetoothState = BT_OFF;

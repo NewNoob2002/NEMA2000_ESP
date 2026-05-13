@@ -29,17 +29,15 @@ int bluetoothWrite(uint8_t value);
 
 // Flush Bluetooth device
 void bluetoothFlush();
-void tickerBluetoothLedUpdate();
 
 // Test each interface to see if there is a connection
 // Return true if one is
 bool bluetoothIsConnected();
 // Check if Bluetooth is connected
 void bluetoothUpdate();
+
 void bluetoothStart();
+void bluetoothStartSkipOnlineCheck();
+void bluetoothStart(bool onlineCheck);
+
 void bluetoothStop();
-
-extern uint16_t* rbOffsetArray_BT;
-extern uint16_t rbOffsetEntries_BT;
-
-extern uint8_t* ringBuffer_BT;
