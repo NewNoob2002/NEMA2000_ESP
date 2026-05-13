@@ -57,9 +57,6 @@ void Power_Shutdown(bool en);
 /*FILE SYSTEM*/
 void FileSystem_Init();
 
-/*SYSTEM*/
-void System_Update();
-
 /* GNSS */
 /**
  * @brief Initialize the GNSS module.

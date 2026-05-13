@@ -1,8 +1,6 @@
-#include "HAL.h"
-#include "esp32-hal.h"
-#include "esp_heap_caps.h"
+#include "Arduino.h"
+#include "Support.h"
 #include "mcu_settings.h"
-#include "myWebServer.h"
 
 static uint32_t lastHeapReport = 0;
 
@@ -34,10 +32,3 @@ reportHeap() {
         reportHeapNow(false);
     }
 }
-
-namespace HAL {
-void
-System_Update() {
-    reportHeap();
-}
-} // namespace HAL

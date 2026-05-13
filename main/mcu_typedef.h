@@ -80,9 +80,9 @@ typedef enum SystemState_t {
     STATE_NTPSERVER_NO_SYNC,     // 24
     STATE_NTPSERVER_SYNC,        // 25
 #endif
-    STATE_SHUTDOWN, // 26
+    STATE_SHUTDOWN,
 
-    STATE_NOT_SET, // 27, Must be last on list
+    STATE_NOT_SET,
 } SystemState_t;
 
 // RTK mode structure
@@ -91,6 +91,39 @@ typedef struct RTK_MODE_ENTRY_T {
     SystemState_t first;
     SystemState_t last;
 } RTK_MODE_ENTRY_T;
+
+// We may receive a command or the user may change a setting that needs to modify the configuration of the GNSS receiver
+// Because this can take time, we group all the changes together and re-configure the receiver once the user has exited
+// the menu system, closed the Web Config, or the CLI is closed.
+typedef enum GNSS_CONFIG_ACTIONS_T {
+    GNSS_CONFIG_ONCE, // Settings specific to a receiver that don't fit into other setting categories
+    GNSS_CONFIG_ROVER,
+    GNSS_CONFIG_BASE,        // Apply any settings before the start of survey-in or fixed base
+    GNSS_CONFIG_BASE_SURVEY, // Start survey in base
+    GNSS_CONFIG_BASE_FIXED,  // Start fixed base
+    GNSS_CONFIG_BAUD_RATE_RADIO,
+    GNSS_CONFIG_BAUD_RATE_DATA,
+    GNSS_CONFIG_FIX_RATE,
+    GNSS_CONFIG_CONSTELLATION, // Turn on/off a constellation
+    GNSS_CONFIG_ELEVATION,
+    GNSS_CONFIG_CN0,
+    GNSS_CONFIG_PPS,
+    GNSS_CONFIG_MODEL,
+    GNSS_CONFIG_MESSAGE_RATE_NMEA,       // Update NMEA message rates
+    GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER, // Update RTCM Rover message rates
+    GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE,  // Update RTCM Base message rates
+    GNSS_CONFIG_MESSAGE_RATE_OTHER,      // Update any other messages (UBX, PQTM, etc)
+    GNSS_CONFIG_PPP,                     // Enable/disable HAS E6 capabilities
+    GNSS_CONFIG_MULTIPATH,
+    GNSS_CONFIG_TILT,            // Enable/disable any output needed for tilt compensation
+    GNSS_CONFIG_EXT_CORRECTIONS, // Enable / disable corrections protocol(s) on the Radio External port
+    GNSS_CONFIG_LOGGING,         // Enable / disable logging
+    GNSS_CONFIG_SAVE,            // Indicates current settings be saved to GNSS receiver NVM
+    GNSS_CONFIG_RESET,           // Indicates receiver needs resetting
+
+    // Add new entries above here
+    GNSS_CONFIG_MAX,
+} GNSS_CONFIG_ACTIONS_T;
 
 // Product Variant used as part of device ID and whitelists. Do not reorder.
 typedef enum {
@@ -241,7 +274,7 @@ typedef struct settings_t {
     // Base operation
     // CoordinateInputType coordinateInputType = COORDINATE_INPUT_TYPE_DD; // Default DD.ddddddddd
     char baseId[8] = "1234";
-    RTK_MODE_t RTK_MODE = RTK_MODE_ROVER;
+
     double fixedAltitude = 1560.089; // m
     bool fixedBase = false;          // Use survey-in by default
     bool fixedBaseCoordinateType = COORD_TYPE_ECEF;

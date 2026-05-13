@@ -1,8 +1,13 @@
 #include "States.h"
 #include "Arduino.h"
+#include "GNSS.h"
 #include "Support.h"
 #include "mcu_settings.h"
 
+#define RTK_MODE(mode)     RTK_MODE = mode;
+
+#define EQ_RTK_MODE(mode)  (RTK_MODE && (RTK_MODE == (mode & RTK_MODE)))
+#define NEQ_RTK_MODE(mode) ((RTK_MODE == 0) || ((mode & RTK_MODE) == 0))
 //----------------------------------------
 // Constants
 //----------------------------------------
@@ -22,6 +27,7 @@ const int stateModeTableEntries = sizeof(stateModeTable) / sizeof(stateModeTable
 // Locals
 //----------------------------------------
 volatile SystemState_t systemState = STATE_NOT_SET;
+volatile RTK_MODE_t RTK_MODE = RTK_MODE_ROVER;
 SystemState_t lastSystemState = STATE_NOT_SET;
 SystemState_t requestedSystemState = STATE_NOT_SET;
 bool newSystemStateRequested = false;
@@ -57,7 +63,11 @@ stateUpdate() {
                 systemPrintf("Unknown state: %d\r\n", systemState);
             } break;
             /* ROVER STATES */
-            case (STATE_ROVER_NOT_STARTED): break;
+            case (STATE_ROVER_NOT_STARTED): {
+                RTK_MODE(RTK_MODE_ROVER);
+
+                gnssConfigure(GNSS_CONFIG_ROVER);
+            } break;
             case (STATE_ROVER_CONFIG_WAIT): break;
             case (STATE_ROVER_NO_FIX): break;
             case (STATE_ROVER_FIX): break;

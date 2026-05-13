@@ -85,7 +85,7 @@ void
 HAL_Update(void* e) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     while (1) {
-        System_Update();
+        reportHeap();
 
         bluetoothUpdate();
 
