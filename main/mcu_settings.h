@@ -11,6 +11,7 @@ extern ProductVariant productType;
 
 extern online_devices_t online_devices;
 extern settings_t settings;
+extern TaskManager_t task;
 
 #ifdef __cplusplus
 }

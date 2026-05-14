@@ -40,4 +40,6 @@ void bluetoothStart();
 void bluetoothStartSkipOnlineCheck();
 void bluetoothStart(bool onlineCheck);
 
+void bluetoothEnd();
 void bluetoothStop();
+void bluetoothEndCommon(bool endMe);

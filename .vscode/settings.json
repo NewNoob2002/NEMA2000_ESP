@@ -1,5 +1,6 @@
 {
   "C_Cpp.errorSquiggles": "enabled",
   "idf.portWin": "COM7",
-  "idf.customExtraVars": {}
+  "idf.customExtraVars": {},
+  "idf.currentSetup": "C:\\.espressif\\v5.5.4\\esp-idf"
 }

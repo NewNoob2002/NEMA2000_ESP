@@ -61,7 +61,6 @@ TaskHandle_t btReadTaskHandle = nullptr;
 SEMP_PARSE_STATE* btParser = nullptr;
 uint8_t bluetoothRxBuffer[kBluetoothRxBufferSize] = {};
 uint8_t messageTxBuffer[kBluetoothTxBufferSize] = {};
-volatile bool btReadTaskStopRequest = false;
 
 void
 parserDebugPrintf(const char* format, ...) {
@@ -196,7 +195,7 @@ decodeMessagePeriod(const int8_t interval) {
 
 bool
 setNmeaPeriod(const char* messageName, const int8_t interval) {
-    if (!HAL::gUm980 || !messageName) {
+    if (!messageName) {
         return false;
     }
     // return HAL::gUm980->setNmeaMessagePeriod(messageName, decodeMessagePeriod(interval));
@@ -208,15 +207,16 @@ handleModelQuery(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestH
     if (!allocateResponse(response, requestHeader, 136)) {
         return;
     }
+    bool gUm980Present = HAL::gUm980 != nullptr;
 
     const esp_app_desc_t* app = esp_app_get_description();
     copyFixedString(response.payload + 0, 8, productPropertiesTable[RTK_S20].name);
     copyFixedString(response.payload + 8, 16, productPropertiesTable[RTK_S20].productPlanUID);
     copyFixedString(response.payload + 24, 8, "V1.2");
     copyFixedString(response.payload + 32, 16, app ? app->version : "");
-    copyFixedString(response.payload + 56, 8, HAL::gUm980->getModelType() == 18 ? "UM980" : "Unknow");
-    copyFixedString(response.payload + 64, 16, HAL::gUm980->getSerialNumber());
-    copyFixedString(response.payload + 80, 16, HAL::gUm980->getFirmwareVersion());
+    copyFixedString(response.payload + 56, 8, gUm980Present && HAL::gUm980->getModelType() == 18 ? "UM980" : "Unknown");
+    copyFixedString(response.payload + 64, 16, gUm980Present ? HAL::gUm980->getSerialNumber() : "");
+    copyFixedString(response.payload + 80, 16, gUm980Present ? HAL::gUm980->getFirmwareVersion() : "");
     copyFixedString(response.payload + 96, 8, "NONE");
     copyFixedString(response.payload + 104, 16, "NONE");
 }
@@ -641,7 +641,14 @@ btReadTask(void* e) {
     }
     int rxBytes = 0;
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    while (!btReadTaskStopRequest) {
+
+    // Start notification
+    task.bluetoothReadTaskRunning = true;
+    if (settings.printTaskStartStop) {
+        systemPrintln("Task bluetoothReadTask started");
+    }
+    // Run task until a request is raised
+    while (!task.bluetoothReadTaskStopRequest) {
         if (bluetoothGetState() == BT_CONNECTED) {
             while (bluetoothRxDataAvailable() > 0) {
                 rxBytes = bluetoothRead(bluetoothRxBuffer, sizeof(bluetoothRxBuffer));
@@ -659,6 +666,7 @@ btReadTask(void* e) {
     }
 
     sempStopParser(&btParser);
+    task.bluetoothReadTaskRunning = false;
     if (settings.printTaskStartStop) {
         systemPrintln("Task: btReadTask stopped");
     }
@@ -676,7 +684,6 @@ Bluetooth_Init() {
     }
 
     if (btReadTaskHandle == nullptr) {
-        btReadTaskStopRequest = false;
         xTaskCreatePinnedToCore(btReadTask, "btReadTask", kBluetoothReadTaskStack, nullptr, settings.btReadTaskPriority,
                                 &btReadTaskHandle, settings.btReadTaskCore);
     }

@@ -4,6 +4,10 @@
 // #define COMPILE_WIFI
 #endif
 
+#ifndef COMPILE_BT
+#define COMPILE_BT
+#endif
+
 #ifndef COMPILE_NTP
 // #define COMPILE_NTP
 #endif

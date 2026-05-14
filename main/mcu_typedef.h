@@ -232,6 +232,19 @@ typedef enum SemaphoreFunction_e {
     FUNCTION_FILE_DUMP,
 } SemaphoreFunction_e;
 
+#if defined(__cplusplus)
+
+typedef struct TaskManager_t {
+    //Running flags
+    volatile bool bluetoothCommandTaskRunning = false;
+    volatile bool bluetoothReadTaskRunning = false;
+    //Stop Requests
+    volatile bool bluetoothCommandTaskStopRequest = false;
+    volatile bool bluetoothReadTaskStopRequest = false;
+} TaskManager_t;
+
+#endif
+
 typedef struct online_wifi_t {
     bool wifiEspNowOnline;    // ESP-NOW started successfully
     bool wifiEspNowRunning;   // False: stopped, True: starting, running, stopping

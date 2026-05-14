@@ -12,3 +12,6 @@ online_devices_t online_devices;
 
 // Settings
 settings_t settings;
+
+// Task Manager
+TaskManager_t task;
