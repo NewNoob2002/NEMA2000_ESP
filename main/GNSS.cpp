@@ -104,3 +104,12 @@ gnssConfigure(uint32_t configureBit) {
     uint32_t mask = (1 << configureBit);
     settings.gnssConfigureRequest |= mask; // Set the bit
 }
+
+// Returns true once all configuration requests are cleared
+bool
+gnssConfigureComplete() {
+    if (settings.gnssConfigureRequest == 0) {
+        return (true);
+    }
+    return (false);
+}

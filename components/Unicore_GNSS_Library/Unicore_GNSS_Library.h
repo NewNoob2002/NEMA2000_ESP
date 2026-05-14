@@ -124,21 +124,10 @@ class UnicoreGNSSLibrary {
     UnicoreResult_t saveConfiguration();
     UnicoreResult_t factoryReset();
 
-    bool getBestNav(UNICORE_BESTNAV_data_t& data) const;
-    bool getBestNavXyz(UNICORE_BESTNAVXYZ_data_t& data) const;
-    bool getRecTime(UNICORE_RECTIME_data_t& data) const;
-    bool getVersion(UNICORE_VERSION_data_t& data) const;
-
-    uint32_t getLastBestNavMs() const;
-    uint32_t getLastBestNavXyzMs() const;
-    uint32_t getLastRecTimeMs() const;
-    uint32_t getLastVersionMs() const;
-    const UnicoreBinaryHeader& getLastBinaryHeader() const;
-
-    void setBestNavCallback(void (*callback)(UNICORE_BESTNAV_data_t*), UNICORE_BESTNAV_data_t* callbackData = nullptr);
-    void setBestNavXyzCallback(void (*callback)(UNICORE_BESTNAVXYZ_data_t*),
-                               UNICORE_BESTNAVXYZ_data_t* callbackData = nullptr);
-    void setRecTimeCallback(void (*callback)(UNICORE_RECTIME_data_t*), UNICORE_RECTIME_data_t* callbackData = nullptr);
+    // void setBestNavCallback(void (*callback)(UNICORE_BESTNAV_data_t*), UNICORE_BESTNAV_data_t* callbackData = nullptr);
+    // void setBestNavXyzCallback(void (*callback)(UNICORE_BESTNAVXYZ_data_t*),
+    //                            UNICORE_BESTNAVXYZ_data_t* callbackData = nullptr);
+    // void setRecTimeCallback(void (*callback)(UNICORE_RECTIME_data_t*), UNICORE_RECTIME_data_t* callbackData = nullptr);
     void setNmeaCallback(UnicoreNmeaCallback callback, void* context = nullptr);
     void setRtcmCallback(UnicoreRtcmCallback callback, void* context = nullptr);
     void setBinaryCallback(UnicoreBinaryCallback callback, void* context = nullptr);
@@ -175,10 +164,21 @@ class UnicoreGNSSLibrary {
     uint8_t nmeaPositionStatus = 0; // Position psition status obtained from GNGGA NMEA
 
   public:
-    UNICORE_BESTNAV_t _bestNav = {};
-    UNICORE_BESTNAVXYZ_t _bestNavXyz = {};
-    UNICORE_RECTIME_t _recTime = {};
-    UNICORE_VERSION_t _version = {};
+    const UnicoreBinaryHeader& getLastBinaryHeader() const;
+    uint32_t getLastBestNavMs() const;
+    uint32_t getLastBestNavXyzMs() const;
+    uint32_t getLastRecTimeMs() const;
+    uint32_t getLastVersionMs() const;
+
+    UNICORE_BESTNAV_data_t _bestNav = {};
+    UNICORE_BESTNAVXYZ_data_t _bestNavXyz = {};
+    UNICORE_RECTIME_data_t _recTime = {};
+    UNICORE_VERSION_data_t _version = {};
+    float _horizontalAccuracy = 0.0f;
+    bool _validDate = false;
+    bool _validTime = false;
+    bool _fullyResolved = false;
+    unsigned long _pvtArrivalMillis = 0;
 
   private:
     Print* _debugPort = nullptr;
@@ -252,10 +252,10 @@ class UnicoreGNSSLibrary {
     uint16_t _rxBufferSize = 0;
     uint8_t* _rxBuffer = nullptr;
 
-    virtual void onBestNavUpdated(const UNICORE_BESTNAV_data_t& data);
-    virtual void onBestNavXyzUpdated(const UNICORE_BESTNAVXYZ_data_t& data);
-    virtual void onRecTimeUpdated(const UNICORE_RECTIME_data_t& data);
-    virtual void onVersionUpdated(const UNICORE_VERSION_data_t& data);
+    // virtual void onBestNavUpdated(const UNICORE_BESTNAV_data_t& data);
+    // virtual void onBestNavXyzUpdated(const UNICORE_BESTNAVXYZ_data_t& data);
+    // virtual void onRecTimeUpdated(const UNICORE_RECTIME_data_t& data);
+    // virtual void onVersionUpdated(const UNICORE_VERSION_data_t& data);
 };
 
 #endif // UNICORE_GNSS_ARDUINO_LIBRARY_H

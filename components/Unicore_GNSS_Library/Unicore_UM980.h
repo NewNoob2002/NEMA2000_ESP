@@ -147,19 +147,10 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     bool isRTKFloat() const;
     bool isValidDate() const;
     bool isValidTime() const;
-    bool isConfirmedDate() const;
-    bool isConfirmedTime() const;
     bool isFullyResolved() const;
-    bool isPvtUpdated();
 
   private:
     gpio_num_t _powerPin;
-
-  protected:
-    void onBestNavUpdated(const UNICORE_BESTNAV_data_t& data) override;
-    void onBestNavXyzUpdated(const UNICORE_BESTNAVXYZ_data_t& data) override;
-    void onRecTimeUpdated(const UNICORE_RECTIME_data_t& data) override;
-    //void onVersionUpdated(const UNICORE_VERSION_data_t& data) override;
 
   private:
     float _nmeaPeriods[MAX_UM980_NMEA_MSG] = {};
@@ -167,31 +158,31 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     float _rtcmBasePeriods[MAX_UM980_RTCM_MSG] = {};
     bool _constellationEnabled[MAX_UM980_CONSTELLATIONS] = {};
 
-    double _latitude = 0.0;
-    double _longitude = 0.0;
-    double _altitude = 0.0;
-    float _horizontalAccuracy = 0.0f;
-    double _ecefX = 0.0;
-    double _ecefY = 0.0;
-    double _ecefZ = 0.0;
-    uint8_t _day = 0;
-    uint8_t _month = 0;
-    uint16_t _year = 0;
-    uint8_t _hour = 0;
-    uint8_t _minute = 0;
-    uint8_t _second = 0;
-    uint16_t _millisecond = 0;
-    uint8_t _leapSeconds = 18;
-    uint8_t _satellitesInView = 0;
-    uint8_t _fixType = 0;
-    uint8_t _carrierSolution = 0;
-    bool _validDate = false;
-    bool _validTime = false;
-    bool _confirmedDate = false;
-    bool _confirmedTime = false;
-    bool _fullyResolved = false;
-    bool _pvtUpdated = false;
-    unsigned long _pvtArrivalMillis = 0;
+    // double _latitude = 0.0;
+    // double _longitude = 0.0;
+    // double _altitude = 0.0;
+    // float _horizontalAccuracy = 0.0f;
+    // double _ecefX = 0.0;
+    // double _ecefY = 0.0;
+    // double _ecefZ = 0.0;
+    // uint8_t _day = 0;
+    // uint8_t _month = 0;
+    // uint16_t _year = 0;
+    // uint8_t _hour = 0;
+    // uint8_t _minute = 0;
+    // uint8_t _second = 0;
+    // uint16_t _millisecond = 0;
+    // uint8_t _leapSeconds = 18;
+    // uint8_t _satellitesInView = 0;
+    // uint8_t _fixType = 0;
+    // uint8_t _carrierSolution = 0;
+    // bool _validDate = false;
+    // bool _validTime = false;
+    // bool _confirmedDate = false;
+    // bool _confirmedTime = false;
+    // bool _fullyResolved = false;
+    // bool _pvtUpdated = false;
+    // unsigned long _pvtArrivalMillis = 0;
     double _rateSeconds = 1.0;
     Um980Mode _mode = Um980Mode::Unknown;
     // char _firmwareVersion[sizeof(UNICORE_VERSION_data_t::swVersion)] = {};

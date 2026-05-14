@@ -716,88 +716,6 @@ UnicoreGNSSLibrary::factoryReset() {
     return sendCommandAndWait("FRESET", 3000);
 }
 
-bool
-UnicoreGNSSLibrary::getBestNav(UNICORE_BESTNAV_data_t& data) const {
-    if (lastUpdateGeodetic == 0) {
-        return false;
-    }
-    data = _bestNav.data;
-    return true;
-}
-
-bool
-UnicoreGNSSLibrary::getBestNavXyz(UNICORE_BESTNAVXYZ_data_t& data) const {
-    if (lastUpdateEcef == 0) {
-        return false;
-    }
-    data = _bestNavXyz.data;
-    return true;
-}
-
-bool
-UnicoreGNSSLibrary::getRecTime(UNICORE_RECTIME_data_t& data) const {
-    if (lastUpdateDateTime == 0) {
-        return false;
-    }
-    data = _recTime.data;
-    return true;
-}
-
-bool
-UnicoreGNSSLibrary::getVersion(UNICORE_VERSION_data_t& data) const {
-    if (lastUpdateVersion == 0) {
-        return false;
-    }
-    data = _version.data;
-    return true;
-}
-
-uint32_t
-UnicoreGNSSLibrary::getLastBestNavMs() const {
-    return lastUpdateGeodetic;
-}
-
-uint32_t
-UnicoreGNSSLibrary::getLastBestNavXyzMs() const {
-    return lastUpdateEcef;
-}
-
-uint32_t
-UnicoreGNSSLibrary::getLastRecTimeMs() const {
-    return lastUpdateDateTime;
-}
-
-uint32_t
-UnicoreGNSSLibrary::getLastVersionMs() const {
-    return lastUpdateVersion;
-}
-
-const UnicoreBinaryHeader&
-UnicoreGNSSLibrary::getLastBinaryHeader() const {
-    return _lastBinaryHeader;
-}
-
-void
-UnicoreGNSSLibrary::setBestNavCallback(void (*callback)(UNICORE_BESTNAV_data_t*),
-                                       UNICORE_BESTNAV_data_t* callbackData) {
-    _bestNav.callbackPointerPtr = callback;
-    _bestNav.callbackData = callbackData;
-}
-
-void
-UnicoreGNSSLibrary::setBestNavXyzCallback(void (*callback)(UNICORE_BESTNAVXYZ_data_t*),
-                                          UNICORE_BESTNAVXYZ_data_t* callbackData) {
-    _bestNavXyz.callbackPointerPtr = callback;
-    _bestNavXyz.callbackData = callbackData;
-}
-
-void
-UnicoreGNSSLibrary::setRecTimeCallback(void (*callback)(UNICORE_RECTIME_data_t*),
-                                       UNICORE_RECTIME_data_t* callbackData) {
-    _recTime.callbackPointerPtr = callback;
-    _recTime.callbackData = callbackData;
-}
-
 void
 UnicoreGNSSLibrary::setNmeaCallback(const UnicoreNmeaCallback callback, void* userdata) {
     _nmeaCallback = callback;
@@ -900,6 +818,31 @@ UnicoreGNSSLibrary::triggerName(const UnicoreLogTrigger trigger) {
         case UnicoreLogTrigger::OnTime:
         default: return "ONTIME";
     }
+}
+
+const UnicoreBinaryHeader&
+UnicoreGNSSLibrary::getLastBinaryHeader() const {
+    return _lastBinaryHeader;
+}
+
+uint32_t
+UnicoreGNSSLibrary::getLastBestNavMs() const {
+    return lastUpdateGeodetic;
+}
+
+uint32_t
+UnicoreGNSSLibrary::getLastBestNavXyzMs() const {
+    return lastUpdateEcef;
+}
+
+uint32_t
+UnicoreGNSSLibrary::getLastRecTimeMs() const {
+    return lastUpdateDateTime;
+}
+
+uint32_t
+UnicoreGNSSLibrary::getLastVersionMs() const {
+    return lastUpdateVersion;
 }
 
 void
@@ -1075,40 +1018,33 @@ UnicoreGNSSLibrary::decodeBestNav(const uint8_t* payload, const uint16_t length)
     if (!payload || (length < (offsetBestnavHorspdStd + sizeof(float)))) {
         return;
     }
-
-    _bestNav.data.solutionStatus = static_cast<uint8_t>(readU4(payload, offsetBestnavPsolStatus));
-    _bestNav.data.positionType = static_cast<uint8_t>(readU4(payload, offsetBestnavPosType));
-    _bestNav.data.latitude = readF8(payload, offsetBestnavLat);
-    _bestNav.data.longitude = readF8(payload, offsetBestnavLon);
-    _bestNav.data.altitude = readF8(payload, offsetBestnavHgt);
-    _bestNav.data.latitudeDeviation = readF4(payload, offsetBestnavLatDeviation);
-    _bestNav.data.longitudeDeviation = readF4(payload, offsetBestnavLonDeviation);
-    _bestNav.data.heightDeviation = readF4(payload, offsetBestnavHgtDeviation);
-    _bestNav.data.satellitesTracked = readU1(payload, offsetBestnavSatsTracked);
-    _bestNav.data.satellitesUsed = readU1(payload, offsetBestnavSatsUsed);
-    const uint8_t extendedStatus = readU1(payload, offsetBestnavExtSolStat);
-    _bestNav.data.rtkSolution = extendedStatus & 0x03U;
-    _bestNav.data.pseudorangeCorrection = (extendedStatus >> 2U) & 0x03U;
-    _bestNav.data.velocityType = static_cast<uint8_t>(readU4(payload, offsetBestnavVelType));
-    _bestNav.data.horizontalSpeed = readF8(payload, offsetBestnavHorSpd);
-    _bestNav.data.trackGround = readF8(payload, offsetBestnavTrkGnd);
-    _bestNav.data.verticalSpeed = readF8(payload, offsetBestnavVertSpd);
-    _bestNav.data.verticalSpeedDeviation = readF4(payload, offsetBestnavVerspdStd);
-    _bestNav.data.horizontalSpeedDeviation = readF4(payload, offsetBestnavHorspdStd);
-
+    _pvtArrivalMillis = millis();
     lastUpdateGeodetic = millis();
+    _bestNav.solutionStatus = static_cast<uint8_t>(readU4(payload, offsetBestnavPsolStatus));
+    _bestNav.positionType = static_cast<uint8_t>(readU4(payload, offsetBestnavPosType));
+    _bestNav.latitude = readF8(payload, offsetBestnavLat);
+    _bestNav.longitude = readF8(payload, offsetBestnavLon);
+    _bestNav.altitude = readF8(payload, offsetBestnavHgt);
+    _bestNav.latitudeDeviation = readF4(payload, offsetBestnavLatDeviation);
+    _bestNav.longitudeDeviation = readF4(payload, offsetBestnavLonDeviation);
+    _bestNav.heightDeviation = readF4(payload, offsetBestnavHgtDeviation);
+    _bestNav.satellitesTracked = readU1(payload, offsetBestnavSatsTracked);
+    _bestNav.satellitesUsed = readU1(payload, offsetBestnavSatsUsed);
+    const uint8_t extendedStatus = readU1(payload, offsetBestnavExtSolStat);
+    _bestNav.rtkSolution = extendedStatus & 0x03U;
+    _bestNav.pseudorangeCorrection = (extendedStatus >> 2U) & 0x03U;
+    _bestNav.velocityType = static_cast<uint8_t>(readU4(payload, offsetBestnavVelType));
+    _bestNav.horizontalSpeed = readF8(payload, offsetBestnavHorSpd);
+    _bestNav.trackGround = readF8(payload, offsetBestnavTrkGnd);
+    _bestNav.verticalSpeed = readF8(payload, offsetBestnavVertSpd);
+    _bestNav.verticalSpeedDeviation = readF4(payload, offsetBestnavVerspdStd);
+    _bestNav.horizontalSpeedDeviation = readF4(payload, offsetBestnavHorspdStd);
+
+    _horizontalAccuracy = (_bestNav.latitudeDeviation > _bestNav.longitudeDeviation) ? _bestNav.latitudeDeviation
+                                                                                     : _bestNav.longitudeDeviation;
     log(UnicoreLogLevel::Debug, UNICORE_LOG_DATA, "BESTNAV fix=%u solution=%u sats=%u used=%u lat=%.8f lon=%.8f",
-        _bestNav.data.positionType, _bestNav.data.solutionStatus, _bestNav.data.satellitesTracked,
-        _bestNav.data.satellitesUsed, _bestNav.data.latitude, _bestNav.data.longitude);
-    onBestNavUpdated(_bestNav.data);
-    if (_bestNav.callbackPointerPtr) {
-        if (_bestNav.callbackData) {
-            *_bestNav.callbackData = _bestNav.data;
-            _bestNav.callbackPointerPtr(_bestNav.callbackData);
-        } else {
-            _bestNav.callbackPointerPtr(&_bestNav.data);
-        }
-    }
+        _bestNav.positionType, _bestNav.solutionStatus, _bestNav.satellitesTracked, _bestNav.satellitesUsed,
+        _bestNav.latitude, _bestNav.longitude);
 }
 
 void
@@ -1117,25 +1053,16 @@ UnicoreGNSSLibrary::decodeBestNavXyz(const uint8_t* payload, const uint16_t leng
         return;
     }
 
-    _bestNavXyz.data.ecefX = readF8(payload, offsetBestnavXyzPX);
-    _bestNavXyz.data.ecefY = readF8(payload, offsetBestnavXyzPY);
-    _bestNavXyz.data.ecefZ = readF8(payload, offsetBestnavXyzPZ);
-    _bestNavXyz.data.ecefXDeviation = readF4(payload, offsetBestnavXyzPXDeviation);
-    _bestNavXyz.data.ecefYDeviation = readF4(payload, offsetBestnavXyzPYDeviation);
-    _bestNavXyz.data.ecefZDeviation = readF4(payload, offsetBestnavXyzPZDeviation);
+    _bestNavXyz.ecefX = readF8(payload, offsetBestnavXyzPX);
+    _bestNavXyz.ecefY = readF8(payload, offsetBestnavXyzPY);
+    _bestNavXyz.ecefZ = readF8(payload, offsetBestnavXyzPZ);
+    _bestNavXyz.ecefXDeviation = readF4(payload, offsetBestnavXyzPXDeviation);
+    _bestNavXyz.ecefYDeviation = readF4(payload, offsetBestnavXyzPYDeviation);
+    _bestNavXyz.ecefZDeviation = readF4(payload, offsetBestnavXyzPZDeviation);
 
     lastUpdateEcef = millis();
-    log(UnicoreLogLevel::Debug, UNICORE_LOG_DATA, "BESTNAVXYZ x=%.3f y=%.3f z=%.3f", _bestNavXyz.data.ecefX,
-        _bestNavXyz.data.ecefY, _bestNavXyz.data.ecefZ);
-    onBestNavXyzUpdated(_bestNavXyz.data);
-    if (_bestNavXyz.callbackPointerPtr) {
-        if (_bestNavXyz.callbackData) {
-            *_bestNavXyz.callbackData = _bestNavXyz.data;
-            _bestNavXyz.callbackPointerPtr(_bestNavXyz.callbackData);
-        } else {
-            _bestNavXyz.callbackPointerPtr(&_bestNavXyz.data);
-        }
-    }
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_DATA, "BESTNAVXYZ x=%.3f y=%.3f z=%.3f", _bestNavXyz.ecefX,
+        _bestNavXyz.ecefY, _bestNavXyz.ecefZ);
 }
 
 void
@@ -1143,37 +1070,30 @@ UnicoreGNSSLibrary::decodeRecTime(const uint8_t* payload, const uint16_t length)
     if (!payload || (length < (offsetRectimeUtcStatus + sizeof(uint32_t)))) {
         return;
     }
-
-    _recTime.data.timeOffset = readF8(payload, offsetRectimeOffset);
-    _recTime.data.timeDeviation = readF8(payload, offsetRectimeOffsetStd);
-    _recTime.data.year = static_cast<uint16_t>(readU4(payload, offsetRectimeUtcYear));
-    _recTime.data.month = readU1(payload, offsetRectimeUtcMonth);
-    _recTime.data.day = readU1(payload, offsetRectimeUtcDay);
-    _recTime.data.hour = readU1(payload, offsetRectimeUtcHour);
-    _recTime.data.minute = readU1(payload, offsetRectimeUtcMinute);
+    lastUpdateDateTime = millis();
+    _recTime.timeOffset = readF8(payload, offsetRectimeOffset);
+    _recTime.timeDeviation = readF8(payload, offsetRectimeOffsetStd);
+    _recTime.year = static_cast<uint16_t>(readU4(payload, offsetRectimeUtcYear));
+    _recTime.month = readU1(payload, offsetRectimeUtcMonth);
+    _recTime.day = readU1(payload, offsetRectimeUtcDay);
+    _recTime.hour = readU1(payload, offsetRectimeUtcHour);
+    _recTime.minute = readU1(payload, offsetRectimeUtcMinute);
 
     const uint32_t milliseconds = readU4(payload, offsetRectimeUtcMillisecond);
-    _recTime.data.second = static_cast<uint8_t>(milliseconds / 1000U);
-    _recTime.data.millisecond = static_cast<uint16_t>(milliseconds % 1000U);
+    _recTime.second = static_cast<uint8_t>(milliseconds / 1000U);
+    _recTime.millisecond = static_cast<uint16_t>(milliseconds % 1000U);
 
     const uint32_t clockStatus = readU4(payload, offsetRectimeClockStatus);
     const uint32_t utcStatus = readU4(payload, offsetRectimeUtcStatus);
-    _recTime.data.timeStatus = static_cast<uint8_t>(clockStatus);
-    _recTime.data.dateStatus = static_cast<uint8_t>(utcStatus);
+    _recTime.timeStatus = static_cast<uint8_t>(clockStatus);
+    _recTime.dateStatus = static_cast<uint8_t>(utcStatus);
 
-    lastUpdateDateTime = millis();
-    log(UnicoreLogLevel::Debug, UNICORE_LOG_DATA, "RECTIME %04u-%02u-%02u %02u:%02u:%02u.%03u", _recTime.data.year,
-        _recTime.data.month, _recTime.data.day, _recTime.data.hour, _recTime.data.minute, _recTime.data.second,
-        _recTime.data.millisecond);
-    onRecTimeUpdated(_recTime.data);
-    if (_recTime.callbackPointerPtr) {
-        if (_recTime.callbackData) {
-            *_recTime.callbackData = _recTime.data;
-            _recTime.callbackPointerPtr(_recTime.callbackData);
-        } else {
-            _recTime.callbackPointerPtr(&_recTime.data);
-        }
-    }
+    _validTime = _recTime.timeStatus != 3;
+    _validDate = (_recTime.dateStatus == 1) || (_recTime.dateStatus == 2);
+    _fullyResolved = _validDate && _validTime;
+
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_DATA, "RECTIME %04u-%02u-%02u %02u:%02u:%02u.%03u", _recTime.year,
+        _recTime.month, _recTime.day, _recTime.hour, _recTime.minute, _recTime.second, _recTime.millisecond);
 }
 
 void
@@ -1182,20 +1102,19 @@ UnicoreGNSSLibrary::decodeVersionBinary(const uint8_t* payload, const uint16_t l
         return;
     }
 
-    _version.data.modelType = readU1(payload, offsetVersionModuleType);
-    copyFixedString(_version.data.swVersion, sizeof(_version.data.swVersion), payload, offsetVersionFirmwareVersion,
-                    length, sizeof(_version.data.swVersion) - 1);
-    copyFixedString(_version.data.serialNumber, sizeof(_version.data.serialNumber), payload, offsetVersionPsn, length,
-                    sizeof(_version.data.serialNumber) - 1);
-    copyFixedString(_version.data.efuseID, sizeof(_version.data.efuseID), payload, offsetVersionEfuseID, length,
-                    sizeof(_version.data.efuseID) - 1);
-    copyFixedString(_version.data.compileTime, sizeof(_version.data.compileTime), payload, offsetVersionCompTime,
-                    length, sizeof(_version.data.compileTime) - 1);
+    _version.modelType = readU1(payload, offsetVersionModuleType);
+    copyFixedString(_version.swVersion, sizeof(_version.swVersion), payload, offsetVersionFirmwareVersion, length,
+                    sizeof(_version.swVersion) - 1);
+    copyFixedString(_version.serialNumber, sizeof(_version.serialNumber), payload, offsetVersionPsn, length,
+                    sizeof(_version.serialNumber) - 1);
+    copyFixedString(_version.efuseID, sizeof(_version.efuseID), payload, offsetVersionEfuseID, length,
+                    sizeof(_version.efuseID) - 1);
+    copyFixedString(_version.compileTime, sizeof(_version.compileTime), payload, offsetVersionCompTime, length,
+                    sizeof(_version.compileTime) - 1);
 
     lastUpdateVersion = millis();
-    log(UnicoreLogLevel::Info, UNICORE_LOG_DATA, "VERSIONB model=%u sw=%s sn=%s", _version.data.modelType,
-        _version.data.swVersion, _version.data.serialNumber);
-    onVersionUpdated(_version.data);
+    log(UnicoreLogLevel::Info, UNICORE_LOG_DATA, "VERSIONB model=%u sw=%s sn=%s", _version.modelType,
+        _version.swVersion, _version.serialNumber);
 }
 
 void
@@ -1208,30 +1127,34 @@ UnicoreGNSSLibrary::decodeVersionHash(const char* sentence) {
 
     char model[18] = {};
     getCsvField(payload, 0, model, sizeof(model));
+    memcpy(_version.modelName, model, sizeof(_version.modelName) - 1);
     if (equalsIgnoreCase(model, "UM980")) {
-        _version.data.modelType = 18;
+        _version.modelType = 18;
+    } else if (equalsIgnoreCase(model, "UM982")) {
+        _version.modelType = 17;
+    } else if (equalsIgnoreCase(model, "UM960")) {
+        _version.modelType = 19;
     }
 
     const char* softwareField = strchr(payload, ',');
     if (softwareField) {
-        copyToken(_version.data.swVersion, sizeof(_version.data.swVersion), softwareField + 1);
+        copyToken(_version.swVersion, sizeof(_version.swVersion), softwareField + 1);
     }
 
     char field[64] = {};
     if (getCsvField(payload, 3, field, sizeof(field))) {
-        copyToken(_version.data.serialNumber, sizeof(_version.data.serialNumber), field);
+        copyToken(_version.serialNumber, sizeof(_version.serialNumber), field);
     }
     if (getCsvField(payload, 4, field, sizeof(field))) {
-        copyToken(_version.data.efuseID, sizeof(_version.data.efuseID), field);
+        copyToken(_version.efuseID, sizeof(_version.efuseID), field);
     }
     if (getCsvField(payload, 5, field, sizeof(field))) {
-        copyToken(_version.data.compileTime, sizeof(_version.data.compileTime), field);
+        copyToken(_version.compileTime, sizeof(_version.compileTime), field);
     }
 
     lastUpdateVersion = millis();
-    log(UnicoreLogLevel::Info, UNICORE_LOG_DATA, "VERSION model=%u sw=%s sn=%s", _version.data.modelType,
-        _version.data.swVersion, _version.data.serialNumber);
-    onVersionUpdated(_version.data);
+    log(UnicoreLogLevel::Info, UNICORE_LOG_DATA, "VERSION model=%u sw=%s sn=%s", _version.modelType, _version.swVersion,
+        _version.serialNumber);
 }
 
 void
@@ -1380,24 +1303,4 @@ UnicoreGNSSLibrary::log(const UnicoreLogLevel level, const uint32_t mask, const 
     va_end(args);
 
     _debugPort->printf("[%ld][Unicore][%s] %s\r\n", millis(), logLevelName(level), buffer);
-}
-
-void
-UnicoreGNSSLibrary::onBestNavUpdated(const UNICORE_BESTNAV_data_t& data) {
-    (void)data;
-}
-
-void
-UnicoreGNSSLibrary::onBestNavXyzUpdated(const UNICORE_BESTNAVXYZ_data_t& data) {
-    (void)data;
-}
-
-void
-UnicoreGNSSLibrary::onRecTimeUpdated(const UNICORE_RECTIME_data_t& data) {
-    (void)data;
-}
-
-void
-UnicoreGNSSLibrary::onVersionUpdated(const UNICORE_VERSION_data_t& data) {
-    (void)data;
 }

@@ -128,12 +128,12 @@ typedef struct {
     uint8_t pseudorangeCorrection;
 } UNICORE_BESTNAV_data_t;
 
-typedef struct {
-    // ubxAutomaticFlags automaticFlags;
-    UNICORE_BESTNAV_data_t data;
-    void (*callbackPointerPtr)(UNICORE_BESTNAV_data_t*);
-    UNICORE_BESTNAV_data_t* callbackData;
-} UNICORE_BESTNAV_t;
+// typedef struct {
+//     // ubxAutomaticFlags automaticFlags;
+//     UNICORE_BESTNAV_data_t data;
+//     void (*callbackPointerPtr)(UNICORE_BESTNAV_data_t*);
+//     UNICORE_BESTNAV_data_t* callbackData;
+// } UNICORE_BESTNAV_t;
 
 typedef struct {
     double ecefX;
@@ -144,12 +144,12 @@ typedef struct {
     float ecefZDeviation;
 } UNICORE_BESTNAVXYZ_data_t;
 
-typedef struct {
-    // ubxAutomaticFlags automaticFlags;
-    UNICORE_BESTNAVXYZ_data_t data;
-    void (*callbackPointerPtr)(UNICORE_BESTNAVXYZ_data_t*);
-    UNICORE_BESTNAVXYZ_data_t* callbackData;
-} UNICORE_BESTNAVXYZ_t;
+// typedef struct {
+//     // ubxAutomaticFlags automaticFlags;
+//     UNICORE_BESTNAVXYZ_data_t data;
+//     void (*callbackPointerPtr)(UNICORE_BESTNAVXYZ_data_t*);
+//     UNICORE_BESTNAVXYZ_data_t* callbackData;
+// } UNICORE_BESTNAVXYZ_t;
 
 typedef struct {
     uint16_t year;
@@ -165,25 +165,26 @@ typedef struct {
     double timeDeviation;
 } UNICORE_RECTIME_data_t;
 
-typedef struct {
-    // ubxAutomaticFlags automaticFlags;
-    UNICORE_RECTIME_data_t data;
-    void (*callbackPointerPtr)(UNICORE_RECTIME_data_t*);
-    UNICORE_RECTIME_data_t* callbackData;
-} UNICORE_RECTIME_t;
+// typedef struct {
+//     // ubxAutomaticFlags automaticFlags;
+//     UNICORE_RECTIME_data_t data;
+//     void (*callbackPointerPtr)(UNICORE_RECTIME_data_t*);
+//     UNICORE_RECTIME_data_t* callbackData;
+// } UNICORE_RECTIME_t;
 
 // #VERSION,98,GPS,UNKNOWN,1,711000,0,0,18,144;UM980,R4.10Build7923,HRPT00-S10C-P,2310415000001-MD22B1224961040,ff3bd496fd7ca68b,2022/09/28*55f61e51
 typedef struct {
     uint8_t modelType;
+    char modelName[18 + 1];    // Add terminator
     char swVersion[33 + 1];    // Add terminator
     char serialNumber[15 + 1]; // Add terminator
     char efuseID[33 + 1];      // Add terminator
     char compileTime[43 + 1];  // Add terminator
 } UNICORE_VERSION_data_t;
 
-typedef struct {
-    // ubxAutomaticFlags automaticFlags;
-    UNICORE_VERSION_data_t data;
-} UNICORE_VERSION_t;
+// typedef struct {
+//     // ubxAutomaticFlags automaticFlags;
+//     UNICORE_VERSION_data_t data;
+// } UNICORE_VERSION_t;
 
 #endif

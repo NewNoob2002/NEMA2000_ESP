@@ -416,17 +416,17 @@ UnicoreUM980::isGgaActive() const {
 
 double
 UnicoreUM980::getLatitude() const {
-    return _latitude;
+    return _bestNav.latitude;
 }
 
 double
 UnicoreUM980::getLongitude() const {
-    return _longitude;
+    return _bestNav.longitude;
 }
 
 double
 UnicoreUM980::getAltitude() const {
-    return _altitude;
+    return _bestNav.altitude;
 }
 
 float
@@ -436,72 +436,72 @@ UnicoreUM980::getHorizontalAccuracy() const {
 
 uint8_t
 UnicoreUM980::getFixType() const {
-    return _fixType;
+    return _bestNav.positionType;
 }
 
 uint8_t
 UnicoreUM980::getCarrierSolution() const {
-    return _carrierSolution;
+    return _bestNav.rtkSolution;
 }
 
 uint8_t
 UnicoreUM980::getSatellitesInView() const {
-    return _satellitesInView;
+    return _bestNav.satellitesTracked;
 }
 
 uint8_t
 UnicoreUM980::getDay() const {
-    return _day;
+    return _recTime.day;
 }
 
 uint8_t
 UnicoreUM980::getMonth() const {
-    return _month;
+    return _recTime.month;
 }
 
 uint16_t
 UnicoreUM980::getYear() const {
-    return _year;
+    return _recTime.year;
 }
 
 uint8_t
 UnicoreUM980::getHour() const {
-    return _hour;
+    return _recTime.hour;
 }
 
 uint8_t
 UnicoreUM980::getMinute() const {
-    return _minute;
+    return _recTime.minute;
 }
 
 uint8_t
 UnicoreUM980::getSecond() const {
-    return _second;
+    return _recTime.second;
 }
 
 uint16_t
 UnicoreUM980::getMillisecond() const {
-    return _millisecond;
+    return _recTime.millisecond;
 }
 
 uint8_t
 UnicoreUM980::getLeapSeconds() const {
-    return _leapSeconds;
+    return getLastBinaryHeader().leapSeconds;
 }
 
 double
 UnicoreUM980::getEcefX() const {
-    return _ecefX;
+    return _bestNavXyz.ecefX;
 }
 
 double
 UnicoreUM980::getEcefY() const {
-    return _ecefY;
+    return _bestNavXyz.ecefY;
 }
 
 double
 UnicoreUM980::getEcefZ() const {
-    return _ecefZ;
+    return _bestNavXyz.ecefZ;
 }
 
 uint16_t
@@ -522,22 +522,22 @@ UnicoreUM980::getMode() const {
 
 const char*
 UnicoreUM980::getFirmwareVersion() const {
-    return _version.data.swVersion;
+    return _version.swVersion;
 }
 
 const char*
 UnicoreUM980::getSerialNumber() const {
-    return _version.data.serialNumber;
+    return _version.serialNumber;
 }
 
 uint8_t
 UnicoreUM980::getModelType() const {
-    return _version.data.modelType;
+    return _version.modelType;
 }
 
 const char*
 UnicoreUM980::getId() const {
-    return _version.data.efuseID;
+    return _version.efuseID;
 }
 
 bool
@@ -547,21 +547,23 @@ UnicoreUM980::inRoverMode() const {
 
 bool
 UnicoreUM980::isFixed() const {
-    return (_fixType != 0) && (getLastBestNavMs() != 0);
+    return (getFixType() != 0) && (getLastBestNavMs() != 0);
 }
 
 bool
 UnicoreUM980::isDgpsFixed() const {
-    return (_fixType == kPosTypePsrDiff) || isRTKFix() || isRTKFloat();
+    return (getFixType() == kPosTypePsrDiff) || isRTKFix() || isRTKFloat();
 }
 
 bool
 UnicoreUM980::isRTKFix() const {
+    uint8_t _fixType = getFixType();
     return (_fixType == kPosTypeL1Int) || (_fixType == kPosTypeNarrowInt);
 }
 
 bool
 UnicoreUM980::isRTKFloat() const {
+    uint8_t _fixType = getFixType();
     return (_fixType == kPosTypeL1Float) || (_fixType == kPosTypeNarrowFloat);
 }
 
@@ -576,76 +578,9 @@ UnicoreUM980::isValidTime() const {
 }
 
 bool
-UnicoreUM980::isConfirmedDate() const {
-    return _confirmedDate;
-}
-
-bool
-UnicoreUM980::isConfirmedTime() const {
-    return _confirmedTime;
-}
-
-bool
 UnicoreUM980::isFullyResolved() const {
     return _fullyResolved;
 }
-
-bool
-UnicoreUM980::isPvtUpdated() {
-    const bool updated = _pvtUpdated;
-    _pvtUpdated = false;
-    return updated;
-}
-
-void
-UnicoreUM980::onBestNavUpdated(const UNICORE_BESTNAV_data_t& data) {
-    _latitude = data.latitude;
-    _longitude = data.longitude;
-    _altitude = data.altitude;
-    _horizontalAccuracy =
-        (data.latitudeDeviation > data.longitudeDeviation) ? data.latitudeDeviation : data.longitudeDeviation;
-    _satellitesInView = data.satellitesTracked;
-    _fixType = data.positionType;
-    _carrierSolution = data.rtkSolution;
-    _confirmedDate = isFixed();
-    _confirmedTime = isFixed();
-    _pvtArrivalMillis = millis();
-    _pvtUpdated = true;
-}
-
-void
-UnicoreUM980::onBestNavXyzUpdated(const UNICORE_BESTNAVXYZ_data_t& data) {
-    _ecefX = data.ecefX;
-    _ecefY = data.ecefY;
-    _ecefZ = data.ecefZ;
-}
-
-void
-UnicoreUM980::onRecTimeUpdated(const UNICORE_RECTIME_data_t& data) {
-    _year = data.year;
-    _month = data.month;
-    _day = data.day;
-    _hour = data.hour;
-    _minute = data.minute;
-    _second = data.second;
-    _millisecond = data.millisecond;
-    _validTime = data.timeStatus != 3;
-    _validDate = (data.dateStatus == 1) || (data.dateStatus == 2);
-    _fullyResolved = _validDate && _validTime;
-    _leapSeconds = getLastBinaryHeader().leapSeconds;
-}
-
-/*
-void
-UnicoreUM980::onVersionUpdated(const UNICORE_VERSION_data_t& data) {
-    strncpy(_firmwareVersion, data.swVersion, sizeof(_firmwareVersion) - 1);
-    _firmwareVersion[sizeof(_firmwareVersion) - 1] = 0;
-    strncpy(_serialNumber, data.serialNumber, sizeof(_serialNumber) - 1);
-    _serialNumber[sizeof(_serialNumber) - 1] = 0;
-    strncpy(_id, data.efuseID, sizeof(_id) - 1);
-    _id[sizeof(_id) - 1] = 0;
-}
-    */
 
 UnicoreResult_t
 UnicoreUM980::applyMessagePeriods(const Um980MessageConfig* messages, const float* periods, const size_t count,

@@ -2,6 +2,7 @@
 #include "Arduino.h"
 #include "GNSS.h"
 #include "Support.h"
+#include "Unicore_UM980.h"
 #include "mcu_settings.h"
 
 #define RTK_MODE(mode)     RTK_MODE = mode;
@@ -39,7 +40,7 @@ bool forceSystemStateUpdate = false; // Set true to avoid update wait
 // Given the current state, see if conditions have moved us to a new state
 // A user pressing the mode button (change between rover/base) is handled by buttonCheckTask()
 void
-stateUpdate() {
+stateUpdate(UnicoreUM980* pUm980) {
     if (((millis() - lastSystemStateUpdate) > 500) || (forceSystemStateUpdate == true)) {
         lastSystemStateUpdate = millis();
         forceSystemStateUpdate = false;
@@ -67,9 +68,26 @@ stateUpdate() {
                 RTK_MODE(RTK_MODE_ROVER);
 
                 gnssConfigure(GNSS_CONFIG_ROVER);
+
+                if (online_devices.gnss == false) {
+                    changeState(STATE_ROVER_NO_FIX);
+                } else {
+                    settings.lastState = STATE_ROVER_NOT_STARTED;
+                    // recordSystemSettings(); // Record this state for next POR
+                    changeState(STATE_ROVER_CONFIG_WAIT);
+                }
             } break;
-            case (STATE_ROVER_CONFIG_WAIT): break;
-            case (STATE_ROVER_NO_FIX): break;
+            case (STATE_ROVER_CONFIG_WAIT): {
+                if (gnssConfigureComplete()) {
+                    systemPrintln("Rover configured");
+                    changeState(STATE_ROVER_NO_FIX);
+                }
+            } break;
+            case (STATE_ROVER_NO_FIX): {
+                if (pUm980->isFixed()) {
+                    changeState(STATE_ROVER_FIX);
+                }
+            } break;
             case (STATE_ROVER_FIX): break;
             case (STATE_ROVER_RTK_FLOAT): break;
             case (STATE_ROVER_RTK_FIX): break;

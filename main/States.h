@@ -3,7 +3,15 @@
 #include <stdint.h>
 #include "mcu_typedef.h"
 
-void stateUpdate();
+//----------------------------------------
+// Types
+//----------------------------------------
+#if defined(__cplusplus)
+class UnicoreUM980;
+
+void stateUpdate(UnicoreUM980* pUm980);
+#endif // __cplusplus
+
 void requestChangeState(SystemState_t requestedState);
 const char* getState(SystemState_t state);
 void changeState(SystemState_t newState);
