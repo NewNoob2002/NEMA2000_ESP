@@ -339,6 +339,11 @@ UnicoreUM980::disableRtcmMessages(const UnicorePort port) {
 
 UnicoreResult_t
 UnicoreUM980::setMode(const char* modeCommand) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!modeCommand) {
+        return Unicore_RESULT_WRONG_COMMAND;
+    }
+#endif // UNICORE_NULLPTR_CHECK
     char command[64] = {};
     snprintf(command, sizeof(command), "MODE %s", modeCommand);
 
@@ -347,6 +352,11 @@ UnicoreUM980::setMode(const char* modeCommand) {
 
 UnicoreResult_t
 UnicoreUM980::setRoverMode(const char* roverType) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!roverType) {
+        return Unicore_RESULT_WRONG_COMMAND;
+    }
+#endif // UNICORE_NULLPTR_CHECK
     char command[50];
     snprintf(command, sizeof(command), "ROVER %s", roverType);
     return setMode(command);
@@ -720,7 +730,11 @@ UnicoreUM980::gnssInBaseFixedMode() {
 }
 
 void
-UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {}
+UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {
+    char MsgName[16] = {};
+    snprintf(MsgName, sizeof(MsgName), "%s", 6);
+    log(UnicoreLogLevel::Info, UNICORE_LOG_DEBUG, "NMEA %s sentence received.", MsgName);
+}
 
 void
 UnicoreUM980::processHashSentence(const char* sentence, uint16_t length) {
@@ -776,6 +790,11 @@ UnicoreUM980::handleModeSentence(const char* sentence, uint16_t length) {
 
 void
 UnicoreUM980::NmeaCallback(const char* sentence, uint16_t length, void* userdata) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!sentence || !userdata) {
+        return;
+    }
+#endif //UNICORE_NULLPTR_CHECK
     UnicoreUM980* instance = static_cast<UnicoreUM980*>(userdata);
     if (instance) {
         instance->processNmeaSentence(sentence, length);

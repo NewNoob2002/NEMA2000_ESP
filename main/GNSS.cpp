@@ -43,9 +43,10 @@ static const int gnssConfigStateEntries = sizeof(gnssConfigDisplayNames) / sizeo
 // Locals
 //----------------------------------------
 volatile bool gnssConfigureInProgress = false;
+static uint32_t lastGnssConfigReportTime = 0;
 
 void
-gnssBegin(HardwareSerial* pGnssSerial, UnicoreUM980* pUm980) {
+gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
     if (settings.printTaskStartStop) {
         systemPrintln("Task pinGnssUartTask started");
     }
@@ -119,9 +120,6 @@ gnssUpdate(UnicoreUM980* gnss) {
 
     if (inWebConfigMode() == false) {
         gnssConfigureInProgress = true; // Set the 'semaphore'
-        if (settings.debugGnssConfig == true) {
-            systemPrintln("Starting GNSS configuration");
-        }
         // Service requests
         // Clear the requests as they are completed successfully
         // If a platform requires a device reset to complete the config (ie, LG290P changing constellations) then
@@ -148,24 +146,33 @@ gnssUpdate(UnicoreUM980* gnss) {
             uint8_t needChange = 0;
             if (currentModel != 0) {
                 //  0 - Unknown, 1 - Rover Survey, 2 - Rover UAV, 3 - Rover Auto, 4 - Base Survey-in, 5 - Base fixed
-                if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_SURVEY && currentModel == 1) {
+                // if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_SURVEY && currentModel == 1) {
+                //     needChange = 1;
+                // }
+                // if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_UAV && currentModel == 2) {
+                //     needChange = 1;
+                // }
+                // if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_AUTOMOTIVE && currentModel == 3) {
+                //     needChange = 1;
+                // }
+                if (currentModel == 4 || currentModel == 5) {
+                    // We are in a Base mode, need to change to Rover
                     needChange = 1;
+                    settings.dynamicModel = UM980_DYN_MODEL_ROVER_SURVEY;
                 }
-                if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_UAV && currentModel == 2) {
-                    needChange = 1;
-                }
-                if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_AUTOMOTIVE && currentModel == 3) {
-                    needChange = 1;
-                }
-                if (needChange) { // Assume we are changing from Base to Rover, request any additional config changes
+                if (needChange) {
+                    // Assume we are changing from Base to Rover, request any additional config changes
                     // Sets the dynamic model (Survey/UAV/Automotive) and puts the device into Rover mode
+                    systemPrintf("GNSS model need change. Current: %d, Desired: %d\r\n", currentModel,
+                                 settings.dynamicModel);
                     gnssConfigure(GNSS_CONFIG_MODEL);
 
                     // Request a change to Rover RTCM
                     gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER);
                 }
                 gnssConfigureClear(GNSS_CONFIG_ROVER);
-                gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA); // Request update to NMEA
+                gnssConfigure(GNSS_CONFIG_SAVE);              // Request receiver commit this change to NVM
             }
         }
 
@@ -225,11 +232,12 @@ gnssUpdate(UnicoreUM980* gnss) {
         }
 
         // Save changes to NVM
-        // if (gnssConfigureRequested(GNSS_CONFIG_SAVE)) {
-        //     if (gnss->saveConfiguration()) {
-        //         gnssConfigureClear(GNSS_CONFIG_SAVE);
-        //     }
-        // }
+        if (gnssConfigureRequested(GNSS_CONFIG_SAVE)) {
+            gnssConfigureClear(GNSS_CONFIG_SAVE);
+            // if (gnss->saveConfiguration()) {
+            //     gnssConfigureClear(GNSS_CONFIG_SAVE);
+            // }
+        }
 
         // if (gnssConfigureRequested(GNSS_CONFIG_RESET)) {
         //     if (gnss->reset()) {
@@ -240,13 +248,12 @@ gnssUpdate(UnicoreUM980* gnss) {
         // If gnssConfigureRequest bits are still set, the next update will attempt to service them.
 
         if (settings.gnssConfigureRequest != 0) {
-            if (settings.debugGnssConfig) {
+            if (settings.debugGnssConfig && (millis() - lastGnssConfigReportTime > 2000)) {
+                lastGnssConfigReportTime = millis();
                 systemPrint("Remaining gnssConfigureRequest: ");
 
                 for (int x = 0; x < GNSS_CONFIG_MAX; x++) {
-                    if (gnssConfigureRequested(x)) {
-                        systemPrintf("%s ", gnssConfigDisplayNames[x]);
-                    }
+                    gnssConfigureRequested(x);
                 }
                 systemPrintln();
             }

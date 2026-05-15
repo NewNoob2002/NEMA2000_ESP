@@ -6,6 +6,10 @@
 #include "SparkFun_Extensible_Message_Parser.h"
 #include "Unicore_Struct.h"
 
+#ifndef UNICORE_NULLPTR_CHECK
+#define UNICORE_NULLPTR_CHECK
+#endif
+
 enum class UnicorePort : uint8_t {
     Current = 0,
     Com1,

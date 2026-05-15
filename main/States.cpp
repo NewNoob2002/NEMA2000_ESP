@@ -39,14 +39,14 @@ bool forceSystemStateUpdate = false; // Set true to avoid update wait
 
 void
 stateInit() {
-    systemState = STATE_ROVER_NOT_STARTED;
+    systemState = STATE_NOT_SET;
 }
 
 // Given the current state, see if conditions have moved us to a new state
 // A user pressing the mode button (change between rover/base) is handled by buttonCheckTask()
 void
 stateUpdate(UnicoreUM980* gnss) {
-    if (gnss != nullptr) {
+    if (gnss == nullptr) {
         systemPrintln(
             "Error: stateUpdate should not be called with a non-nullptr pUm980. State updates should occur regardless "
             "of GNSS state, and the current state of the GNSS should be checked within the state machine as needed.");
@@ -146,7 +146,10 @@ stateUpdate(UnicoreUM980* gnss) {
             case (STATE_NTPSERVER_SYNC): break;
 #endif
             case (STATE_SHUTDOWN): break;
-            case (STATE_NOT_SET): break;
+            case (STATE_NOT_SET): {
+                gnssConfigure(GNSS_CONFIG_ONCE);
+                changeState(STATE_ROVER_NOT_STARTED);
+            } break;
         }
     }
 }
