@@ -2,8 +2,12 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include "GNSS.h"
+#include "States.h"
 #include "Unicore_Struct.h"
+#include "mcu_settings.h"
 
 namespace {
 constexpr uint8_t kPosTypeSingle = 16;
@@ -13,18 +17,25 @@ constexpr uint8_t kPosTypeWideInt = 49;
 constexpr uint8_t kPosTypeNarrowInt = 50;
 
 bool
-isPositivePeriod(const float periodSeconds) {
-    return std::isfinite(periodSeconds) && (periodSeconds > 0.0f);
-}
-
-const char*
-dynamicModelName(const Um980DynamicModel model) {
-    switch (model) {
-        case Um980DynamicModel::UM980_DYN_MODEL_SURVEY: return "SURVEY";
-        case Um980DynamicModel::UM980_DYN_MODEL_UAV: return "UAV";
-        case Um980DynamicModel::UM980_DYN_MODEL_AUTOMOTIVE: return "AUTOMOTIVE";
-        default: return "SURVEY";
+copyModeToken(char* destination, const size_t destinationSize, const char*& cursor) {
+    if (!destination || (destinationSize == 0) || !cursor) {
+        return false;
     }
+
+    while (*cursor == ' ') {
+        cursor++;
+    }
+
+    size_t index = 0;
+    while (*cursor && (*cursor != ' ') && (*cursor != ',') && (*cursor != '*') && (*cursor != '\r')
+           && (*cursor != '\n')) {
+        if (index < (destinationSize - 1)) {
+            destination[index++] = *cursor;
+        }
+        cursor++;
+    }
+    destination[index] = 0;
+    return index > 0;
 }
 } // namespace
 
@@ -148,33 +159,16 @@ UnicoreUM980::configureGNSS(const UnicorePort port) {
     return result;
 }
 
-bool
+uint8_t
 UnicoreUM980::configureRover() {
-    int currentMode = getMode();
-    // result = firstError(result, configureRoverOutput(port));
-    return result;
+    return getModel();
 }
 
 UnicoreResult_t
 UnicoreUM980::configureBase(const UnicorePort port) {
     UnicoreResult_t result = setBaseMode();
-    result = firstError(result, configureBaseOutput(port));
+    // result = firstError(result, configureBaseOutput(port));
     _mode = (result == Unicore_RESULT_RESPONSE_COMMAND_OK) ? Um980Mode::Base : _mode;
-    return result;
-}
-
-UnicoreResult_t
-UnicoreUM980::configureRoverOutput(const UnicorePort port) {
-    UnicoreResult_t result = disableAllOutput();
-    result = firstError(result, enableNmeaMessages(port));
-    result = firstError(result, enableBinaryNavigation(port, static_cast<float>(_rateSeconds)));
-    return result;
-}
-
-UnicoreResult_t
-UnicoreUM980::configureBaseOutput(const UnicorePort port) {
-    UnicoreResult_t result = disableAllOutput();
-    result = firstError(result, enableRtcmBaseMessages(port));
     return result;
 }
 
@@ -241,29 +235,106 @@ UnicoreUM980::disableAllOutput() {
     return (com1Done && com2Done && com3Done) ? Unicore_RESULT_RESPONSE_COMMAND_OK : firstFailure;
 }
 
+bool
+UnicoreUM980::setMessagesNMEA() {
+    bool gpggaEnabled = false;
+    bool gpzdaEnabled = false;
+
+    log(UnicoreLogLevel::Info, UNICORE_LOG_DEBUG, "Setting NMEA messages on COM ports...");
+
+    UnicoreResult_t result = disableAllOutput(); // Disable all NMEA and RTCM output on all ports...
+
+    um980MessagesEnabled_NMEA.enabled = false;
+
+    if (um980MessagesEnabled_RTCM_Rover || um980MessagesEnabled_RTCM_Base) {
+        um980MessagesEnabled_RTCM_Rover = false;
+        um980MessagesEnabled_RTCM_Base = false;
+        // Request reconfigure of RTCM
+        if (inBaseMode()) { // If the current system state is Base
+            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE);
+        } else {
+            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER);
+        }
+    }
+
+    result = enableNmeaMessages(); // Enable all NMEA messages on the current port
+
+    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        um980MessagesEnabled_NMEA.enabled = true;
+        um980MessagesEnabled_NMEA.millis = millis();
+        return true;
+    }
+    return false;
+}
+
 UnicoreResult_t
 UnicoreUM980::enableNmeaMessages(const UnicorePort port) {
-    return applyMessagePeriods(kUm980NmeaMessages, _nmeaPeriods, MAX_UM980_NMEA_MSG, port);
+    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
+    for (int messageNumber = 0; messageNumber < MAX_UM980_NMEA_MSG; messageNumber++) {
+        if (_nmeaPeriods[messageNumber] > 0.0f) {
+            // Enable the message
+            result = firstError(result,
+                                setPortMessage(&kUm980NmeaMessages[messageNumber], _nmeaPeriods[messageNumber], port));
+        }
+        if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            if (settings.debugGnssConfig) {
+                log(UnicoreLogLevel::Error, UNICORE_LOG_DEBUG,
+                    "setMessagesNMEA failed to set %0.2f for message %s [%d] on port %s.\r\n",
+                    _nmeaPeriods[messageNumber], kUm980NmeaMessages[messageNumber].name, messageNumber, portName(port));
+            }
+            return Unicore_RESULT_RESPONSE_COMMAND_ERROR; // Don't attempt other messages, assume communication is down
+        }
+    }
+    return result;
 }
 
 UnicoreResult_t
 UnicoreUM980::disableNmeaMessages(const UnicorePort port) {
-    return unlogMessages(kUm980NmeaMessages, MAX_UM980_NMEA_MSG, port);
+    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
+    for (int messageNumber = 0; messageNumber < MAX_UM980_NMEA_MSG; messageNumber++) {
+        if (_nmeaPeriods[messageNumber] == 0.0f) {
+            // Enable the message
+            result = firstError(result,
+                                setPortMessage(&kUm980NmeaMessages[messageNumber], _nmeaPeriods[messageNumber], port));
+        }
+        if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            if (settings.debugGnssConfig) {
+                log(UnicoreLogLevel::Error, UNICORE_LOG_DEBUG,
+                    "setMessagesNMEA failed to set %0.2f for message %s [%d] on port %s.\r\n",
+                    _nmeaPeriods[messageNumber], kUm980NmeaMessages[messageNumber].name, messageNumber, portName(port));
+            }
+            return Unicore_RESULT_RESPONSE_COMMAND_ERROR; // Don't attempt other messages, assume communication is down
+        }
+    }
+    return result;
+}
+
+bool
+UnicoreUM980::setMessagesRTCMRover() {
+    return false;
+}
+
+bool
+UnicoreUM980::setMessagesRTCMBase() {
+    return false;
 }
 
 UnicoreResult_t
 UnicoreUM980::enableRtcmRoverMessages(const UnicorePort port) {
-    return applyMessagePeriods(kUm980RtcmMessages, _rtcmRoverPeriods, MAX_UM980_RTCM_MSG, port);
+    // return setMessagePeriods(kUm980RtcmMessages, _rtcmRoverPeriods, MAX_UM980_RTCM_MSG, port);
+    return Unicore_RESULT_RESPONSE_OVERFLOW;
 }
 
 UnicoreResult_t
 UnicoreUM980::enableRtcmBaseMessages(const UnicorePort port) {
-    return applyMessagePeriods(kUm980RtcmMessages, _rtcmBasePeriods, MAX_UM980_RTCM_MSG, port);
+    // return setMessagePeriods(kUm980RtcmMessages, _rtcmBasePeriods, MAX_UM980_RTCM_MSG, port);
+    return Unicore_RESULT_RESPONSE_OVERFLOW;
 }
 
 UnicoreResult_t
 UnicoreUM980::disableRtcmMessages(const UnicorePort port) {
-    return unlogMessages(kUm980RtcmMessages, MAX_UM980_RTCM_MSG, port);
+    // return unlogMessages(kUm980RtcmMessages, MAX_UM980_RTCM_MSG, port);
+    return Unicore_RESULT_RESPONSE_OVERFLOW;
 }
 
 UnicoreResult_t
@@ -303,11 +374,11 @@ UnicoreUM980::setRate(const double secondsBetweenSolutions) {
 bool
 UnicoreUM980::setModel(const uint8_t modelNumber) {
     if (_online) {
-        if (modelNumber == UM980_DYN_MODEL_SURVEY) {
+        if (modelNumber == UM980_DYN_MODEL_ROVER_SURVEY) {
             return setRoverMode("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
-        } else if (modelNumber == UM980_DYN_MODEL_UAV) {
+        } else if (modelNumber == UM980_DYN_MODEL_ROVER_UAV) {
             return setRoverMode("UAV") == Unicore_RESULT_RESPONSE_COMMAND_OK;
-        } else if (modelNumber == UM980_DYN_MODEL_AUTOMOTIVE) {
+        } else if (modelNumber == UM980_DYN_MODEL_ROVER_AUTOMOTIVE) {
             return setRoverMode("AUTOMOTIVE") == Unicore_RESULT_RESPONSE_COMMAND_OK;
         } else {
             log(UnicoreLogLevel::Error, UNICORE_LOG_DEBUG, "Unsupported UM980 model number: %u, Use SURVEY default",
@@ -321,7 +392,7 @@ UnicoreUM980::setModel(const uint8_t modelNumber) {
 uint8_t
 UnicoreUM980::getModel() {
     if (sendCommandAndWait("MODE", 2000, "#MODE") == Unicore_RESULT_RESPONSE_COMMAND_OK) {
-        return strtoul(_lastCommandResponse, nullptr, 10);
+        return _model;
     }
     return 0;
 }
@@ -420,7 +491,7 @@ uint8_t
 UnicoreUM980::getActiveNmeaMessageCount() const {
     uint8_t count = 0;
     for (const float period : _nmeaPeriods) {
-        if (isPositivePeriod(period)) {
+        if (period > 0.0f) {
             count++;
         }
     }
@@ -431,7 +502,7 @@ uint8_t
 UnicoreUM980::getActiveRtcmRoverMessageCount() const {
     uint8_t count = 0;
     for (const float period : _rtcmRoverPeriods) {
-        if (isPositivePeriod(period)) {
+        if (period > 0.0f) {
             count++;
         }
     }
@@ -442,7 +513,7 @@ uint8_t
 UnicoreUM980::getActiveRtcmBaseMessageCount() const {
     uint8_t count = 0;
     for (const float period : _rtcmBasePeriods) {
-        if (isPositivePeriod(period)) {
+        if (period > 0.0f) {
             count++;
         }
     }
@@ -632,18 +703,76 @@ UnicoreUM980::isFullyResolved() const {
     return _fullyResolved;
 }
 
+bool
+UnicoreUM980::gnssInRoverMode() {
+    return _model == UM980_DYN_MODEL_ROVER_SURVEY || _model == UM980_DYN_MODEL_ROVER_UAV
+           || _model == UM980_DYN_MODEL_ROVER_AUTOMOTIVE;
+}
+
+bool
+UnicoreUM980::gnssInBaseSurveyInMode() {
+    return _model == UM980_DYN_MODEL_BASE;
+}
+
+bool
+UnicoreUM980::gnssInBaseFixedMode() {
+    return _model == UM980_DYN_MODEL_BASE;
+}
+
 void
-UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {
-    if (getLastCommandResult() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
-        // capture response to command for potential use in getters like getModel()
-        if (strncmp(sentence, "#MODE,", 6) == 0) {
-            handleModeSentence(sentence, length);
-        }
+UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {}
+
+void
+UnicoreUM980::processHashSentence(const char* sentence, uint16_t length) {
+    if (sentence && (strncmp(sentence, "#MODE,", 6) == 0)) {
+        handleModeSentence(sentence, length);
     }
 }
 
 void
-UnicoreUM980::handleModeSentence(const char* sentence, uint16_t length) {}
+UnicoreUM980::handleModeSentence(const char* sentence, uint16_t length) {
+    (void)length;
+
+    if (!sentence || (strncmp(sentence, "#MODE,", 6) != 0)) {
+        return;
+    }
+
+    const char* modePayload = strchr(sentence, ';');
+    if (!modePayload) {
+        return;
+    }
+    modePayload++;
+
+    if (strncmp(modePayload, "MODE ", 5) != 0) {
+        return;
+    }
+    modePayload += 5;
+
+    char mode[16] = {};
+    char model[16] = {};
+    if (!copyModeToken(mode, sizeof(mode), modePayload)) {
+        return;
+    }
+    copyModeToken(model, sizeof(model), modePayload);
+
+    if (strcasecmp(mode, "ROVER") == 0) {
+        _mode = Um980Mode::Rover;
+    } else if (strcasecmp(mode, "BASE") == 0) {
+        _mode = Um980Mode::Base;
+    } else {
+        _mode = Um980Mode::Unknown;
+    }
+
+    if (strcasecmp(model, "SURVEY") == 0) {
+        _model = UM980_DYN_MODEL_ROVER_SURVEY;
+    } else if (strcasecmp(model, "UAV") == 0) {
+        _model = UM980_DYN_MODEL_ROVER_UAV;
+    } else if (strcasecmp(model, "AUTOMOTIVE") == 0) {
+        _model = UM980_DYN_MODEL_ROVER_AUTOMOTIVE;
+    }
+
+    log(UnicoreLogLevel::Info, UNICORE_LOG_DEBUG, "Mode sentence received. Mode: %s, Model: %s", mode, model);
+}
 
 void
 UnicoreUM980::NmeaCallback(const char* sentence, uint16_t length, void* userdata) {
@@ -653,27 +782,38 @@ UnicoreUM980::NmeaCallback(const char* sentence, uint16_t length, void* userdata
     }
 }
 
-UnicoreResult_t
-UnicoreUM980::applyMessagePeriods(const Um980MessageConfig* messages, const float* periods, const size_t count,
-                                  const UnicorePort port) {
-    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
-    for (size_t index = 0; index < count; index++) {
-        if (isPositivePeriod(periods[index])) {
-            result =
-                firstError(result, logMessage(messages[index].name, port, UnicoreLogTrigger::OnTime, periods[index]),
-                           Unicore_RESULT_RESPONSE_COMMAND_OK);
-        } else {
-            result = firstError(result, unlogMessage(messages[index].name, port), Unicore_RESULT_RESPONSE_COMMAND_OK);
-        }
+void
+UnicoreUM980::HashCallback(const char* sentence, uint16_t length, void* userdata) {
+    UnicoreUM980* instance = static_cast<UnicoreUM980*>(userdata);
+    if (instance) {
+        instance->processHashSentence(sentence, length);
     }
-    return result;
+}
+
+void
+UnicoreUM980::RtcmCallback(const uint8_t* message, uint16_t length, uint16_t messageNumber, void* userdata) {
+    (void)message;
+    (void)length;
+    (void)messageNumber;
+    (void)userdata;
+}
+
+void
+UnicoreUM980::BinaryCallback(const UnicoreBinaryHeader& header, const uint8_t* payload, uint16_t length,
+                             void* userdata) {
+    (void)header;
+    (void)payload;
+    (void)length;
+    (void)userdata;
 }
 
 UnicoreResult_t
-UnicoreUM980::unlogMessages(const Um980MessageConfig* messages, const size_t count, const UnicorePort port) {
+UnicoreUM980::setPortMessage(const Um980MessageConfig* messages, const float periods, const UnicorePort port) {
     UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
-    for (size_t index = 0; index < count; index++) {
-        result = firstError(result, unlogMessage(messages[index].name, port), Unicore_RESULT_RESPONSE_COMMAND_OK);
+    if (periods > 0.0f) {
+        result = firstError(result, logMessage(messages->name, port, UnicoreLogTrigger::OnTime, periods));
+    } else {
+        result = firstError(result, unlogMessage(messages->name, port));
     }
     return result;
 }

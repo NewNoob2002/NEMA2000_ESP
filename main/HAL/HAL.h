@@ -62,19 +62,19 @@ void FileSystem_Init();
  * @brief Initialize the GNSS module.
  * 
  */
-void GNSS_Init();
+void gnssInit();
 
 /**
  * @brief Configure the GNSS module, such as setting message output rates and dynamic model.
  * 
  */
-void GNSS_Configure();
+void gnssUpdate();
 
 /* Bluetooth */
 /**
  * @brief Initialize the Bluetooth module.
  */
-void Bluetooth_Init();
+void bluetoothInit();
 
 } // namespace HAL
 

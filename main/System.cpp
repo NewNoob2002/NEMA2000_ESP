@@ -29,6 +29,6 @@ reportHeapNow(bool alwaysPrint) {
 void
 reportHeap() {
     if (millis() - lastHeapReport >= 5000) {
-        reportHeapNow(false);
+        reportHeapNow(true);
     }
 }

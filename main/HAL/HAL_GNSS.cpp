@@ -1,3 +1,4 @@
+#include "GNSS.h"
 #include "HAL.h"
 #include "HAL_Config.h"
 #include "HardwareSerial.h"
@@ -14,8 +15,12 @@ UnicoreUM980* gUm980 = nullptr;
 namespace HAL {
 
 void
-GNSS_Init() {}
+gnssInit() {
+    gnssBegin(gnssSerial, gUm980);
+}
 
 void
-GNSS_Configure() {}
+gnssUpdate() {
+    gnssUpdate(gUm980);
+}
 } // namespace HAL

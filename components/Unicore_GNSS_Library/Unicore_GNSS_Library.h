@@ -108,8 +108,7 @@ class UnicoreGNSSLibrary {
     // Returns true if successful
     UnicoreResult_t requestMessage(const char* messageName, uint32_t timeoutMs = 1000);
     UnicoreResult_t logMessage(const char* messageName, UnicorePort port = UnicorePort::Current,
-                               UnicoreLogTrigger trigger = UnicoreLogTrigger::OnTime, float periodSeconds = 1.0f,
-                               float offsetSeconds = 0.0f);
+                               UnicoreLogTrigger trigger = UnicoreLogTrigger::OnTime, float periodSeconds = 1.0f);
     UnicoreResult_t unlogMessage(const char* messageName, UnicorePort port = UnicorePort::Current);
     UnicoreResult_t unlogPort(UnicorePort port = UnicorePort::Current);
 

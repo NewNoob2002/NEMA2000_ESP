@@ -15,9 +15,11 @@ struct Um980MessageConfig {
 };
 
 enum Um980DynamicModel : uint8_t {
-    UM980_DYN_MODEL_SURVEY = 0,
-    UM980_DYN_MODEL_UAV,
-    UM980_DYN_MODEL_AUTOMOTIVE,
+    UM980_DYN_MODEL_ROVER_SURVEY = 1,
+    UM980_DYN_MODEL_ROVER_UAV,
+    UM980_DYN_MODEL_ROVER_AUTOMOTIVE,
+    UM980_DYN_MODEL_BASE,
+    UM980_DYN_MODEL_BASE_TIME,
 };
 
 enum class Um980Mode : uint8_t {
@@ -76,20 +78,25 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     void baseRtcmLowDataRate();
 
     bool configure();
-    bool configureRover();
+    uint8_t configureRover();
 
     UnicoreResult_t configureOnceTime();
     UnicoreResult_t configureGNSS(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t configureBase(UnicorePort port = UnicorePort::Current);
-    UnicoreResult_t configureRoverOutput(UnicorePort port = UnicorePort::Current);
-    UnicoreResult_t configureBaseOutput(UnicorePort port = UnicorePort::Current);
 
     UnicoreResult_t requestVersion(uint32_t timeoutMs = 1000);
     UnicoreResult_t enableBinaryNavigation(UnicorePort port = UnicorePort::Current, float periodSeconds = 1.0f);
     UnicoreResult_t disableBinaryNavigation(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t disableAllOutput();
+
+    //-----------------------
+    // Message configuration
+    //-----------------------
+    bool setMessagesNMEA();
     UnicoreResult_t enableNmeaMessages(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t disableNmeaMessages(UnicorePort port = UnicorePort::Current);
+    bool setMessagesRTCMRover();
+    bool setMessagesRTCMBase();
     UnicoreResult_t enableRtcmRoverMessages(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t enableRtcmBaseMessages(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t disableRtcmMessages(UnicorePort port = UnicorePort::Current);
@@ -154,8 +161,16 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     bool isValidDate() const;
     bool isValidTime() const;
     bool isFullyResolved() const;
+
+    bool gnssInRoverMode();
+    bool gnssInBaseSurveyInMode();
+    bool gnssInBaseFixedMode();
+
     // process
     void processNmeaSentence(const char* sentence, uint16_t length = 0);
+    void processRtcmMessage(const uint8_t* message, uint16_t length, uint16_t messageNumber);
+    void processBinaryMessage(const UnicoreBinaryHeader& header, const uint8_t* payload, uint16_t length);
+    void processHashSentence(const char* sentence, uint16_t length = 0);
     //handle
     void handleModeSentence(const char* sentence, uint16_t length);
 
@@ -168,9 +183,19 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     float _rtcmBasePeriods[MAX_UM980_RTCM_MSG] = {};
     bool _constellationEnabled[MAX_UM980_CONSTELLATIONS] = {};
 
+    struct {
+        bool enabled = false;               // Goes true when we enable NMEA messages
+        unsigned long millis = 0;           // Set to millis when we enable NMEA messages
+        const unsigned long refresh = 5000; // Refresh after this many millis
+    } um980MessagesEnabled_NMEA;
+
+    bool um980MessagesEnabled_RTCM_Rover = false;
+    bool um980MessagesEnabled_RTCM_Base = false;
+
     double _rateSeconds = 1.0;
     bool _online = false;
     Um980Mode _mode = Um980Mode::Unknown;
+    uint8_t _model = UM980_DYN_MODEL_ROVER_SURVEY;
 
     static void RtcmCallback(const uint8_t* message, uint16_t length, uint16_t messageNumber, void* userdata);
     static void NmeaCallback(const char* sentence, uint16_t length, void* userdata);
@@ -178,9 +203,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
                                void* userdata);
     static void HashCallback(const char* sentence, uint16_t length, void* userdata);
 
-    UnicoreResult_t applyMessagePeriods(const Um980MessageConfig* messages, const float* periods, size_t count,
-                                        UnicorePort port);
-    UnicoreResult_t unlogMessages(const Um980MessageConfig* messages, size_t count, UnicorePort port);
+    UnicoreResult_t setPortMessage(const Um980MessageConfig* messages, float periods, UnicorePort port);
     bool setMessagePeriod(const Um980MessageConfig* messages, float* periods, size_t count, const char* msgName,
                           float periodSeconds);
     float getMessagePeriod(const Um980MessageConfig* messages, const float* periods, size_t count,

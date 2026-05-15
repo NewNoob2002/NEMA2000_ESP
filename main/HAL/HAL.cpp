@@ -1,7 +1,7 @@
 #include "HAL.h"
 #include "Bluetooth.h"
 #include "HAL_Config.h"
-#include "HardwareSerial.h"
+#include "States.h"
 #include "mcu_settings.h"
 #include "myWIFI.h"
 #include "myWebServer.h"
@@ -79,20 +79,20 @@ showBootTimes() {
 
 namespace HAL {
 
+extern HardwareSerial* gnssSerial;
+extern UnicoreUM980* gUm980;
+
 TaskHandle_t HAL_Update_Task = nullptr;
 
 void
 HAL_Update(void* e) {
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-    while (1) {
-        reportHeap();
+    reportHeap();
 
-        bluetoothUpdate();
+    stateUpdate(gUm980);
 
-        // webServerUpdate();
+    gnssUpdate();
 
-        vTaskDelayUntil(&xLastWakeTime, 10);
-    }
+    bluetoothUpdate();
 }
 
 void
@@ -114,14 +114,14 @@ HAL_Init() {
     DMW_b("FileSystem_Init");
     FileSystem_Init();
     // Init GNSS Module
-    DMW_b("GNSS_Init");
-    GNSS_Init();
-    DMW_b("GNSS_Configure");
-    GNSS_Configure();
-    // Init Bluetooth
-    DMW_b("Bluetooth_Init");
-    Bluetooth_Init();
+    DMW_b("gnssInit");
+    gnssInit();
 
+    DMW_b("bluetoothInit");
+    bluetoothInit();
+
+    DMW_b("stateInit");
+    stateInit();
     // DMW_b("wifiUpdateSettings");
     // wifiUpdateSettings();
     // if (settings.wifiConfigOverAP) {
@@ -130,8 +130,5 @@ HAL_Init() {
     // }
 
     showBootTimes();
-
-    xTaskCreatePinnedToCore(HAL_Update, "HAL_Update", HAL_UPDATE_STACK_SIZE, nullptr, HAL_UPDATE_PROI, &HAL_Update_Task,
-                            1);
 }
 } // namespace HAL

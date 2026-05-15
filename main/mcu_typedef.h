@@ -730,8 +730,8 @@ typedef struct settings_t {
     uint16_t cliBlePrintDelay_ms =
         50; // Time delayed between prints during a LIST command to avoid overwhelming the BLE connection
     uint32_t gnssConfigureRequest =
-        0;                        // Bitfield containing the change requests for various settings on the GNSS receiver
-    bool debugGnssConfig = false; // Enable to print output during gnssUpdate
+        0;                       // Bitfield containing the change requests for various settings on the GNSS receiver
+    bool debugGnssConfig = true; // Enable to print output during gnssUpdate
 
     int pppMode = PPP_MODE_HAS;            // 0 = Disable, 1 = B2b PPP, 2 = HAS, 0xFF = Auto
     int pppDatum = 1;                      // 1 = WGS84, 2 = PPP Original, 3 = CGCS2000

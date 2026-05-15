@@ -37,6 +37,11 @@ static uint32_t lastStateTime = 0;
 uint32_t lastSystemStateUpdate = 0;
 bool forceSystemStateUpdate = false; // Set true to avoid update wait
 
+void
+stateInit() {
+    systemState = STATE_ROVER_NOT_STARTED;
+}
+
 // Given the current state, see if conditions have moved us to a new state
 // A user pressing the mode button (change between rover/base) is handled by buttonCheckTask()
 void
@@ -141,6 +146,7 @@ stateUpdate(UnicoreUM980* gnss) {
             case (STATE_NTPSERVER_SYNC): break;
 #endif
             case (STATE_SHUTDOWN): break;
+            case (STATE_NOT_SET): break;
         }
     }
 }

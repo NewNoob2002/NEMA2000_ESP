@@ -45,16 +45,16 @@ app_main(void) {
     // uint32_t sent = 0;
     // uint32_t failed = 0;
 
-    // while (true) {
-    //     nmea2000.ParseMessages();
+    while (true) {
+        // nmea2000.ParseMessages();
 
-    //     tGatewayN2kMessages messages;
-    //     if (nmeaParser.TakeMessages(messages)) {
-    //         SendGatewayMessage(nmea2000, messages.LatLonRapid, "GNSS rapid position", sent, failed);
-    //         SendGatewayMessage(nmea2000, messages.CogSogRapid, "COG/SOG rapid", sent, failed);
-    //         SendGatewayMessage(nmea2000, messages.Gnss, "GNSS position data", sent, failed);
-    //     }
-
-    //     vTaskDelay(pdMS_TO_TICKS(10));
-    // }
+        // tGatewayN2kMessages messages;
+        // if (nmeaParser.TakeMessages(messages)) {
+        //     SendGatewayMessage(nmea2000, messages.LatLonRapid, "GNSS rapid position", sent, failed);
+        //     SendGatewayMessage(nmea2000, messages.CogSogRapid, "COG/SOG rapid", sent, failed);
+        //     SendGatewayMessage(nmea2000, messages.Gnss, "GNSS position data", sent, failed);
+        // }
+        HAL::HAL_Update(nullptr);
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
 }

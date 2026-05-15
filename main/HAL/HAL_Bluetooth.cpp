@@ -677,7 +677,7 @@ btReadTask(void* e) {
 
 namespace HAL {
 void
-Bluetooth_Init() {
+bluetoothInit() {
     bluetoothStart();
     if (!online_devices.bluetooth) {
         return;

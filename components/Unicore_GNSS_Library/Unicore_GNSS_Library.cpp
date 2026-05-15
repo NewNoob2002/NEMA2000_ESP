@@ -589,28 +589,25 @@ UnicoreGNSSLibrary::requestMessage(const char* messageName, const uint32_t timeo
 
 UnicoreResult_t
 UnicoreGNSSLibrary::logMessage(const char* messageName, const UnicorePort port, const UnicoreLogTrigger trigger,
-                               const float periodSeconds, const float offsetSeconds) {
+                               const float periodSeconds) {
     if (!messageName || (messageName[0] == 0)) {
         return Unicore_RESULT_WRONG_COMMAND;
     }
 
     char command[96] = {};
     const char* portText = portName(port);
-    const char* triggerText = triggerName(trigger);
 
     if (trigger == UnicoreLogTrigger::Once) {
         if (port == UnicorePort::Current) {
-            snprintf(command, sizeof(command), "LOG %s %s", messageName, triggerText);
+            snprintf(command, sizeof(command), "%s", messageName);
         } else {
-            snprintf(command, sizeof(command), "LOG %s %s %s", portText, messageName, triggerText);
+            snprintf(command, sizeof(command), "%s %s", portText, messageName);
         }
     } else {
         if (port == UnicorePort::Current) {
-            snprintf(command, sizeof(command), "LOG %s %s %.3f %.3f", messageName, triggerText, periodSeconds,
-                     offsetSeconds);
+            snprintf(command, sizeof(command), "%s %0.2f", messageName, periodSeconds);
         } else {
-            snprintf(command, sizeof(command), "LOG %s %s %s %.3f %.3f", portText, messageName, triggerText,
-                     periodSeconds, offsetSeconds);
+            snprintf(command, sizeof(command), "%s %s %0.2f", messageName, portText, periodSeconds);
         }
     }
 
