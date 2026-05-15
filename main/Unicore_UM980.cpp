@@ -125,17 +125,17 @@ UnicoreUM980::configure() {
         if (configureOnceTime() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
             return true;
         }
-        log(UnicoreLogLevel::Warn, UNICORE_LOG_DEBUG, "Configuration attempt %d failed, retrying...", x + 1);
+        log(UnicoreLogLevel::Warn, UNICORE_LOG_CHILD_CLASS, "Configuration attempt %d failed, retrying...", x + 1);
 
         //To Do: reset module
     }
-    log(UnicoreLogLevel::Error, UNICORE_LOG_DEBUG, "Configuration failed after 3 attempts");
+    log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS, "Configuration failed after 3 attempts");
     return false;
 }
 
 UnicoreResult_t
 UnicoreUM980::configureOnceTime() {
-    log(UnicoreLogLevel::Info, UNICORE_LOG_DEBUG, "Configuring UM980 with current settings...");
+    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Configuring UM980 with current settings...");
 
     UnicoreResult_t result = disableAllOutput();
 
@@ -237,10 +237,7 @@ UnicoreUM980::disableAllOutput() {
 
 bool
 UnicoreUM980::setMessagesNMEA() {
-    bool gpggaEnabled = false;
-    bool gpzdaEnabled = false;
-
-    log(UnicoreLogLevel::Info, UNICORE_LOG_DEBUG, "Setting NMEA messages on COM ports...");
+    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting NMEA messages on COM ports...");
 
     UnicoreResult_t result = disableAllOutput(); // Disable all NMEA and RTCM output on all ports...
 
@@ -278,7 +275,7 @@ UnicoreUM980::enableNmeaMessages(const UnicorePort port) {
         }
         if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
             if (settings.debugGnssConfig) {
-                log(UnicoreLogLevel::Error, UNICORE_LOG_DEBUG,
+                log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS,
                     "setMessagesNMEA failed to set %0.2f for message %s [%d] on port %s.\r\n",
                     _nmeaPeriods[messageNumber], kUm980NmeaMessages[messageNumber].name, messageNumber, portName(port));
             }
@@ -299,7 +296,7 @@ UnicoreUM980::disableNmeaMessages(const UnicorePort port) {
         }
         if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
             if (settings.debugGnssConfig) {
-                log(UnicoreLogLevel::Error, UNICORE_LOG_DEBUG,
+                log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS,
                     "setMessagesNMEA failed to set %0.2f for message %s [%d] on port %s.\r\n",
                     _nmeaPeriods[messageNumber], kUm980NmeaMessages[messageNumber].name, messageNumber, portName(port));
             }
@@ -311,30 +308,74 @@ UnicoreUM980::disableNmeaMessages(const UnicorePort port) {
 
 bool
 UnicoreUM980::setMessagesRTCMRover() {
+    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting RTCM rover messages on COM ports...");
+
+    UnicoreResult_t result = disableRtcmMessages();
+    result = firstError(result, enableRtcmRoverMessages());
+
+    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        um980MessagesEnabled_RTCM_Rover = true;
+        um980MessagesEnabled_RTCM_Base = false;
+        return true;
+    }
     return false;
 }
 
 bool
 UnicoreUM980::setMessagesRTCMBase() {
+    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting RTCM base messages on COM ports...");
+
+    UnicoreResult_t result = disableRtcmMessages();
+    result = firstError(result, enableRtcmBaseMessages());
+
+    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        um980MessagesEnabled_RTCM_Base = true;
+        um980MessagesEnabled_RTCM_Rover = false;
+        return true;
+    }
     return false;
 }
 
 UnicoreResult_t
 UnicoreUM980::enableRtcmRoverMessages(const UnicorePort port) {
-    // return setMessagePeriods(kUm980RtcmMessages, _rtcmRoverPeriods, MAX_UM980_RTCM_MSG, port);
-    return Unicore_RESULT_RESPONSE_OVERFLOW;
+    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
+    for (int messageNumber = 0; messageNumber < MAX_UM980_RTCM_MSG; messageNumber++) {
+        if (_rtcmRoverPeriods[messageNumber] > 0.0f) {
+            result = firstError(
+                result, setPortMessage(&kUm980RtcmMessages[messageNumber], _rtcmRoverPeriods[messageNumber], port));
+        }
+        if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            return result;
+        }
+    }
+    return result;
 }
 
 UnicoreResult_t
 UnicoreUM980::enableRtcmBaseMessages(const UnicorePort port) {
-    // return setMessagePeriods(kUm980RtcmMessages, _rtcmBasePeriods, MAX_UM980_RTCM_MSG, port);
-    return Unicore_RESULT_RESPONSE_OVERFLOW;
+    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
+    for (int messageNumber = 0; messageNumber < MAX_UM980_RTCM_MSG; messageNumber++) {
+        if (_rtcmBasePeriods[messageNumber] > 0.0f) {
+            result = firstError(
+                result, setPortMessage(&kUm980RtcmMessages[messageNumber], _rtcmBasePeriods[messageNumber], port));
+        }
+        if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            return result;
+        }
+    }
+    return result;
 }
 
 UnicoreResult_t
 UnicoreUM980::disableRtcmMessages(const UnicorePort port) {
-    // return unlogMessages(kUm980RtcmMessages, MAX_UM980_RTCM_MSG, port);
-    return Unicore_RESULT_RESPONSE_OVERFLOW;
+    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
+    for (int messageNumber = 0; messageNumber < MAX_UM980_RTCM_MSG; messageNumber++) {
+        result = firstError(result, unlogMessage(kUm980RtcmMessages[messageNumber].name, port));
+        if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            return result;
+        }
+    }
+    return result;
 }
 
 UnicoreResult_t
@@ -391,8 +432,8 @@ UnicoreUM980::setModel(const uint8_t modelNumber) {
         } else if (modelNumber == UM980_DYN_MODEL_ROVER_AUTOMOTIVE) {
             return setRoverMode("AUTOMOTIVE") == Unicore_RESULT_RESPONSE_COMMAND_OK;
         } else {
-            log(UnicoreLogLevel::Error, UNICORE_LOG_DEBUG, "Unsupported UM980 model number: %u, Use SURVEY default",
-                modelNumber);
+            log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS,
+                "Unsupported UM980 model number: %u, Use SURVEY default", modelNumber);
             return setRoverMode("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
         }
     }
@@ -726,18 +767,28 @@ UnicoreUM980::gnssInBaseSurveyInMode() {
 
 bool
 UnicoreUM980::gnssInBaseFixedMode() {
-    return _model == UM980_DYN_MODEL_BASE;
+    return _model == UM980_DYN_MODEL_BASE_TIME;
 }
 
 void
 UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {
-    char MsgName[16] = {};
-    snprintf(MsgName, sizeof(MsgName), "%s", 6);
-    log(UnicoreLogLevel::Info, UNICORE_LOG_DEBUG, "NMEA %s sentence received.", MsgName);
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!sentence) {
+        return;
+    }
+#endif // UNICORE_NULLPTR_CHECK
+
+    // log(UnicoreLogLevel::Debug, UNICORE_LOG_CHILD_CLASS, "NMEA %s sentence received.", msgName);
 }
 
 void
 UnicoreUM980::processHashSentence(const char* sentence, uint16_t length) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!sentence) {
+        return;
+    }
+#endif // UNICORE_NULLPTR_CHECK
+
     if (sentence && (strncmp(sentence, "#MODE,", 6) == 0)) {
         handleModeSentence(sentence, length);
     }
@@ -771,21 +822,25 @@ UnicoreUM980::handleModeSentence(const char* sentence, uint16_t length) {
 
     if (strcasecmp(mode, "ROVER") == 0) {
         _mode = Um980Mode::Rover;
+        if (strcasecmp(model, "UAV") == 0) {
+            _model = UM980_DYN_MODEL_ROVER_UAV;
+        } else if (strcasecmp(model, "AUTOMOTIVE") == 0) {
+            _model = UM980_DYN_MODEL_ROVER_AUTOMOTIVE;
+        } else {
+            _model = UM980_DYN_MODEL_ROVER_SURVEY;
+        }
     } else if (strcasecmp(mode, "BASE") == 0) {
         _mode = Um980Mode::Base;
+        if ((strcasecmp(model, "TIME") == 0) || (strcasecmp(model, "FIXED") == 0)) {
+            _model = UM980_DYN_MODEL_BASE_TIME;
+        } else {
+            _model = UM980_DYN_MODEL_BASE;
+        }
     } else {
         _mode = Um980Mode::Unknown;
     }
 
-    if (strcasecmp(model, "SURVEY") == 0) {
-        _model = UM980_DYN_MODEL_ROVER_SURVEY;
-    } else if (strcasecmp(model, "UAV") == 0) {
-        _model = UM980_DYN_MODEL_ROVER_UAV;
-    } else if (strcasecmp(model, "AUTOMOTIVE") == 0) {
-        _model = UM980_DYN_MODEL_ROVER_AUTOMOTIVE;
-    }
-
-    log(UnicoreLogLevel::Info, UNICORE_LOG_DEBUG, "Mode sentence received. Mode: %s, Model: %s", mode, model);
+    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Mode sentence received. Mode: %s, Model: %s", mode, model);
 }
 
 void
@@ -803,6 +858,12 @@ UnicoreUM980::NmeaCallback(const char* sentence, uint16_t length, void* userdata
 
 void
 UnicoreUM980::HashCallback(const char* sentence, uint16_t length, void* userdata) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!sentence || !userdata) {
+        return;
+    }
+#endif //UNICORE_NULLPTR_CHECK
+
     UnicoreUM980* instance = static_cast<UnicoreUM980*>(userdata);
     if (instance) {
         instance->processHashSentence(sentence, length);
@@ -811,23 +872,64 @@ UnicoreUM980::HashCallback(const char* sentence, uint16_t length, void* userdata
 
 void
 UnicoreUM980::RtcmCallback(const uint8_t* message, uint16_t length, uint16_t messageNumber, void* userdata) {
-    (void)message;
-    (void)length;
-    (void)messageNumber;
-    (void)userdata;
+#ifdef UNICORE_NULLPTR_CHECK
+    if ((!message && (length > 0)) || !userdata) {
+        return;
+    }
+#endif //UNICORE_NULLPTR_CHECK
+
+    UnicoreUM980* instance = static_cast<UnicoreUM980*>(userdata);
+    if (instance) {
+        instance->processRtcmMessage(message, length, messageNumber);
+    }
 }
 
 void
 UnicoreUM980::BinaryCallback(const UnicoreBinaryHeader& header, const uint8_t* payload, uint16_t length,
                              void* userdata) {
-    (void)header;
-    (void)payload;
-    (void)length;
-    (void)userdata;
+#ifdef UNICORE_NULLPTR_CHECK
+    if ((!payload && (length > 0)) || !userdata) {
+        return;
+    }
+#endif //UNICORE_NULLPTR_CHECK
+
+    UnicoreUM980* instance = static_cast<UnicoreUM980*>(userdata);
+    if (instance) {
+        instance->processBinaryMessage(header, payload, length);
+    }
+}
+
+void
+UnicoreUM980::processRtcmMessage(const uint8_t* message, uint16_t length, uint16_t messageNumber) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!message && (length > 0)) {
+        return;
+    }
+#endif //UNICORE_NULLPTR_CHECK
+
+    log(UnicoreLogLevel::Verbose, UNICORE_LOG_CHILD_CLASS, "RTCM%u message received, length=%u", messageNumber, length);
+}
+
+void
+UnicoreUM980::processBinaryMessage(const UnicoreBinaryHeader& header, const uint8_t* payload, uint16_t length) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!payload && (length > 0)) {
+        return;
+    }
+#endif //UNICORE_NULLPTR_CHECK
+
+    log(UnicoreLogLevel::Verbose, UNICORE_LOG_CHILD_CLASS, "Binary message %u received, length=%u", header.messageId,
+        length);
 }
 
 UnicoreResult_t
 UnicoreUM980::setPortMessage(const Um980MessageConfig* messages, const float periods, const UnicorePort port) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!messages || !messages->name || (messages->name[0] == 0)) {
+        return Unicore_RESULT_WRONG_COMMAND;
+    }
+#endif //UNICORE_NULLPTR_CHECK
+
     UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
     if (periods > 0.0f) {
         result = firstError(result, logMessage(messages->name, port, UnicoreLogTrigger::OnTime, periods));
@@ -840,6 +942,12 @@ UnicoreUM980::setPortMessage(const Um980MessageConfig* messages, const float per
 bool
 UnicoreUM980::setMessagePeriod(const Um980MessageConfig* messages, float* periods, const size_t count,
                                const char* msgName, const float periodSeconds) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!messages || !periods) {
+        return false;
+    }
+#endif //UNICORE_NULLPTR_CHECK
+
     const int16_t index = findMessageIndex(messages, count, msgName);
     if (index == UM980_MESSAGE_NOT_FOUND) {
         return false;
@@ -852,6 +960,12 @@ UnicoreUM980::setMessagePeriod(const Um980MessageConfig* messages, float* period
 float
 UnicoreUM980::getMessagePeriod(const Um980MessageConfig* messages, const float* periods, const size_t count,
                                const char* msgName) const {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!messages || !periods) {
+        return 0.0f;
+    }
+#endif //UNICORE_NULLPTR_CHECK
+
     const int16_t index = findMessageIndex(messages, count, msgName);
     if (index == UM980_MESSAGE_NOT_FOUND) {
         return 0.0f;
@@ -861,11 +975,16 @@ UnicoreUM980::getMessagePeriod(const Um980MessageConfig* messages, const float* 
 
 int16_t
 UnicoreUM980::findMessageIndex(const Um980MessageConfig* messages, const size_t count, const char* msgName) const {
-    if (!msgName) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!messages || !msgName) {
         return UM980_MESSAGE_NOT_FOUND;
     }
+#endif //UNICORE_NULLPTR_CHECK
 
     for (size_t index = 0; index < count; index++) {
+        if (!messages[index].name) {
+            continue;
+        }
         if (strcasecmp(messages[index].name, msgName) == 0) {
             return static_cast<int16_t>(index);
         }

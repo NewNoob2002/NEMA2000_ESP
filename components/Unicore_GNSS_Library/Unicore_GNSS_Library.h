@@ -41,7 +41,7 @@ enum UnicoreLogMask : uint32_t {
     UNICORE_LOG_PARSER = 1UL << 3,
     UNICORE_LOG_DATA = 1UL << 4,
     UNICORE_LOG_TASK = 1UL << 5,
-    UNICORE_LOG_DEBUG = 1UL << 6,
+    UNICORE_LOG_CHILD_CLASS = 1UL << 6,
     UNICORE_LOG_ALL = 0xFFFFFFFFUL,
 };
 

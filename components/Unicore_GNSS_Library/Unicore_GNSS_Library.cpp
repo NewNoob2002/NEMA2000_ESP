@@ -185,15 +185,6 @@ getCsvField(const char* text, const uint8_t fieldIndex, char* output, const size
     return true;
 }
 
-uint8_t
-parseUint8Field(const char* text, const uint8_t fieldIndex, const char delimiter = ',') {
-    char field[12] = {};
-    if (!getCsvField(text, fieldIndex, field, sizeof(field), delimiter)) {
-        return 0;
-    }
-    return static_cast<uint8_t>(strtoul(field, nullptr, 10));
-}
-
 void
 copyToken(char* destination, const size_t destinationSize, const char* source) {
     if (!destination || (destinationSize == 0)) {
@@ -642,6 +633,12 @@ UnicoreGNSSLibrary::unlogPort(const UnicorePort port) {
 
 UnicoreResult_t
 UnicoreGNSSLibrary::enableSystem(const char* systemName) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!systemName || (systemName[0] == 0)) {
+        return Unicore_RESULT_WRONG_COMMAND;
+    }
+#endif // UNICORE_NULLPTR_CHECK
+
     char command[32] = {};
     snprintf(command, sizeof(command), "UNMASK %s", systemName);
 
@@ -650,6 +647,12 @@ UnicoreGNSSLibrary::enableSystem(const char* systemName) {
 
 UnicoreResult_t
 UnicoreGNSSLibrary::disableSystem(const char* systemName) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!systemName || (systemName[0] == 0)) {
+        return Unicore_RESULT_WRONG_COMMAND;
+    }
+#endif // UNICORE_NULLPTR_CHECK
+
     char command[32] = {};
     snprintf(command, sizeof(command), "MASK %s", systemName);
 
@@ -716,25 +719,25 @@ UnicoreGNSSLibrary::factoryReset() {
 void
 UnicoreGNSSLibrary::setNmeaCallback(const UnicoreNmeaCallback callback, void* userdata) {
     _nmeaCallback = callback;
-    _nmeaCallbackUserdata = userdata;
+    _nmeaCallbackUserdata = callback ? userdata : nullptr;
 }
 
 void
 UnicoreGNSSLibrary::setRtcmCallback(const UnicoreRtcmCallback callback, void* userdata) {
     _rtcmCallback = callback;
-    _rtcmCallbackUserdata = userdata;
+    _rtcmCallbackUserdata = callback ? userdata : nullptr;
 }
 
 void
 UnicoreGNSSLibrary::setBinaryCallback(const UnicoreBinaryCallback callback, void* userdata) {
     _binaryCallback = callback;
-    _binaryCallbackUserdata = userdata;
+    _binaryCallbackUserdata = callback ? userdata : nullptr;
 }
 
 void
 UnicoreGNSSLibrary::setHashCallback(UnicoreHashCallback callback, void* context) {
     _hashCallback = callback;
-    _hashCallbackUserdata = context;
+    _hashCallbackUserdata = callback ? context : nullptr;
 }
 
 void
@@ -858,7 +861,12 @@ UnicoreGNSSLibrary::parserEomCallback(SEMP_PARSE_STATE* parse, const uint16_t ty
 bool
 UnicoreGNSSLibrary::parserBadChecksumCallback(SEMP_PARSE_STATE* parse) {
     if (_activeInstance) {
-        _activeInstance->log(UnicoreLogLevel::Debug, UNICORE_LOG_PARSER, "bad checksum, received : %s", parse->buffer);
+        if (parse && parse->buffer) {
+            _activeInstance->log(UnicoreLogLevel::Debug, UNICORE_LOG_PARSER, "bad checksum, received : %s",
+                                 parse->buffer);
+        } else {
+            _activeInstance->log(UnicoreLogLevel::Debug, UNICORE_LOG_PARSER, "bad checksum, empty parser frame");
+        }
     }
     return false;
 }
@@ -925,6 +933,30 @@ UnicoreGNSSLibrary::handleNmeaSentence(const char* sentence, const uint16_t leng
 
     updateCommandResultFromSentence(sentence);
 
+    const size_t sentenceLength = (length > 0) ? length : strlen(sentence);
+    if (sentenceLength < 6) {
+        return;
+    }
+
+    char msgName[8] = {};
+    const char* start = (*sentence == '$') ? (sentence + 1) : sentence;
+    size_t index = 0;
+    while (start[index] && (start[index] != ',') && (index < (sizeof(msgName) - 1))) {
+        msgName[index] = start[index];
+        index++;
+    }
+
+    if (strcasecmp(msgName, "GNGGA") == 0 || strcasecmp(msgName, "GPGGA") == 0) {
+        const char* cursor = sentence;
+        uint8_t field = 0;
+        while (*cursor && (field < 6)) {
+            if (*cursor == ',') {
+                field++;
+            }
+            cursor++;
+        }
+        nmeaPositionStatus = static_cast<uint8_t>(strtoul(cursor, nullptr, 10));
+    }
     if (_nmeaCallback) {
         _nmeaCallback(sentence, length, _nmeaCallbackUserdata);
     }
@@ -945,6 +977,11 @@ UnicoreGNSSLibrary::handleConfigSentence(const char* sentence, const uint16_t le
 
 void
 UnicoreGNSSLibrary::handleRtcmMessage(const uint8_t* message, const uint16_t length, const uint16_t messageNumber) {
+    if (!message && (length > 0)) {
+        log(UnicoreLogLevel::Warn, UNICORE_LOG_RX, "RX RTCM rejected: null message length=%u", length);
+        return;
+    }
+
     log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "Unicore RTCM%u length=%u", messageNumber, length);
     if (_rtcmCallback) {
         _rtcmCallback(message, length, messageNumber, _rtcmCallbackUserdata);
@@ -1122,6 +1159,12 @@ UnicoreGNSSLibrary::decodeVersionBinary(const uint8_t* payload, const uint16_t l
 
 void
 UnicoreGNSSLibrary::decodeVersionHash(const char* sentence) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!sentence) {
+        return;
+    }
+#endif // UNICORE_NULLPTR_CHECK
+
     const char* payload = strchr(sentence, ';');
     if (!payload) {
         return;
