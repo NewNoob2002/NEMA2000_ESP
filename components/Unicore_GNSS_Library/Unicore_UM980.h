@@ -14,10 +14,10 @@ struct Um980MessageConfig {
     float defaultPeriodSeconds;
 };
 
-enum class Um980DynamicModel : uint8_t {
-    Survey = 0,
-    Uav,
-    Automotive,
+enum Um980DynamicModel : uint8_t {
+    UM980_DYN_MODEL_SURVEY = 0,
+    UM980_DYN_MODEL_UAV,
+    UM980_DYN_MODEL_AUTOMOTIVE,
 };
 
 enum class Um980Mode : uint8_t {
@@ -69,13 +69,17 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     void powerOn();
     void powerOff();
 
+    void isOnline(bool online);
+
     void resetDefaults();
     void baseRtcmDefault();
     void baseRtcmLowDataRate();
 
+    bool configure();
+    bool configureRover();
+
     UnicoreResult_t configureOnceTime();
     UnicoreResult_t configureGNSS(UnicorePort port = UnicorePort::Current);
-    UnicoreResult_t configureRover(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t configureBase(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t configureRoverOutput(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t configureBaseOutput(UnicorePort port = UnicorePort::Current);
@@ -90,10 +94,12 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     UnicoreResult_t enableRtcmBaseMessages(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t disableRtcmMessages(UnicorePort port = UnicorePort::Current);
 
-    UnicoreResult_t setRoverMode();
+    bool setModel(uint8_t modelNumber);
+    uint8_t getModel();
+    UnicoreResult_t setMode(const char* modeCommand);
+    UnicoreResult_t setRoverMode(const char* roverType);
     UnicoreResult_t setBaseMode();
     UnicoreResult_t setRate(double secondsBetweenSolutions);
-    UnicoreResult_t setModel(Um980DynamicModel model);
     UnicoreResult_t setElevation(uint8_t elevationDegrees);
     UnicoreResult_t setMinCno(uint8_t cnoValue);
     UnicoreResult_t setMultipathMitigation(bool enable);
@@ -148,6 +154,10 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     bool isValidDate() const;
     bool isValidTime() const;
     bool isFullyResolved() const;
+    // process
+    void processNmeaSentence(const char* sentence, uint16_t length = 0);
+    //handle
+    void handleModeSentence(const char* sentence, uint16_t length);
 
   private:
     gpio_num_t _powerPin;
@@ -158,36 +168,15 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     float _rtcmBasePeriods[MAX_UM980_RTCM_MSG] = {};
     bool _constellationEnabled[MAX_UM980_CONSTELLATIONS] = {};
 
-    // double _latitude = 0.0;
-    // double _longitude = 0.0;
-    // double _altitude = 0.0;
-    // float _horizontalAccuracy = 0.0f;
-    // double _ecefX = 0.0;
-    // double _ecefY = 0.0;
-    // double _ecefZ = 0.0;
-    // uint8_t _day = 0;
-    // uint8_t _month = 0;
-    // uint16_t _year = 0;
-    // uint8_t _hour = 0;
-    // uint8_t _minute = 0;
-    // uint8_t _second = 0;
-    // uint16_t _millisecond = 0;
-    // uint8_t _leapSeconds = 18;
-    // uint8_t _satellitesInView = 0;
-    // uint8_t _fixType = 0;
-    // uint8_t _carrierSolution = 0;
-    // bool _validDate = false;
-    // bool _validTime = false;
-    // bool _confirmedDate = false;
-    // bool _confirmedTime = false;
-    // bool _fullyResolved = false;
-    // bool _pvtUpdated = false;
-    // unsigned long _pvtArrivalMillis = 0;
     double _rateSeconds = 1.0;
+    bool _online = false;
     Um980Mode _mode = Um980Mode::Unknown;
-    // char _firmwareVersion[sizeof(UNICORE_VERSION_data_t::swVersion)] = {};
-    // char _serialNumber[sizeof(UNICORE_VERSION_data_t::serialNumber)] = {};
-    // char _id[sizeof(UNICORE_VERSION_data_t::efuseID)] = {};
+
+    static void RtcmCallback(const uint8_t* message, uint16_t length, uint16_t messageNumber, void* userdata);
+    static void NmeaCallback(const char* sentence, uint16_t length, void* userdata);
+    static void BinaryCallback(const UnicoreBinaryHeader& header, const uint8_t* payload, uint16_t length,
+                               void* userdata);
+    static void HashCallback(const char* sentence, uint16_t length, void* userdata);
 
     UnicoreResult_t applyMessagePeriods(const Um980MessageConfig* messages, const float* periods, size_t count,
                                         UnicorePort port);
@@ -197,7 +186,8 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     float getMessagePeriod(const Um980MessageConfig* messages, const float* periods, size_t count,
                            const char* msgName) const;
     int16_t findMessageIndex(const Um980MessageConfig* messages, size_t count, const char* msgName) const;
-    UnicoreResult_t firstError(UnicoreResult_t current, UnicoreResult_t next) const;
+    UnicoreResult_t firstError(UnicoreResult_t current, UnicoreResult_t next,
+                               UnicoreResult_t request = Unicore_RESULT_RESPONSE_COMMAND_OK) const;
 };
 
 #endif // UNICORE_UM980_H

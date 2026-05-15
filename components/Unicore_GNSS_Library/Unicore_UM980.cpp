@@ -6,10 +6,10 @@
 #include "Unicore_Struct.h"
 
 namespace {
+constexpr uint8_t kPosTypeSingle = 16;
 constexpr uint8_t kPosTypePsrDiff = 17;
-constexpr uint8_t kPosTypeL1Float = 32;
 constexpr uint8_t kPosTypeNarrowFloat = 34;
-constexpr uint8_t kPosTypeL1Int = 48;
+constexpr uint8_t kPosTypeWideInt = 49;
 constexpr uint8_t kPosTypeNarrowInt = 50;
 
 bool
@@ -20,9 +20,9 @@ isPositivePeriod(const float periodSeconds) {
 const char*
 dynamicModelName(const Um980DynamicModel model) {
     switch (model) {
-        case Um980DynamicModel::Survey: return "SURVEY";
-        case Um980DynamicModel::Uav: return "UAV";
-        case Um980DynamicModel::Automotive: return "AUTOMOTIVE";
+        case Um980DynamicModel::UM980_DYN_MODEL_SURVEY: return "SURVEY";
+        case Um980DynamicModel::UM980_DYN_MODEL_UAV: return "UAV";
+        case Um980DynamicModel::UM980_DYN_MODEL_AUTOMOTIVE: return "AUTOMOTIVE";
         default: return "SURVEY";
     }
 }
@@ -40,6 +40,11 @@ UnicoreUM980::init() {
     ioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&ioConfig);
     gpio_set_level(_powerPin, 0);
+
+    setRtcmCallback(RtcmCallback, this);
+    setNmeaCallback(NmeaCallback, this);
+    setBinaryCallback(BinaryCallback, this);
+    setHashCallback(HashCallback, this);
 }
 
 void
@@ -50,6 +55,11 @@ UnicoreUM980::powerOn() {
 void
 UnicoreUM980::powerOff() {
     gpio_set_level(_powerPin, 0);
+}
+
+void
+UnicoreUM980::isOnline(bool online) {
+    _online = online;
 }
 
 void
@@ -98,8 +108,24 @@ UnicoreUM980::baseRtcmLowDataRate() {
     setRtcmBaseMessagePeriod("RTCM1124", 2.0f);
 }
 
+bool
+UnicoreUM980::configure() {
+    for (int x = 0; x < 3; x++) {
+        if (configureOnceTime() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            return true;
+        }
+        log(UnicoreLogLevel::Warn, UNICORE_LOG_DEBUG, "Configuration attempt %d failed, retrying...", x + 1);
+
+        //To Do: reset module
+    }
+    log(UnicoreLogLevel::Error, UNICORE_LOG_DEBUG, "Configuration failed after 3 attempts");
+    return false;
+}
+
 UnicoreResult_t
 UnicoreUM980::configureOnceTime() {
+    log(UnicoreLogLevel::Info, UNICORE_LOG_DEBUG, "Configuring UM980 with current settings...");
+
     UnicoreResult_t result = disableAllOutput();
 
     result = firstError(result, setElevation(15));
@@ -122,11 +148,10 @@ UnicoreUM980::configureGNSS(const UnicorePort port) {
     return result;
 }
 
-UnicoreResult_t
-UnicoreUM980::configureRover(const UnicorePort port) {
-    UnicoreResult_t result = setRoverMode();
-    result = firstError(result, configureRoverOutput(port));
-    _mode = (result == Unicore_RESULT_RESPONSE_COMMAND_OK) ? Um980Mode::Rover : _mode;
+bool
+UnicoreUM980::configureRover() {
+    int currentMode = getMode();
+    // result = firstError(result, configureRoverOutput(port));
     return result;
 }
 
@@ -242,12 +267,18 @@ UnicoreUM980::disableRtcmMessages(const UnicorePort port) {
 }
 
 UnicoreResult_t
-UnicoreUM980::setRoverMode() {
-    const UnicoreResult_t result = sendCommandAndWait("MODE ROVER", 1500);
-    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
-        _mode = Um980Mode::Rover;
-    }
-    return result;
+UnicoreUM980::setMode(const char* modeCommand) {
+    char command[64] = {};
+    snprintf(command, sizeof(command), "MODE %s", modeCommand);
+
+    return sendCommandAndWait(command, 1500);
+}
+
+UnicoreResult_t
+UnicoreUM980::setRoverMode(const char* roverType) {
+    char command[50];
+    snprintf(command, sizeof(command), "ROVER %s", roverType);
+    return setMode(command);
 }
 
 UnicoreResult_t
@@ -269,11 +300,30 @@ UnicoreUM980::setRate(const double secondsBetweenSolutions) {
     return Unicore_RESULT_RESPONSE_COMMAND_OK;
 }
 
-UnicoreResult_t
-UnicoreUM980::setModel(const Um980DynamicModel model) {
-    char command[40] = {};
-    snprintf(command, sizeof(command), "DYNMODEL %s", dynamicModelName(model));
-    return sendCommandAndWait(command, 1000);
+bool
+UnicoreUM980::setModel(const uint8_t modelNumber) {
+    if (_online) {
+        if (modelNumber == UM980_DYN_MODEL_SURVEY) {
+            return setRoverMode("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+        } else if (modelNumber == UM980_DYN_MODEL_UAV) {
+            return setRoverMode("UAV") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+        } else if (modelNumber == UM980_DYN_MODEL_AUTOMOTIVE) {
+            return setRoverMode("AUTOMOTIVE") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+        } else {
+            log(UnicoreLogLevel::Error, UNICORE_LOG_DEBUG, "Unsupported UM980 model number: %u, Use SURVEY default",
+                modelNumber);
+            return setRoverMode("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+        }
+    }
+    return false;
+}
+
+uint8_t
+UnicoreUM980::getModel() {
+    if (sendCommandAndWait("MODE", 2000, "#MODE") == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        return strtoul(_lastCommandResponse, nullptr, 10);
+    }
+    return 0;
 }
 
 UnicoreResult_t
@@ -558,13 +608,13 @@ UnicoreUM980::isDgpsFixed() const {
 bool
 UnicoreUM980::isRTKFix() const {
     uint8_t _fixType = getFixType();
-    return (_fixType == kPosTypeL1Int) || (_fixType == kPosTypeNarrowInt);
+    return (_fixType == kPosTypeNarrowInt);
 }
 
 bool
 UnicoreUM980::isRTKFloat() const {
     uint8_t _fixType = getFixType();
-    return (_fixType == kPosTypeL1Float) || (_fixType == kPosTypeNarrowFloat);
+    return (_fixType == kPosTypeWideInt) || (_fixType == kPosTypeNarrowFloat);
 }
 
 bool
@@ -582,6 +632,27 @@ UnicoreUM980::isFullyResolved() const {
     return _fullyResolved;
 }
 
+void
+UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {
+    if (getLastCommandResult() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        // capture response to command for potential use in getters like getModel()
+        if (strncmp(sentence, "#MODE,", 6) == 0) {
+            handleModeSentence(sentence, length);
+        }
+    }
+}
+
+void
+UnicoreUM980::handleModeSentence(const char* sentence, uint16_t length) {}
+
+void
+UnicoreUM980::NmeaCallback(const char* sentence, uint16_t length, void* userdata) {
+    UnicoreUM980* instance = static_cast<UnicoreUM980*>(userdata);
+    if (instance) {
+        instance->processNmeaSentence(sentence, length);
+    }
+}
+
 UnicoreResult_t
 UnicoreUM980::applyMessagePeriods(const Um980MessageConfig* messages, const float* periods, const size_t count,
                                   const UnicorePort port) {
@@ -589,9 +660,10 @@ UnicoreUM980::applyMessagePeriods(const Um980MessageConfig* messages, const floa
     for (size_t index = 0; index < count; index++) {
         if (isPositivePeriod(periods[index])) {
             result =
-                firstError(result, logMessage(messages[index].name, port, UnicoreLogTrigger::OnTime, periods[index]));
+                firstError(result, logMessage(messages[index].name, port, UnicoreLogTrigger::OnTime, periods[index]),
+                           Unicore_RESULT_RESPONSE_COMMAND_OK);
         } else {
-            result = firstError(result, unlogMessage(messages[index].name, port));
+            result = firstError(result, unlogMessage(messages[index].name, port), Unicore_RESULT_RESPONSE_COMMAND_OK);
         }
     }
     return result;
@@ -601,7 +673,7 @@ UnicoreResult_t
 UnicoreUM980::unlogMessages(const Um980MessageConfig* messages, const size_t count, const UnicorePort port) {
     UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
     for (size_t index = 0; index < count; index++) {
-        result = firstError(result, unlogMessage(messages[index].name, port));
+        result = firstError(result, unlogMessage(messages[index].name, port), Unicore_RESULT_RESPONSE_COMMAND_OK);
     }
     return result;
 }
@@ -643,6 +715,7 @@ UnicoreUM980::findMessageIndex(const Um980MessageConfig* messages, const size_t 
 }
 
 UnicoreResult_t
-UnicoreUM980::firstError(const UnicoreResult_t current, const UnicoreResult_t next) const {
-    return (current == Unicore_RESULT_RESPONSE_COMMAND_OK) ? next : current;
+UnicoreUM980::firstError(const UnicoreResult_t current, const UnicoreResult_t next,
+                         const UnicoreResult_t request) const {
+    return (current == request) ? next : current;
 }

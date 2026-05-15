@@ -15,3 +15,5 @@ void stateUpdate(UnicoreUM980* pUm980);
 void requestChangeState(SystemState_t requestedState);
 const char* getState(SystemState_t state);
 void changeState(SystemState_t newState);
+
+bool inWebConfigMode();

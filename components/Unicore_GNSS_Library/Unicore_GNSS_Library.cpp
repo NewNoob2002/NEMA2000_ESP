@@ -735,6 +735,12 @@ UnicoreGNSSLibrary::setBinaryCallback(const UnicoreBinaryCallback callback, void
 }
 
 void
+UnicoreGNSSLibrary::setHashCallback(UnicoreHashCallback callback, void* context) {
+    _hashCallback = callback;
+    _hashCallbackUserdata = context;
+}
+
+void
 UnicoreGNSSLibrary::enableBinaryBeforeFix() {
     startBinaryBeforeFix = true;
 }
@@ -923,7 +929,7 @@ UnicoreGNSSLibrary::handleNmeaSentence(const char* sentence, const uint16_t leng
     updateCommandResultFromSentence(sentence);
 
     if (_nmeaCallback) {
-        _nmeaCallback(sentence, _nmeaCallbackUserdata);
+        _nmeaCallback(sentence, length, _nmeaCallbackUserdata);
     }
 }
 
@@ -963,7 +969,7 @@ UnicoreGNSSLibrary::handleHashSentence(const char* sentence, const uint16_t leng
     updateCommandResultFromSentence(sentence);
 
     if (_hashCallback) {
-        _hashCallback(sentence, length, _hashCallbackUserdate);
+        _hashCallback(sentence, length, _hashCallbackUserdata);
     }
 }
 

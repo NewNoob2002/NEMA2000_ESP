@@ -40,7 +40,13 @@ bool forceSystemStateUpdate = false; // Set true to avoid update wait
 // Given the current state, see if conditions have moved us to a new state
 // A user pressing the mode button (change between rover/base) is handled by buttonCheckTask()
 void
-stateUpdate(UnicoreUM980* pUm980) {
+stateUpdate(UnicoreUM980* gnss) {
+    if (gnss != nullptr) {
+        systemPrintln(
+            "Error: stateUpdate should not be called with a non-nullptr pUm980. State updates should occur regardless "
+            "of GNSS state, and the current state of the GNSS should be checked within the state machine as needed.");
+        return;
+    }
     if (((millis() - lastSystemStateUpdate) > 500) || (forceSystemStateUpdate == true)) {
         lastSystemStateUpdate = millis();
         forceSystemStateUpdate = false;
@@ -84,13 +90,33 @@ stateUpdate(UnicoreUM980* pUm980) {
                 }
             } break;
             case (STATE_ROVER_NO_FIX): {
-                if (pUm980->isFixed()) {
+                if (gnss->isFixed()) {
                     changeState(STATE_ROVER_FIX);
                 }
             } break;
-            case (STATE_ROVER_FIX): break;
-            case (STATE_ROVER_RTK_FLOAT): break;
-            case (STATE_ROVER_RTK_FIX): break;
+            case (STATE_ROVER_FIX): {
+                if (gnss->isRTKFloat()) {
+                    changeState(STATE_ROVER_RTK_FLOAT);
+                } else if (gnss->isRTKFix()) {
+                    changeState(STATE_ROVER_RTK_FIX);
+                }
+            } break;
+            case (STATE_ROVER_RTK_FLOAT): {
+                if (gnss->isRTKFix() == false && gnss->isRTKFloat() == false) { // No RTK
+                    changeState(STATE_ROVER_FIX);
+                }
+                if (gnss->isRTKFix() == true) {
+                    changeState(STATE_ROVER_RTK_FIX);
+                }
+            } break;
+            case (STATE_ROVER_RTK_FIX): {
+                if (gnss->isRTKFix() == false && gnss->isRTKFloat() == false) { // No RTK
+                    changeState(STATE_ROVER_FIX);
+                }
+                if (gnss->isRTKFloat()) {
+                    changeState(STATE_ROVER_RTK_FLOAT);
+                }
+            } break;
             /* BASE STATES */
             case (STATE_BASE_CASTER_NOT_STARTED): break;
             case (STATE_BASE_ASSIST_NOT_STARTED): break;

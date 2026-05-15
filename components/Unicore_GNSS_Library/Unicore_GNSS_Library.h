@@ -37,6 +37,7 @@ enum UnicoreLogMask : uint32_t {
     UNICORE_LOG_PARSER = 1UL << 3,
     UNICORE_LOG_DATA = 1UL << 4,
     UNICORE_LOG_TASK = 1UL << 5,
+    UNICORE_LOG_DEBUG = 1UL << 6,
     UNICORE_LOG_ALL = 0xFFFFFFFFUL,
 };
 
@@ -54,10 +55,10 @@ struct UnicoreBinaryHeader {
 };
 
 typedef void (*UnicoreRtcmCallback)(const uint8_t* message, uint16_t length, uint16_t messageNumber, void* userdata);
-typedef void (*UnicoreNmeaCallback)(const char* sentence, void* userdata);
+typedef void (*UnicoreNmeaCallback)(const char* sentence, uint16_t length, void* userdata);
 typedef void (*UnicoreBinaryCallback)(const UnicoreBinaryHeader& header, const uint8_t* payload, uint16_t length,
                                       void* userdata);
-typedef void (*UnicoreHashCallback)(const char* sentence, uint16_t lenth, void* userdata);
+typedef void (*UnicoreHashCallback)(const char* sentence, uint16_t length, void* userdata);
 
 class UnicoreGNSSLibrary {
   public:
@@ -131,6 +132,7 @@ class UnicoreGNSSLibrary {
     void setNmeaCallback(UnicoreNmeaCallback callback, void* context = nullptr);
     void setRtcmCallback(UnicoreRtcmCallback callback, void* context = nullptr);
     void setBinaryCallback(UnicoreBinaryCallback callback, void* context = nullptr);
+    void setHashCallback(UnicoreHashCallback callback, void* context = nullptr);
 
     void enableBinaryBeforeFix();
     void disableBinaryBeforeFix();
@@ -164,6 +166,7 @@ class UnicoreGNSSLibrary {
     uint8_t nmeaPositionStatus = 0; // Position psition status obtained from GNGGA NMEA
 
   public:
+    void log(UnicoreLogLevel level, uint32_t mask, const char* format, ...);
     const UnicoreBinaryHeader& getLastBinaryHeader() const;
     uint32_t getLastBestNavMs() const;
     uint32_t getLastBestNavXyzMs() const;
@@ -213,7 +216,7 @@ class UnicoreGNSSLibrary {
     UnicoreBinaryCallback _binaryCallback = nullptr;
     void* _binaryCallbackUserdata = nullptr;
     UnicoreHashCallback _hashCallback = nullptr;
-    void* _hashCallbackUserdate = nullptr;
+    void* _hashCallbackUserdata = nullptr;
 
     static UnicoreGNSSLibrary* _activeInstance;
     static void rxTaskEntry(void* context);
@@ -245,7 +248,6 @@ class UnicoreGNSSLibrary {
     UnicoreResult_t waitForCommandResponse(uint32_t timeoutMs);
     bool pendingExpectedMatches(const char* text) const;
     void rxTask();
-    void log(UnicoreLogLevel level, uint32_t mask, const char* format, ...);
 
   protected:
     HardwareSerial* _hwSerialPort = nullptr;
