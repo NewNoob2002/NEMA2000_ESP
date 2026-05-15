@@ -138,6 +138,71 @@ containsIgnoreCase(const char* text, const char* needle) {
     return false;
 }
 
+bool
+startsWithIgnoreCase(const char* text, const char* prefix) {
+    if (!text || !prefix) {
+        return false;
+    }
+
+    while (*prefix) {
+        if (!*text
+            || (std::toupper(static_cast<unsigned char>(*text)) != std::toupper(static_cast<unsigned char>(*prefix)))) {
+            return false;
+        }
+        text++;
+        prefix++;
+    }
+    return true;
+}
+
+bool
+copyCommandToken(char* destination, const size_t destinationSize, const char*& cursor) {
+    if (!destination || (destinationSize == 0) || !cursor) {
+        return false;
+    }
+
+    while (*cursor && std::isspace(static_cast<unsigned char>(*cursor))) {
+        cursor++;
+    }
+
+    size_t index = 0;
+    while (*cursor && !std::isspace(static_cast<unsigned char>(*cursor)) && (*cursor != ',') && (*cursor != '*')) {
+        if (index < (destinationSize - 1)) {
+            destination[index++] = *cursor;
+        }
+        cursor++;
+    }
+    destination[index] = 0;
+    return index > 0;
+}
+
+bool
+commandAckMatchesPendingCommand(const char* sentence, const char* pendingCommand) {
+    if (!sentence || !pendingCommand || !startsWithIgnoreCase(sentence, "$command,")) {
+        return false;
+    }
+
+    const char* commandCursor = pendingCommand;
+    char commandToken[24] = {};
+    if (!copyCommandToken(commandToken, sizeof(commandToken), commandCursor)) {
+        return false;
+    }
+
+    if ((equalsIgnoreCase(commandToken, "COM1") || equalsIgnoreCase(commandToken, "COM2")
+         || equalsIgnoreCase(commandToken, "COM3") || equalsIgnoreCase(commandToken, "USB"))
+        && !copyCommandToken(commandToken, sizeof(commandToken), commandCursor)) {
+        return false;
+    }
+
+    const char* responseCursor = sentence + strlen("$command,");
+    char responseToken[24] = {};
+    if (!copyCommandToken(responseToken, sizeof(responseToken), responseCursor)) {
+        return false;
+    }
+
+    return equalsIgnoreCase(commandToken, responseToken);
+}
+
 /**
  * @brief Extracts a delimited field from a text string, such as a CSV or NMEA sentence. The output is always null-terminated.
  * 
@@ -1216,6 +1281,10 @@ UnicoreGNSSLibrary::updateCommandResultFromSentence(const char* sentence) {
     } else if (pendingExpectedMatches(sentence)) {
         log(UnicoreLogLevel::Debug, UNICORE_LOG_COMMAND, "command response matched expected: %s",
             _pendingExpectedResponse);
+        completePendingCommand(Unicore_RESULT_RESPONSE_COMMAND_OK);
+    } else if (!_pendingExpectedResponse[0] && commandAckMatchesPendingCommand(sentence, _pendingCommand)) {
+        log(UnicoreLogLevel::Debug, UNICORE_LOG_COMMAND, "command response matched pending command: %s",
+            _pendingCommand);
         completePendingCommand(Unicore_RESULT_RESPONSE_COMMAND_OK);
     } else if (!_pendingExpectedResponse[0]
                && (containsIgnoreCase(sentence, "OK") || containsIgnoreCase(sentence, "SUCCESS"))) {
