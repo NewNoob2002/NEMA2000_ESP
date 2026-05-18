@@ -1,3 +1,4 @@
+#include "DataProc/DataProc.h"
 #include "GNSS.h"
 #include "HAL.h"
 #include "HAL_Config.h"
@@ -5,6 +6,11 @@
 #include "Support.h"
 #include "Unicore_UM980.h"
 #include "mcu_settings.h"
+
+void
+userGnssNmeaCallback(const char* sentence, uint16_t length, void* userdata) {
+    DP_GNSS_DataHandler(sentence, length, userdata);
+}
 
 namespace HAL {
 HardwareSerial* gnssSerial = nullptr;
@@ -17,6 +23,9 @@ namespace HAL {
 void
 gnssInit() {
     gnssBegin(gnssSerial, gUm980);
+    if (gUm980) {
+        gUm980->setUserNmeaCallback(userGnssNmeaCallback);
+    }
 }
 
 void

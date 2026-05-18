@@ -771,13 +771,60 @@ UnicoreUM980::gnssInBaseFixedMode() {
 }
 
 void
+UnicoreUM980::setUserNmeaCallback(UserNmeaCallback callback, void* context) {
+    if (callback) {
+        _userNmeaCallback = callback;
+        _userNmeaContext = context;
+    } else {
+        _userNmeaCallback = nullptr;
+        _userNmeaContext = nullptr;
+    }
+}
+
+void
+UnicoreUM980::setUserRtcmCallback(UserRtcmCallback callback, void* context) {
+    if (callback) {
+        _userRtcmCallback = callback;
+        _userRtcmContext = context;
+    } else {
+        _userRtcmCallback = nullptr;
+        _userRtcmContext = nullptr;
+    }
+}
+
+void
+UnicoreUM980::setUserBinaryCallback(UserBinaryCallback callback, void* context) {
+    if (callback) {
+        _userBinaryCallback = callback;
+        _userBinaryContext = context;
+    } else {
+        _userBinaryCallback = nullptr;
+        _userBinaryContext = nullptr;
+    }
+}
+
+void
+UnicoreUM980::setUserHashCallback(UserHashCallback callback, void* context) {
+    if (callback) {
+        _userHashCallback = callback;
+        _userHashContext = context;
+    } else {
+        _userHashCallback = nullptr;
+        _userHashContext = nullptr;
+    }
+}
+
+void
 UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {
 #ifdef UNICORE_NULLPTR_CHECK
     if (!sentence) {
         return;
     }
 #endif // UNICORE_NULLPTR_CHECK
-
+    // external callback for users to receive NMEA sentences directly as they are received by the module, before any internal processing
+    if (_userNmeaCallback) {
+        _userNmeaCallback(sentence, length, _userNmeaContext);
+    }
     // log(UnicoreLogLevel::Debug, UNICORE_LOG_CHILD_CLASS, "NMEA %s sentence received.", msgName);
 }
 
@@ -791,6 +838,11 @@ UnicoreUM980::processHashSentence(const char* sentence, uint16_t length) {
 
     if (sentence && (strncmp(sentence, "#MODE,", 6) == 0)) {
         handleModeSentence(sentence, length);
+    }
+
+    // external callback for users to receive hash sentences directly as they are received by the module, before any internal processing
+    if (_userHashCallback) {
+        _userHashCallback(sentence, length, _userHashContext);
     }
 }
 
@@ -908,6 +960,10 @@ UnicoreUM980::processRtcmMessage(const uint8_t* message, uint16_t length, uint16
 #endif //UNICORE_NULLPTR_CHECK
 
     log(UnicoreLogLevel::Verbose, UNICORE_LOG_CHILD_CLASS, "RTCM%u message received, length=%u", messageNumber, length);
+
+    if (_userRtcmCallback) {
+        _userRtcmCallback(message, length, _userRtcmContext);
+    }
 }
 
 void
@@ -920,6 +976,10 @@ UnicoreUM980::processBinaryMessage(const UnicoreBinaryHeader& header, const uint
 
     log(UnicoreLogLevel::Verbose, UNICORE_LOG_CHILD_CLASS, "Binary message %u received, length=%u", header.messageId,
         length);
+
+    if (_userBinaryCallback) {
+        _userBinaryCallback(header, payload, length, _userBinaryContext);
+    }
 }
 
 UnicoreResult_t

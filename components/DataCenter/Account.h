@@ -114,7 +114,8 @@ class Account {
     typedef std::vector<Account*> AccountVector_t;
 
   public:
-    Account(const char* id, DataCenter* center, uint32_t bufSize = 0, void* userData = nullptr);
+    Account(const char* id, DataCenter* center, uint32_t bufSize = 0, uint8_t averageFrameSize = 128,
+            void* userData = nullptr);
     ~Account();
 
     Account* Subscribe(const char* pubID);

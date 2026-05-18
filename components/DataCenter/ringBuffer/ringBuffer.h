@@ -25,9 +25,7 @@
 
 #ifdef __cplusplus
 
-#define AVERAGE_LENGTH_IN_BYTES 128
-
-#define RB_USE_LOG              1
+#define RB_USE_LOG 1
 
 #if RB_USE_LOG
 #include <cstdio>
@@ -64,7 +62,7 @@ typedef struct {
 
 class ringBuffer {
   public:
-    ringBuffer(uint32_t data_size, const char* id);
+    ringBuffer(uint32_t data_size, const uint8_t averageLengthInBytes, const char* id);
     ~ringBuffer();
 
     bool Init();
@@ -90,6 +88,7 @@ class ringBuffer {
     uint16_t _rbOffsetTail;
 
     uint8_t* _ringBuffer;
+    uint8_t _averageLengthInBytes;
     uint32_t _ringBufferSize;
 
     uint32_t _freeSpace;

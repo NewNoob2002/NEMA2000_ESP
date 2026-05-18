@@ -58,6 +58,12 @@ static constexpr size_t MAX_UM980_NMEA_MSG = sizeof(kUm980NmeaMessages) / sizeof
 static constexpr size_t MAX_UM980_RTCM_MSG = sizeof(kUm980RtcmMessages) / sizeof(kUm980RtcmMessages[0]);
 static constexpr int16_t UM980_MESSAGE_NOT_FOUND = -1;
 
+typedef void (*UserRtcmCallback)(const uint8_t* message, uint16_t length, void* userdata);
+typedef void (*UserNmeaCallback)(const char* sentence, uint16_t length, void* userdata);
+typedef void (*UserBinaryCallback)(const UnicoreBinaryHeader& header, const uint8_t* payload, uint16_t length,
+                                   void* userdata);
+typedef void (*UserHashCallback)(const char* sentence, uint16_t length, void* userdata);
+
 class UnicoreUM980 : public UnicoreGNSSLibrary {
   public:
     static constexpr const char* MSG_BESTNAVB = "BESTNAVB";
@@ -166,6 +172,11 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     bool gnssInBaseSurveyInMode();
     bool gnssInBaseFixedMode();
 
+    void setUserNmeaCallback(UserNmeaCallback callback, void* context = nullptr);
+    void setUserRtcmCallback(UserRtcmCallback callback, void* context = nullptr);
+    void setUserBinaryCallback(UserBinaryCallback callback, void* context = nullptr);
+    void setUserHashCallback(UserHashCallback callback, void* context = nullptr);
+
     // process
     void processNmeaSentence(const char* sentence, uint16_t length = 0);
     void processRtcmMessage(const uint8_t* message, uint16_t length, uint16_t messageNumber);
@@ -196,6 +207,15 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     bool _online = false;
     Um980Mode _mode = Um980Mode::Unknown;
     uint8_t _model = UM980_DYN_MODEL_ROVER_SURVEY;
+
+    UserNmeaCallback _userNmeaCallback = nullptr;
+    void* _userNmeaContext = nullptr;
+    UserRtcmCallback _userRtcmCallback = nullptr;
+    void* _userRtcmContext = nullptr;
+    UserBinaryCallback _userBinaryCallback = nullptr;
+    void* _userBinaryContext = nullptr;
+    UserHashCallback _userHashCallback = nullptr;
+    void* _userHashContext = nullptr;
 
     static void RtcmCallback(const uint8_t* message, uint16_t length, uint16_t messageNumber, void* userdata);
     static void NmeaCallback(const char* sentence, uint16_t length, void* userdata);

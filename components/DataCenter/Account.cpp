@@ -29,10 +29,11 @@
  * @param  id:       Unique name
  * @param  center:   Pointer to the data center
  * @param  bufSize:  The length of the data to be cached
+ * @param  averageFrameSize: The average size of each frame in the ring buffer, used to calculate the number of frames that can be cached
  * @param  userData: Point to the address of user-defined data
  * @retval None
  */
-Account::Account(const char* id, DataCenter* center, uint32_t bufSize, void* userData) {
+Account::Account(const char* id, DataCenter* center, uint32_t bufSize, uint8_t averageFrameSize, void* userData) {
     memset(&priv, 0, sizeof(priv));
 
     ID = id;
@@ -40,7 +41,7 @@ Account::Account(const char* id, DataCenter* center, uint32_t bufSize, void* use
     UserData = userData;
 
     if (bufSize != 0) {
-        priv._ringBuffer = new ringBuffer(bufSize, ID);
+        priv._ringBuffer = new ringBuffer(bufSize, averageFrameSize, ID);
         priv._bufferSize = bufSize;
         if (!priv._ringBuffer || !priv._ringBuffer->Init()) {
             ACCOUNT_LOG_ERROR("Account[%s] Ring buffer initialization failed!", ID);

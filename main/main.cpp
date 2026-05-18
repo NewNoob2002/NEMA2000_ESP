@@ -4,6 +4,7 @@
 #include "HardwareSerial.h"
 #include "nmea0183_to_n2k.h"
 
+#include "App/App.h"
 #include "HAL/HAL.h"
 #include "NMEA2000_esp32.h"
 #include "esp_log.h"
@@ -28,6 +29,7 @@ SendGatewayMessage(tNMEA2000_esp32& nmea2000, const tN2kMsg& message, const char
 extern "C" void
 app_main(void) {
     HAL::HAL_Init();
+    App_Init();
     // Serial.begin(115200);
     // static tGatewayNmea0183Parser nmeaParser;
     // if (!nmeaParser.Begin()) {

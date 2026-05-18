@@ -9,10 +9,10 @@
 #include <inttypes.h>
 #include "Account.h"
 
-ringBuffer::ringBuffer(uint32_t data_size, const char* id)
+ringBuffer::ringBuffer(uint32_t data_size, uint8_t averageLengthInBytes, const char* id)
     : ID(id), _rbOffsetArray(nullptr), _rbOffsetSize(0), _rbOffsetHead(0), _rbOffsetTail(0), _ringBuffer(nullptr),
-      _ringBufferSize(data_size), _freeSpace(data_size), _usedBytes(0), _frameCount(0), _droppedFrames(0), _dataHead(0),
-      _dataTail(0), _mutex(nullptr) {}
+      _averageLengthInBytes(averageLengthInBytes), _ringBufferSize(data_size), _freeSpace(data_size), _usedBytes(0),
+      _frameCount(0), _droppedFrames(0), _dataHead(0), _dataTail(0), _mutex(nullptr) {}
 
 ringBuffer::~ringBuffer() {
     if (_mutex) {
@@ -32,7 +32,7 @@ ringBuffer::Init() {
         return false;
     }
 
-    _rbOffsetSize = static_cast<uint16_t>(_ringBufferSize / AVERAGE_LENGTH_IN_BYTES);
+    _rbOffsetSize = static_cast<uint16_t>(_ringBufferSize / _averageLengthInBytes);
     if (_rbOffsetSize < 4) {
         _rbOffsetSize = 4;
     }
