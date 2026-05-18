@@ -1,6 +1,5 @@
 #include "HAL.h"
 #include "Bluetooth.h"
-#include "DataProc/DataProc.h"
 #include "HAL_Config.h"
 #include "States.h"
 #include "mcu_settings.h"
@@ -114,8 +113,6 @@ HAL_Init() {
 #endif
     DMW_b("FileSystem_Init");
     FileSystem_Init();
-    DMW_b("DataProc_Init");
-    DataProc_Init();
     // Init GNSS Module
     DMW_b("gnssInit");
     gnssInit();

@@ -97,7 +97,7 @@ ringBuffer::WriteToRingBuf(void* pWriteBuf, uint32_t totalSize) {
     _usedBytes += frameSize;
     _freeSpace = _ringBufferSize - _usedBytes;
 
-    RB_LOG_INFO("%s write frame start=%u end=%u size=%u frames=%" PRIu32, ID ? ID : "", start, _dataHead, frameSize,
+    RB_LOG_INFO("%s write frame %u --> %u (size=%u frames=%" PRIu32 ")", ID ? ID : "", start, _dataHead, frameSize,
                 _frameCount);
     GiveLock();
     return true;

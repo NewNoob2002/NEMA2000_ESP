@@ -25,7 +25,7 @@
 
 #ifdef __cplusplus
 
-#define RB_USE_LOG 1
+#define RB_USE_LOG 0
 
 #if RB_USE_LOG
 #include <cstdio>

@@ -33,9 +33,9 @@
 
 #if ACCOUNT_USE_LOG
 #include <cstdio>
-#define ACCOUNT_LOG_INFO(format, ...)  printf("[ACCOUNT][I] " format "\n", ##__VA_ARGS__)
-#define ACCOUNT_LOG_WARN(format, ...)  printf("[ACCOUNT][W] " format "\n", ##__VA_ARGS__)
-#define ACCOUNT_LOG_ERROR(format, ...) printf("[ACCOUNT][E] " format "\n", ##__VA_ARGS__)
+#define ACCOUNT_LOG_INFO(format, ...)  printf("[ACCOUNT][I]" format "\n", ##__VA_ARGS__)
+#define ACCOUNT_LOG_WARN(format, ...)  printf("[ACCOUNT][W]" format "\n", ##__VA_ARGS__)
+#define ACCOUNT_LOG_ERROR(format, ...) printf("[ACCOUNT][E]" format "\n", ##__VA_ARGS__)
 #else
 #define ACCOUNT_LOG_INFO(...)
 #define ACCOUNT_LOG_WARN(...)

@@ -13,7 +13,7 @@ pullGnssNmea(Account* account) {
     uint8_t buffer[kNmeaFrameBufferSize] = {};
     uint32_t size = sizeof(buffer);
 
-    while (account->Pull("GNSS_NMEA", buffer, &size) == Account::RES_OK) {
+    if (account->Pull("GNSS_NMEA", buffer, &size) == Account::RES_OK) {
         if (bluetoothIsConnected()) {
             bluetoothWrite(buffer, size);
         }
