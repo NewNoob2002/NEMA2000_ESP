@@ -18,8 +18,8 @@ enum Um980DynamicModel : uint8_t {
     UM980_DYN_MODEL_ROVER_SURVEY = 1,
     UM980_DYN_MODEL_ROVER_UAV,
     UM980_DYN_MODEL_ROVER_AUTOMOTIVE,
-    UM980_DYN_MODEL_BASE,
-    UM980_DYN_MODEL_BASE_TIME,
+    UM980_DYN_MODEL_BASE_SURVEY,
+    UM980_DYN_MODEL_BASE_FIXED,
 };
 
 enum class Um980Mode : uint8_t {
@@ -78,17 +78,20 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     void powerOff();
 
     void isOnline(bool online);
+    void setConnectCom(const char* com);
 
     void resetDefaults();
     void baseRtcmDefault();
     void baseRtcmLowDataRate();
 
     bool configure();
-    uint8_t configureRover();
+    bool configureRover();
+    bool configureBase();
+    bool surveyInStart();
+    bool fixedBaseStart();
 
     UnicoreResult_t configureOnceTime();
     UnicoreResult_t configureGNSS(UnicorePort port = UnicorePort::Current);
-    UnicoreResult_t configureBase(UnicorePort port = UnicorePort::Current);
 
     UnicoreResult_t requestVersion(uint32_t timeoutMs = 1000);
     UnicoreResult_t enableBinaryNavigation(UnicorePort port = UnicorePort::Current, float periodSeconds = 1.0f);
@@ -108,10 +111,14 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     UnicoreResult_t disableRtcmMessages(UnicorePort port = UnicorePort::Current);
 
     bool setModel(uint8_t modelNumber);
-    uint8_t getModel();
+    uint8_t requestModel();
     UnicoreResult_t setMode(const char* modeCommand);
     UnicoreResult_t setRoverMode(const char* roverType);
-    UnicoreResult_t setBaseMode();
+    UnicoreResult_t setBaseMode(const char* baseType);
+    UnicoreResult_t setModeBaseAverage(uint16_t averageSeconds = 60);
+    bool setBaseModeECEF(double coordinateX, double coordinateY, double coordinateZ);
+    bool setBaseModeGeodetic(double latitude, double longitude, double altitude);
+
     UnicoreResult_t setRate(double secondsBetweenSolutions);
     UnicoreResult_t setElevation(uint8_t elevationDegrees);
     UnicoreResult_t setMinCno(uint8_t cnoValue);
@@ -154,6 +161,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     uint16_t getFixAgeMilliseconds() const;
     double getRateS() const;
     Um980Mode getMode() const;
+    uint8_t getDynamicModel() const;
     const char* getFirmwareVersion() const;
     const char* getSerialNumber() const;
     uint8_t getModelType() const;
@@ -187,6 +195,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
 
   private:
     gpio_num_t _powerPin;
+    char _connectCom[8] = {0};
 
   private:
     float _nmeaPeriods[MAX_UM980_NMEA_MSG] = {};
@@ -204,6 +213,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     bool um980MessagesEnabled_RTCM_Base = false;
 
     double _rateSeconds = 1.0;
+    uint32_t _autoBaseStartTimer = 0;
     bool _online = false;
     Um980Mode _mode = Um980Mode::Unknown;
     uint8_t _model = UM980_DYN_MODEL_ROVER_SURVEY;

@@ -143,8 +143,7 @@ stateUpdate(UnicoreUM980* gnss) {
                 }
 
                 changeState(gnssReady ? STATE_BASE_CONFIG_WAIT
-                                      : (settings.fixedBase ? STATE_BASE_FIXED_NOT_STARTED
-                                                            : STATE_BASE_TEMP_SETTLE));
+                                      : (settings.fixedBase ? STATE_BASE_FIXED_NOT_STARTED : STATE_BASE_TEMP_SETTLE));
             } break;
             case (STATE_BASE_CONFIG_WAIT): {
                 if (gnssConfigureComplete()) {
@@ -211,7 +210,7 @@ stateUpdate(UnicoreUM980* gnss) {
             case (STATE_SHUTDOWN): break;
             case (STATE_NOT_SET): {
                 gnssConfigure(GNSS_CONFIG_ONCE);
-                changeState(STATE_ROVER_NOT_STARTED);
+                changeState(STATE_BASE_NOT_STARTED);
             } break;
         }
     }

@@ -138,8 +138,9 @@ ringBuffer::ReadRingBuf(Account* subscriber, void* pReadBuf, uint32_t* size) {
         GiveLock();
         return false;
     }
-
+#if RB_USE_LOG
     const uint16_t oldPos = info->readPos;
+#endif
     CopyFromRing(info->readPos, static_cast<uint8_t*>(pReadBuf), frameSize);
     info->readPos = frameEnd;
     info->readOffsetIndex = static_cast<uint16_t>((info->readOffsetIndex + 1) % _rbOffsetSize);
@@ -286,8 +287,9 @@ ringBuffer::DropOldestFrame() {
         _freeSpace = _ringBufferSize;
         return;
     }
-
+#if RB_USE_LOG
     const uint16_t oldTail = _dataTail;
+#endif
     const uint16_t oldIndex = _rbOffsetTail;
     const uint16_t frameEnd = _rbOffsetArray[_rbOffsetTail];
     const uint16_t frameSize = Distance(_dataTail, frameEnd);

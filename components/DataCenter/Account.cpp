@@ -325,7 +325,7 @@ Account::Pull(Account* pub, void* data_p, uint32_t* size) {
 
         if (pub->priv._ringBuffer) {
             if (pub->priv._ringBuffer->ReadRingBuf(this, data_p, size)) {
-                ACCOUNT_LOG_INFO("read ring buffer done");
+                ACCOUNT_LOG_INFO("sub[%s] read pub[%s] ring buffer [%" PRIu32 "] done", ID, pub->ID, *size);
                 retval = RES_OK;
             } else {
                 ACCOUNT_LOG_WARN("pub[%s] no new data available in ring buffer!", pub->ID);

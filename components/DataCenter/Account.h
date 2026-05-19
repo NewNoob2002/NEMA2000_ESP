@@ -29,7 +29,7 @@
 #include "esp_timer.h"
 #include "ringBuffer/ringBuffer.h"
 
-#define ACCOUNT_USE_LOG 1
+#define ACCOUNT_USE_LOG 0
 
 #if ACCOUNT_USE_LOG
 #include <cstdio>

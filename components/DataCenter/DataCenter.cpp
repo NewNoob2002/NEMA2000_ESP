@@ -109,7 +109,9 @@ DataCenter::AddAccount(Account* account) {
 
     AccountPool.push_back(account);
 
-    AccountMain.Subscribe(account->ID);
+    if (account->priv._ringBuffer == nullptr) {
+        AccountMain.Subscribe(account->ID);
+    }
 
     return true;
 }

@@ -92,7 +92,8 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
     }
 
     pUm980->enableDebugLogging(Serial, UnicoreLogLevel::Debug,
-                               UNICORE_LOG_COMMAND | UNICORE_LOG_DATA | UNICORE_LOG_TASK | UNICORE_LOG_CHILD_CLASS);
+                               UNICORE_LOG_COMMAND | UNICORE_LOG_RX | UNICORE_LOG_TX | UNICORE_LOG_CHILD_CLASS);
+    //    UNICORE_LOG_COMMAND | UNICORE_LOG_DATA | UNICORE_LOG_TASK | UNICORE_LOG_CHILD_CLASS);
     pUm980->init();
     pUm980->powerOn();
     if (pUm980->begin(*pGnssSerial, nullptr, &Serial)) {
@@ -160,61 +161,30 @@ gnssUpdate(UnicoreUM980* gnss) {
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_ROVER)) {
-            uint8_t currentModel = gnss->configureRover();
-            uint8_t needChange = 0;
-            if (currentModel != 0) {
-                //  0 - Unknown, 1 - Rover Survey, 2 - Rover UAV, 3 - Rover Auto, 4 - Base Survey-in, 5 - Base fixed
-                // if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_SURVEY && currentModel == 1) {
-                //     needChange = 1;
-                // }
-                // if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_UAV && currentModel == 2) {
-                //     needChange = 1;
-                // }
-                // if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_AUTOMOTIVE && currentModel == 3) {
-                //     needChange = 1;
-                // }
-                if (currentModel == 4 || currentModel == 5) {
-                    // We are in a Base mode, need to change to Rover
-                    needChange = 1;
-                    settings.dynamicModel = UM980_DYN_MODEL_ROVER_SURVEY;
-                }
-                if (needChange) {
-                    // Assume we are changing from Base to Rover, request any additional config changes
-                    // Sets the dynamic model (Survey/UAV/Automotive) and puts the device into Rover mode
-                    systemPrintf("GNSS model need change. Current: %d, Desired: %d\r\n", currentModel,
-                                 settings.dynamicModel);
-                    gnssConfigure(GNSS_CONFIG_MODEL);
-
-                    // Request a change to Rover RTCM
-                    gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER);
-                }
-                gnssConfigureClear(GNSS_CONFIG_ROVER);
-                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA); // Request update to NMEA
-                gnssConfigure(GNSS_CONFIG_SAVE);              // Request receiver commit this change to NVM
-            }
+            gnss->configureRover();
+            gnssConfigureClear(GNSS_CONFIG_ROVER);
+            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA); // Request update to NMEA
+            gnssConfigure(GNSS_CONFIG_SAVE);              // Request receiver commit this change to NVM
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_BASE)) {
-            if (gnss->configureBase() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            if (gnss->configureBase()) {
                 gnssConfigureClear(GNSS_CONFIG_BASE);
                 gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA);
-                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE);
                 gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_BASE_SURVEY)) {
-            if (gnss->configureBase() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            if (gnss->surveyInStart()) {
                 gnssConfigureClear(GNSS_CONFIG_BASE_SURVEY);
-                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE);
                 gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_BASE_FIXED)) {
-            if (gnss->configureBase() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            if (gnss->fixedBaseStart()) {
                 gnssConfigureClear(GNSS_CONFIG_BASE_FIXED);
-                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE);
                 gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
             }
         }
@@ -283,7 +253,9 @@ gnssUpdate(UnicoreUM980* gnss) {
 
         if (gnssConfigureRequested(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER)) {
             if (settings.debugGnssConfig == true && gnss->gnssInRoverMode() == false) {
-                systemPrintln("Warning: Change to RTCM Rover rates requested but not in Rover mode.");
+                systemPrintf(
+                    "Warning: Change to RTCM Rover rates requested but not in Rover mode, current mode :%d.\r\n",
+                    gnss->getDynamicModel());
             }
 
             if (gnss->setMessagesRTCMRover() == true) {
@@ -296,7 +268,9 @@ gnssUpdate(UnicoreUM980* gnss) {
         if (gnssConfigureRequested(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE)) {
             if (settings.debugGnssConfig == true) {
                 if (gnss->gnssInBaseFixedMode() == false && gnss->gnssInBaseSurveyInMode() == false) {
-                    systemPrintln("Warning: Change to RTCM Base rates requested but not in Base mode.");
+                    systemPrintf(
+                        "Warning: Change to RTCM Base rates requested but not in Base mode, current mode :%d.\r\n",
+                        gnss->getDynamicModel());
                 }
             }
 

@@ -74,6 +74,11 @@ UnicoreUM980::isOnline(bool online) {
 }
 
 void
+UnicoreUM980::setConnectCom(const char* com) {
+    snprintf(_connectCom, sizeof(_connectCom), "%s", com);
+}
+
+void
 UnicoreUM980::resetDefaults() {
     for (size_t index = 0; index < MAX_UM980_NMEA_MSG; index++) {
         _nmeaPeriods[index] = kUm980NmeaMessages[index].defaultPeriodSeconds;
@@ -159,16 +164,152 @@ UnicoreUM980::configureGNSS(const UnicorePort port) {
     return result;
 }
 
-uint8_t
-UnicoreUM980::configureRover() {
-    return getModel();
+UnicoreResult_t
+UnicoreUM980::setModeBaseAverage(uint16_t averageSeconds) {
+    char command[50];
+    snprintf(command, sizeof(command), "TIME %d", averageSeconds);
+
+    return (setBaseMode(command));
 }
 
-UnicoreResult_t
-UnicoreUM980::configureBase(const UnicorePort port) {
-    UnicoreResult_t result = setBaseMode();
-    // result = firstError(result, configureBaseOutput(port));
-    _mode = (result == Unicore_RESULT_RESPONSE_COMMAND_OK) ? Um980Mode::Base : _mode;
+bool
+UnicoreUM980::setBaseModeECEF(double coordinateX, double coordinateY, double coordinateZ) {
+    char command[50];
+    snprintf(command, sizeof(command), "%0.4f %0.4f %0.4f", coordinateX, coordinateY, coordinateZ);
+
+    return (setBaseMode(command) == Unicore_RESULT_RESPONSE_COMMAND_OK);
+}
+
+bool
+UnicoreUM980::setBaseModeGeodetic(double latitude, double longitude, double altitude) {
+    char command[50];
+    snprintf(command, sizeof(command), "%0.11f %0.11f %0.6f", latitude, longitude, altitude);
+
+    return (setBaseMode(command) == Unicore_RESULT_RESPONSE_COMMAND_OK);
+}
+
+bool
+UnicoreUM980::configureRover() {
+    if (!_online) {
+        log(UnicoreLogLevel::Warn, UNICORE_LOG_CHILD_CLASS, "Cannot configure Rover mode while GNSS is offline");
+        return false;
+    }
+    uint8_t currentModel = requestModel();
+    uint8_t needChange = 0;
+    if (currentModel != 0) {
+        //  0 - Unknown, 1 - Rover Survey, 2 - Rover UAV, 3 - Rover Auto, 4 - Base Survey-in, 5 - Base fixed
+        if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_SURVEY && currentModel == 1) {
+            needChange = 0;
+        }
+        if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_UAV && currentModel == 2) {
+            needChange = 0;
+        }
+        if (settings.dynamicModel == UM980_DYN_MODEL_ROVER_AUTOMOTIVE && currentModel == 3) {
+            needChange = 0;
+        }
+        if (currentModel == 4 || currentModel == 5) {
+            // We are in a Base mode, need to change to Rover
+            needChange = 1;
+            settings.dynamicModel = UM980_DYN_MODEL_ROVER_SURVEY;
+        }
+        if (needChange) {
+            // Assume we are changing from Base to Rover, request any additional config changes
+            // Sets the dynamic model (Survey/UAV/Automotive) and puts the device into Rover mode
+            log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Changing GNSS model from Base to Rover...");
+            gnssConfigure(GNSS_CONFIG_MODEL);
+
+            // Request a change to Rover RTCM
+            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER);
+        } else {
+            // No change needed, but we may want to update the message rates just in case
+            log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "GNSS model no change needed. Current: %d   ",
+                currentModel);
+        }
+    }
+    return true;
+}
+
+bool
+UnicoreUM980::configureBase() {
+    static bool firstTime = true;
+    requestModel();
+    if (firstTime) {
+        firstTime = false;
+    } else // Skip these checks first time around. We need the setModel
+    {
+        // If we are already in the appropriate base mode, no changes needed
+        if (settings.fixedBase == false && gnssInBaseSurveyInMode()) {
+            return (true);
+        }
+        if (settings.fixedBase == true && gnssInBaseFixedMode()) {
+            return (true);
+        }
+    }
+
+    // Assume we are changing from Rover to Base, request any additional config
+    // changes
+
+    // Set the dynamic mode. This will cancel any base averaging mode and is
+    // needed to allow a freshly started device to settle in regular GNSS
+    // reception mode before issuing a surveyInStart().
+    // gnss->setModel(settings.dynamicModel) sets the model
+    gnssConfigure(GNSS_CONFIG_MODEL);
+
+    // Request a change to Base RTCM. gnss->setMessagesRTCMBase() sets the
+    // messages
+    gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE);
+
+    return (true);
+}
+
+bool
+UnicoreUM980::surveyInStart() {
+    if (_online) {
+        if (gnssInBaseSurveyInMode()) {
+            return (true);
+        }
+        // Set base averaging to the specified seconds to start the survey-in process. The receiver will automatically determine when it has enough data for a position solution and switch from "Survey" to "Fixed" mode at that time.
+        UnicoreResult_t result = setModeBaseAverage(settings.observationSeconds);
+
+        if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS,
+                "Failed to start survey-in with average time of %d seconds. Result: %d", settings.observationSeconds,
+                result);
+            return false;
+        }
+
+        log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS,
+            "Survey-in started with average time of %d seconds. Waiting for receiver to determine when it has enough "
+            "data to complete the survey-in process...",
+            settings.observationSeconds);
+
+        _autoBaseStartTimer = millis();
+        return true;
+    }
+    return false;
+}
+
+bool
+UnicoreUM980::fixedBaseStart() {
+    if (_online == false) {
+        return (false);
+    }
+
+    // If we are already in the appropriate base mode, no changes needed
+    if (gnssInBaseFixedMode()) {
+        return (true);
+    }
+
+    bool result = false;
+
+    if (settings.fixedBaseCoordinateType == COORD_TYPE_ECEF) {
+        result &= setBaseModeECEF(settings.fixedEcefX, settings.fixedEcefY, settings.fixedEcefZ);
+    } else if (settings.fixedBaseCoordinateType == COORD_TYPE_GEODETIC) {
+        float totalFixedAltitude =
+            settings.fixedAltitude + ((settings.antennaHeight_mm + settings.antennaPhaseCenter_mm) / 1000.0);
+        result &= setBaseModeGeodetic(settings.fixedLat, settings.fixedLong, totalFixedAltitude);
+    }
+
     return result;
 }
 
@@ -309,15 +450,15 @@ UnicoreUM980::disableNmeaMessages(const UnicorePort port) {
 bool
 UnicoreUM980::setMessagesRTCMRover() {
     log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting RTCM rover messages on COM ports...");
-
-    UnicoreResult_t result = disableRtcmMessages();
-    result = firstError(result, enableRtcmRoverMessages());
+    UnicoreResult_t result = enableRtcmRoverMessages();
 
     if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
         um980MessagesEnabled_RTCM_Rover = true;
         um980MessagesEnabled_RTCM_Base = false;
+        log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "RTCM rover messages enabled successfully.");
         return true;
     }
+    log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS, "Failed to enable RTCM rover messages. Result: %d", result);
     return false;
 }
 
@@ -325,14 +466,15 @@ bool
 UnicoreUM980::setMessagesRTCMBase() {
     log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting RTCM base messages on COM ports...");
 
-    UnicoreResult_t result = disableRtcmMessages();
-    result = firstError(result, enableRtcmBaseMessages());
+    UnicoreResult_t result = enableRtcmBaseMessages();
 
     if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
         um980MessagesEnabled_RTCM_Base = true;
         um980MessagesEnabled_RTCM_Rover = false;
+        log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "RTCM base messages enabled successfully.");
         return true;
     }
+    log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS, "Failed to enable RTCM base messages. Result: %d", result);
     return false;
 }
 
@@ -404,12 +546,15 @@ UnicoreUM980::setRoverMode(const char* roverType) {
 }
 
 UnicoreResult_t
-UnicoreUM980::setBaseMode() {
-    const UnicoreResult_t result = sendCommandAndWait("MODE BASE", 1500);
-    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
-        _mode = Um980Mode::Base;
+UnicoreUM980::setBaseMode(const char* baseType) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!baseType) {
+        return Unicore_RESULT_WRONG_COMMAND;
     }
-    return result;
+#endif // UNICORE_NULLPTR_CHECK
+    char command[50];
+    snprintf(command, sizeof(command), "BASE %s", baseType);
+    return setMode(command);
 }
 
 UnicoreResult_t
@@ -441,7 +586,7 @@ UnicoreUM980::setModel(const uint8_t modelNumber) {
 }
 
 uint8_t
-UnicoreUM980::getModel() {
+UnicoreUM980::requestModel() {
     if (sendCommandAndWait("MODE", 2000, "#MODE") == Unicore_RESULT_RESPONSE_COMMAND_OK) {
         return _model;
     }
@@ -692,6 +837,11 @@ UnicoreUM980::getMode() const {
     return _mode;
 }
 
+uint8_t
+UnicoreUM980::getDynamicModel() const {
+    return _model;
+}
+
 const char*
 UnicoreUM980::getFirmwareVersion() const {
     return _version.swVersion;
@@ -762,12 +912,12 @@ UnicoreUM980::gnssInRoverMode() {
 
 bool
 UnicoreUM980::gnssInBaseSurveyInMode() {
-    return _model == UM980_DYN_MODEL_BASE;
+    return _model == UM980_DYN_MODEL_BASE_SURVEY;
 }
 
 bool
 UnicoreUM980::gnssInBaseFixedMode() {
-    return _model == UM980_DYN_MODEL_BASE_TIME;
+    return _model == UM980_DYN_MODEL_BASE_FIXED;
 }
 
 void
@@ -815,38 +965,6 @@ UnicoreUM980::setUserHashCallback(UserHashCallback callback, void* context) {
 }
 
 void
-UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {
-#ifdef UNICORE_NULLPTR_CHECK
-    if (!sentence) {
-        return;
-    }
-#endif // UNICORE_NULLPTR_CHECK
-    // external callback for users to receive NMEA sentences directly as they are received by the module, before any internal processing
-    if (_userNmeaCallback) {
-        _userNmeaCallback(sentence, length, _userNmeaContext);
-    }
-    // log(UnicoreLogLevel::Debug, UNICORE_LOG_CHILD_CLASS, "NMEA %s sentence received.", msgName);
-}
-
-void
-UnicoreUM980::processHashSentence(const char* sentence, uint16_t length) {
-#ifdef UNICORE_NULLPTR_CHECK
-    if (!sentence) {
-        return;
-    }
-#endif // UNICORE_NULLPTR_CHECK
-
-    if (sentence && (strncmp(sentence, "#MODE,", 6) == 0)) {
-        handleModeSentence(sentence, length);
-    }
-
-    // external callback for users to receive hash sentences directly as they are received by the module, before any internal processing
-    if (_userHashCallback) {
-        _userHashCallback(sentence, length, _userHashContext);
-    }
-}
-
-void
 UnicoreUM980::handleModeSentence(const char* sentence, uint16_t length) {
     (void)length;
 
@@ -878,15 +996,15 @@ UnicoreUM980::handleModeSentence(const char* sentence, uint16_t length) {
             _model = UM980_DYN_MODEL_ROVER_UAV;
         } else if (strcasecmp(model, "AUTOMOTIVE") == 0) {
             _model = UM980_DYN_MODEL_ROVER_AUTOMOTIVE;
-        } else {
+        } else if (strcasecmp(model, "SURVEY") == 0) {
             _model = UM980_DYN_MODEL_ROVER_SURVEY;
         }
     } else if (strcasecmp(mode, "BASE") == 0) {
         _mode = Um980Mode::Base;
-        if ((strcasecmp(model, "TIME") == 0) || (strcasecmp(model, "FIXED") == 0)) {
-            _model = UM980_DYN_MODEL_BASE_TIME;
-        } else {
-            _model = UM980_DYN_MODEL_BASE;
+        if (strcasecmp(model, "FIXED") == 0) {
+            _model = UM980_DYN_MODEL_BASE_FIXED;
+        } else if (strcasecmp(model, "TIME") == 0) {
+            _model = UM980_DYN_MODEL_BASE_SURVEY;
         }
     } else {
         _mode = Um980Mode::Unknown;
@@ -952,6 +1070,20 @@ UnicoreUM980::BinaryCallback(const UnicoreBinaryHeader& header, const uint8_t* p
 }
 
 void
+UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!sentence) {
+        return;
+    }
+#endif // UNICORE_NULLPTR_CHECK
+    // external callback for users to receive NMEA sentences directly as they are received by the module, before any internal processing
+    // log(UnicoreLogLevel::Debug, UNICORE_LOG_CHILD_CLASS, "NMEA %s sentence received.", msgName);
+    if (_userNmeaCallback) {
+        _userNmeaCallback(sentence, length, _userNmeaContext);
+    }
+}
+
+void
 UnicoreUM980::processRtcmMessage(const uint8_t* message, uint16_t length, uint16_t messageNumber) {
 #ifdef UNICORE_NULLPTR_CHECK
     if (!message && (length > 0)) {
@@ -959,7 +1091,7 @@ UnicoreUM980::processRtcmMessage(const uint8_t* message, uint16_t length, uint16
     }
 #endif //UNICORE_NULLPTR_CHECK
 
-    log(UnicoreLogLevel::Verbose, UNICORE_LOG_CHILD_CLASS, "RTCM%u message received, length=%u", messageNumber, length);
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_CHILD_CLASS, "RTCM%u message received, length=%u", messageNumber, length);
 
     if (_userRtcmCallback) {
         _userRtcmCallback(message, length, _userRtcmContext);
@@ -974,11 +1106,30 @@ UnicoreUM980::processBinaryMessage(const UnicoreBinaryHeader& header, const uint
     }
 #endif //UNICORE_NULLPTR_CHECK
 
-    log(UnicoreLogLevel::Verbose, UNICORE_LOG_CHILD_CLASS, "Binary message %u received, length=%u", header.messageId,
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_CHILD_CLASS, "Binary message %u received, length=%u", header.messageId,
         length);
 
     if (_userBinaryCallback) {
         _userBinaryCallback(header, payload, length, _userBinaryContext);
+    }
+}
+
+void
+UnicoreUM980::processHashSentence(const char* sentence, uint16_t length) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!sentence) {
+        return;
+    }
+#endif // UNICORE_NULLPTR_CHECK
+
+    if (sentence && (strncmp(sentence, "#MODE,", 6) == 0)) {
+        handleModeSentence(sentence, length);
+    }
+
+    //log(UnicoreLogLevel::Debug, UNICORE_LOG_CHILD_CLASS, "Hash %*.s sentence received.", length, sentence);
+    // external callback for users to receive hash sentences directly as they are received by the module, before any internal processing
+    if (_userHashCallback) {
+        _userHashCallback(sentence, length, _userHashContext);
     }
 }
 

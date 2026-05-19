@@ -296,7 +296,7 @@ typedef struct settings_t {
     double fixedEcefZ = 4086665.484;
     double fixedLat = 40.09029479;
     double fixedLong = -105.18505761;
-    int observationSeconds = 60;             // Default survey in time of 60 seconds
+    int observationSeconds = 15;             // Default survey in time of 15 seconds
     float observationPositionAccuracy = 5.0; // Default survey in pos accy of 5m
     float surveyInStartingAccuracy =
         1.0; // Wait for this horizontal positional accuracy in meters before starting survey in

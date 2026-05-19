@@ -9,7 +9,9 @@
 
 void
 userGnssNmeaCallback(const char* sentence, uint16_t length, void* userdata) {
-    DP_GNSS_DataHandler(sentence, length, userdata);
+    if (sentence[0] == '$' && sentence[1] == 'G') {
+        DP_GNSS_DataHandler(sentence, length, userdata);
+    }
 }
 
 namespace HAL {
