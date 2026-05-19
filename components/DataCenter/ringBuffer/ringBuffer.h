@@ -95,6 +95,7 @@ class ringBuffer {
     uint32_t _usedBytes;
     uint32_t _frameCount;
     uint32_t _droppedFrames;
+    uint32_t _releasedFrames;
 
     uint16_t _dataHead;
     uint16_t _dataTail;
@@ -109,7 +110,7 @@ class ringBuffer {
     uint16_t Distance(uint16_t from, uint16_t to) const;
     void CopyToRing(uint16_t offset, const uint8_t* data, uint16_t size);
     void CopyFromRing(uint16_t offset, uint8_t* data, uint16_t size);
-    void DropOldestFrame();
+    void DropOldestFrame(bool forcedDrop);
     void UpdateFreeSpaceLocked();
 };
 

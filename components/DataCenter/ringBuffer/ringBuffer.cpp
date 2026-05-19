@@ -12,7 +12,7 @@
 ringBuffer::ringBuffer(uint32_t data_size, uint8_t averageLengthInBytes, const char* id)
     : ID(id), _rbOffsetArray(nullptr), _rbOffsetSize(0), _rbOffsetHead(0), _rbOffsetTail(0), _ringBuffer(nullptr),
       _averageLengthInBytes(averageLengthInBytes), _ringBufferSize(data_size), _freeSpace(data_size), _usedBytes(0),
-      _frameCount(0), _droppedFrames(0), _dataHead(0), _dataTail(0), _mutex(nullptr) {}
+      _frameCount(0), _droppedFrames(0), _releasedFrames(0), _dataHead(0), _dataTail(0), _mutex(nullptr) {}
 
 ringBuffer::~ringBuffer() {
     if (_mutex) {
@@ -63,6 +63,7 @@ ringBuffer::Init() {
     _freeSpace = _ringBufferSize;
     _frameCount = 0;
     _droppedFrames = 0;
+    _releasedFrames = 0;
 
     RB_LOG_INFO("Account[%s] created circular buffer Header-%p(%u entries) Data-%p(%" PRIu32 " bytes)", ID ? ID : "",
                 _rbOffsetArray, _rbOffsetSize, _ringBuffer, _ringBufferSize);
@@ -85,7 +86,7 @@ ringBuffer::WriteToRingBuf(void* pWriteBuf, uint32_t totalSize) {
     const uint16_t frameSize = static_cast<uint16_t>(totalSize);
     const uint16_t maxFrames = static_cast<uint16_t>(_rbOffsetSize - 1);
     while ((_frameCount >= maxFrames) || (_freeSpace < totalSize)) {
-        DropOldestFrame();
+        DropOldestFrame(true);
     }
 
     const uint16_t start = _dataHead;
@@ -280,7 +281,7 @@ ringBuffer::CopyFromRing(uint16_t offset, uint8_t* data, uint16_t size) {
 }
 
 void
-ringBuffer::DropOldestFrame() {
+ringBuffer::DropOldestFrame(bool forcedDrop) {
     if (_frameCount == 0) {
         _dataTail = _dataHead;
         _usedBytes = 0;
@@ -298,18 +299,23 @@ ringBuffer::DropOldestFrame() {
     _frameCount--;
     _usedBytes = (_usedBytes >= frameSize) ? (_usedBytes - frameSize) : 0;
     _freeSpace = _ringBufferSize - _usedBytes;
-    _droppedFrames++;
 
-    for (auto& info : subscriberReads) {
-        if (info.readOffsetIndex == oldIndex) {
-            info.readOffsetIndex = _rbOffsetTail;
-            info.readPos = _dataTail;
-            info.lostFrames++;
+    if (forcedDrop) {
+        _droppedFrames++;
+        for (auto& info : subscriberReads) {
+            if (info.readOffsetIndex == oldIndex) {
+                info.readOffsetIndex = _rbOffsetTail;
+                info.readPos = _dataTail;
+                info.lostFrames++;
+            }
         }
+        RB_LOG_WARN("%s drop frame %u -> %u size=%u dropped=%" PRIu32, ID ? ID : "", oldTail, _dataTail, frameSize,
+                    _droppedFrames);
+    } else {
+        _releasedFrames++;
+        RB_LOG_INFO("%s release frame %u -> %u size=%u released=%" PRIu32, ID ? ID : "", oldTail, _dataTail, frameSize,
+                    _releasedFrames);
     }
-
-    RB_LOG_WARN("%s drop frame %u -> %u size=%u dropped=%" PRIu32, ID ? ID : "", oldTail, _dataTail, frameSize,
-                _droppedFrames);
 }
 
 void
@@ -325,6 +331,6 @@ ringBuffer::UpdateFreeSpaceLocked() {
         if (oldestNeeded) {
             break;
         }
-        DropOldestFrame();
+        DropOldestFrame(false);
     }
 }
