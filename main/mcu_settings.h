@@ -7,7 +7,11 @@ extern "C" {
 #endif
 
 extern productProperties_t productPropertiesTable[];
+extern const int productPropertiesEntries;
 extern ProductVariant productType;
+
+extern const measurementScaleEntry measurementScaleTable[];
+extern const int measurementScaleEntries;
 
 extern online_devices_t online_devices;
 extern settings_t settings;

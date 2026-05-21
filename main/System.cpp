@@ -32,3 +32,47 @@ reportHeap() {
         reportHeapNow(true);
     }
 }
+
+// This allows the measurementScaleTable to be alphabetised if desired
+int
+measurementScaleToIndex(uint8_t scale) {
+    for (int i = 0; i < MEASUREMENT_UNITS_MAX; i++) {
+        if (measurementScaleTable[i].measurementUnit == scale) {
+            return i;
+        }
+    }
+
+    return -1; // This should never happen...
+}
+
+// Returns string of the HPA units
+const char*
+getHpaUnits(double hpa, char* buffer, int length, int decimals, bool limit) {
+    static const char unknown[] = "Unknown";
+
+    int i = measurementScaleToIndex(settings.measurementScale);
+    if (i >= 0) {
+        const char* units = measurementScaleTable[i].measurementScale1NameShort;
+
+        hpa *= measurementScaleTable[i].multiplierMetersToScale1; // Scale1: m->m or m->ft
+
+        bool limited = false;
+        if (limit && (hpa > measurementScaleTable[i].reportingLimitScale1)) // Limit the reported accuracy (Scale1)
+        {
+            limited = true;
+            hpa = measurementScaleTable[i].reportingLimitScale1;
+        }
+
+        if (hpa <= measurementScaleTable[i].changeFromScale1To2At) // Scale2: m->m or ft->in
+        {
+            hpa *= measurementScaleTable[i].multiplierScale1To2;
+            units = measurementScaleTable[i].measurementScale2NameShort;
+        }
+
+        snprintf(buffer, length, "%s%.*f", limited ? "> " : "", decimals, hpa);
+        return units;
+    }
+
+    strncpy(buffer, unknown, length);
+    return unknown;
+}

@@ -88,6 +88,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     bool configureRover();
     bool configureBase();
     bool surveyInStart();
+    bool surveyInReset();
     bool fixedBaseStart();
 
     UnicoreResult_t configureOnceTime();
@@ -111,6 +112,9 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     UnicoreResult_t disableRtcmMessages(UnicorePort port = UnicorePort::Current);
 
     bool setModel(uint8_t modelNumber);
+    bool setModeRoverSurvey();
+    bool setModeRoverUAV();
+    bool setModeRoverAutomotive();
     uint8_t requestModel();
     UnicoreResult_t setMode(const char* modeCommand);
     UnicoreResult_t setRoverMode(const char* roverType);
@@ -144,6 +148,9 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     double getLongitude() const;
     double getAltitude() const;
     float getHorizontalAccuracy() const;
+    float getSurveyInMeanAccuracy() const;
+    uint32_t getSurveyInObservationTimeSeconds() const;
+    bool isSurveyInComplete() const;
     uint8_t getFixType() const;
     uint8_t getCarrierSolution() const;
     uint8_t getSatellitesInView() const;

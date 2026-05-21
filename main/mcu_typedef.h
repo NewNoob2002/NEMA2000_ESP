@@ -50,6 +50,17 @@ typedef enum measurementUnits {
     MEASUREMENT_UNITS_MAX
 } measurementUnits;
 
+typedef struct {
+    const measurementUnits measurementUnit;
+    const char* measurementScaleName;
+    const char* measurementScale1NameShort;
+    const char* measurementScale2NameShort;
+    const double multiplierMetersToScale1;
+    const double changeFromScale1To2At;
+    const double multiplierScale1To2;
+    const double reportingLimitScale1;
+} measurementScaleEntry;
+
 // System can enter a variety of states
 // See statemachine diagram at:
 // https://lucid.app/lucidchart/53519501-9fa5-4352-aa40-673f88ca0c9b/edit?invitationId=inv_ebd4b988-513d-4169-93fd-c291851108f8

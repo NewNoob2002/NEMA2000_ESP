@@ -234,9 +234,13 @@ UnicoreUM980::configureBase() {
     static bool firstTime = true;
     requestModel();
     if (firstTime) {
+        log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS,
+            "First time Base configuration. Current GNSS model: %d. Skipping mode checks to allow initial "
+            "configuration to complete.",
+            _model);
         firstTime = false;
-    } else // Skip these checks first time around. We need the setModel
-    {
+    } else {
+        // Skip these checks first time around. We need the setModel
         // If we are already in the appropriate base mode, no changes needed
         if (settings.fixedBase == false && gnssInBaseSurveyInMode()) {
             return (true);
@@ -245,15 +249,15 @@ UnicoreUM980::configureBase() {
             return (true);
         }
     }
-
+    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Changing GNSS model to Base...");
     // Assume we are changing from Rover to Base, request any additional config
     // changes
-
+    // settings.dynamicModel = settings.fixedBase ? UM980_DYN_MODEL_BASE_FIXED : UM980_DYN_MODEL_BASE_SURVEY;
     // Set the dynamic mode. This will cancel any base averaging mode and is
     // needed to allow a freshly started device to settle in regular GNSS
     // reception mode before issuing a surveyInStart().
     // gnss->setModel(settings.dynamicModel) sets the model
-    gnssConfigure(GNSS_CONFIG_MODEL);
+    // gnssConfigure(GNSS_CONFIG_MODEL);
 
     // Request a change to Base RTCM. gnss->setMessagesRTCMBase() sets the
     // messages
@@ -287,6 +291,15 @@ UnicoreUM980::surveyInStart() {
         return true;
     }
     return false;
+}
+
+bool
+UnicoreUM980::surveyInReset() {
+    bool result = false;
+    if (_online) {
+        result = setModeRoverSurvey();
+    }
+    return (result);
 }
 
 bool
@@ -585,6 +598,21 @@ UnicoreUM980::setModel(const uint8_t modelNumber) {
     return false;
 }
 
+bool
+UnicoreUM980::setModeRoverSurvey() {
+    return setRoverMode("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+}
+
+bool
+UnicoreUM980::setModeRoverUAV() {
+    return setRoverMode("UAV") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+}
+
+bool
+UnicoreUM980::setModeRoverAutomotive() {
+    return setRoverMode("AUTOMOTIVE") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+}
+
 uint8_t
 UnicoreUM980::requestModel() {
     if (sendCommandAndWait("MODE", 2000, "#MODE") == Unicore_RESULT_RESPONSE_COMMAND_OK) {
@@ -748,7 +776,27 @@ UnicoreUM980::getAltitude() const {
 
 float
 UnicoreUM980::getHorizontalAccuracy() const {
-    return _horizontalAccuracy;
+    // Return the current HPA instead
+    return 0.0f;
+}
+
+float
+UnicoreUM980::getSurveyInMeanAccuracy() const {
+    return 0.0f;
+}
+
+uint32_t
+UnicoreUM980::getSurveyInObservationTimeSeconds() const {
+    uint32_t elapsedSeconds = (millis() - _autoBaseStartTimer) / 1000;
+    return (elapsedSeconds);
+}
+
+bool
+UnicoreUM980::isSurveyInComplete() const {
+    if (getSurveyInObservationTimeSeconds() > settings.observationSeconds) {
+        return (true);
+    }
+    return (false);
 }
 
 uint8_t

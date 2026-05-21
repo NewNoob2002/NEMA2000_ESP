@@ -126,57 +126,159 @@ stateUpdate(UnicoreUM980* gnss) {
                 settings.baseCasterOverride = true;
                 changeState(STATE_BASE_NOT_STARTED);
             } break;
+                // User wants to switch to fixed base, using the current position as
+                // the fixed base position.
+                // Note: this works when switching from Rover (e.g. with RTK Fix)
+                //       or when switching from Temporary Base (after Survey-In)
             case (STATE_BASE_ASSIST_NOT_STARTED): {
-                settings.baseCasterOverride = false;
+                RTK_MODE(RTK_MODE_BASE_UNDECIDED);
+                if (!online_devices.gnss) {
+                    return;
+                }
+                // Copy current position into fixed base position
+                settings.fixedBase = true;
+                if (settings.fixedBaseCoordinateType == COORD_TYPE_GEODETIC) {
+                    settings.fixedLat = gnss->getLatitude();
+                    settings.fixedLong = gnss->getLongitude();
+
+                    // See issue #809
+                    // gnss->getAltitude() will always return Height above ellipsoid
+                    // even if the underlying library getAltitude does not
+                    settings.fixedAltitude = gnss->getAltitude();
+
+                    // Subtract the antennaHeight and antennaPhaseCenter
+                    // settings.fixedAltitude is the pole tip altitude, not the GNSS antenna altitude
+                    settings.fixedAltitude -= ((settings.antennaHeight_mm + settings.antennaPhaseCenter_mm) / 1000.0);
+
+                    systemPrint("Switching to Fixed Base mode using:");
+                    systemPrint(" Lat: ");
+                    systemPrint(settings.fixedLat, 8);
+                    systemPrint(", Lon: ");
+                    systemPrint(settings.fixedLong, 8);
+                    systemPrint(", Alt: ");
+                    systemPrintln(settings.fixedAltitude, 4);
+                } else {
+                    double ecefX = 0;
+                    double ecefY = 0;
+                    double ecefZ = 0;
+                    // Don't subtract antennaHeight_mm + antennaPhaseCenter_mm
+                    geodeticToEcef(gnss->getLatitude(), gnss->getLongitude(), gnss->getAltitude(), &ecefX, &ecefY,
+                                   &ecefZ);
+                    settings.fixedEcefX = ecefX;
+                    settings.fixedEcefY = ecefY;
+                    settings.fixedEcefZ = ecefZ;
+
+                    systemPrint("Switching to Fixed Base mode using ECEF: ");
+                    systemPrint(settings.fixedEcefX, 4);
+                    systemPrint(",");
+                    systemPrint(settings.fixedEcefY, 4);
+                    systemPrint(",");
+                    systemPrintln(settings.fixedEcefZ, 4);
+                }
+                // STATE_BASE_NOT_STARTED will record settings for next POR
                 changeState(STATE_BASE_NOT_STARTED);
             } break;
             case (STATE_BASE_NOT_STARTED): {
-                settings.lastState = STATE_BASE_NOT_STARTED;
-
-                gnssConfigure(GNSS_CONFIG_BASE);
-                if (settings.fixedBase) {
-                    RTK_MODE(RTK_MODE_BASE_FIXED);
-                    gnssConfigure(GNSS_CONFIG_BASE_FIXED);
-                } else {
-                    RTK_MODE(RTK_MODE_BASE_SURVEY_IN);
-                    gnssConfigure(GNSS_CONFIG_BASE_SURVEY);
+                // Mark RTK_MODE as BASE_UNDECIDED to avoid starting NTRIP Client when we may not need it
+                RTK_MODE(RTK_MODE_BASE_UNDECIDED);
+                if (!online_devices.gnss) {
+                    return;
                 }
-
-                changeState(gnssReady ? STATE_BASE_CONFIG_WAIT
-                                      : (settings.fixedBase ? STATE_BASE_FIXED_NOT_STARTED : STATE_BASE_TEMP_SETTLE));
+                gnssConfigure(GNSS_CONFIG_BASE);
+                changeState(STATE_BASE_CONFIG_WAIT);
             } break;
             case (STATE_BASE_CONFIG_WAIT): {
                 if (gnssConfigureComplete()) {
-                    changeState(settings.fixedBase ? STATE_BASE_FIXED_TRANSMITTING : STATE_BASE_TEMP_SETTLE);
+                    systemPrintln("Base configured");
+
+                    if (settings.fixedBase == false) {
+                        changeState(STATE_BASE_TEMP_SETTLE);
+                        RTK_MODE(RTK_MODE_BASE_SURVEY_IN); // Now allow NTRIP Client to start
+                    } else {
+                        gnssConfigure(GNSS_CONFIG_BASE_FIXED); // Request start of fixed base
+                        changeState(STATE_BASE_FIXED_NOT_STARTED);
+                        RTK_MODE(RTK_MODE_BASE_FIXED); // Now allow NTRIP Server to start
+                    }
                 }
             } break;
             case (STATE_BASE_TEMP_SETTLE): {
-                if (gnssReady && gnss->isFixed()
-                    && (gnss->getHorizontalAccuracy() <= settings.surveyInStartingAccuracy)) {
-                    gnssConfigure(GNSS_CONFIG_BASE_SURVEY);
+                int siv = gnss->getSatellitesInView();
+                float hpa = gnss->getHorizontalAccuracy();
+
+                // Check for horizontal accuracy threshold before starting survey in
+                char accuracy[20];
+                char temp[20];
+                const char* units = getHpaUnits(hpa, temp, sizeof(temp), 2, true);
+
+                // surveyInStartingAccuracy is 10m max
+                const char* accUnits =
+                    getHpaUnits(settings.surveyInStartingAccuracy, accuracy, sizeof(accuracy), 2, false);
+
+                systemPrintf("Waiting for Horz Accuracy < %s (%s): %s%s%s%s, SIV: %d\r\n", accuracy, accUnits, temp,
+                             (accUnits != units) ? " (" : "", (accUnits != units) ? units : "",
+                             (accUnits != units) ? ")" : "", siv);
+
+                // On the mosaic-X5, the HPA is undefined while the GNSS is determining its fixed position
+                // We need to skip the HPA check...
+                if (hpa > 0.0 && hpa < settings.surveyInStartingAccuracy) {
+                    gnssConfigure(GNSS_CONFIG_BASE_SURVEY); // Request reconfigure to base survey in mode
+
                     changeState(STATE_BASE_TEMP_SURVEY_STARTED);
                 }
             } break;
             case (STATE_BASE_TEMP_SURVEY_STARTED): {
-                if (gnssConfigureComplete()) {
+                // Get the data once to avoid duplicate slow responses
+                int observationTime = gnss->getSurveyInObservationTimeSeconds();
+                float meanAccuracy = gnss->getSurveyInMeanAccuracy();
+                int siv = gnss->getSatellitesInView();
+
+                if (gnss->isSurveyInComplete() == true) // Survey in complete
+                {
+                    systemPrintf("Observation Time: %d\r\n", observationTime);
+                    systemPrintln("Base survey complete! RTCM now broadcasting.");
+
+                    // baseStatusLedOn(); // Indicate survey complete
+
+                    // Start the NTRIP server if requested
+                    RTK_MODE(RTK_MODE_BASE_FIXED);
+
+                    // rtcmPacketsSent = 0; // Reset any previous number
                     changeState(STATE_BASE_TEMP_TRANSMITTING);
+                } else {
+                    char temp[20];
+                    const char* units = getHpaUnits(meanAccuracy, temp, sizeof(temp), 3, true);
+                    systemPrintf("Time elapsed: %d Accuracy (%s): %s SIV: %d\r\n", observationTime, units, temp, siv);
+
+                    if (observationTime > 60UL * 15UL) {
+                        systemPrintf("Survey-In took more than %d minutes. Returning to rover mode.\r\n",
+                                     60UL * 15UL / 60UL);
+
+                        if (gnss->surveyInReset() == false) {
+                            systemPrintln("Survey reset failed - attempt 1/3");
+                            if (gnss->surveyInReset() == false) {
+                                systemPrintln("Survey reset failed - attempt 2/3");
+                                if (gnss->surveyInReset() == false) {
+                                    systemPrintln("Survey reset failed - attempt 3/3");
+                                }
+                            }
+                        }
+
+                        changeState(STATE_ROVER_NOT_STARTED);
+                    }
                 }
             } break;
+
+            // Leave base temp transmitting over external radio, or WiFi/NTRIP, or ESP NOW
             case (STATE_BASE_TEMP_TRANSMITTING): {
-                if (settings.fixedBase) {
-                    changeState(STATE_BASE_FIXED_NOT_STARTED);
-                }
             } break;
             case (STATE_BASE_FIXED_NOT_STARTED): {
-                RTK_MODE(RTK_MODE_BASE_FIXED);
-                gnssConfigure(GNSS_CONFIG_BASE_FIXED);
-                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE);
-                changeState(gnssReady ? STATE_BASE_CONFIG_WAIT : STATE_BASE_FIXED_TRANSMITTING);
-            } break;
-            case (STATE_BASE_FIXED_TRANSMITTING): {
-                if (!settings.fixedBase) {
-                    changeState(STATE_BASE_NOT_STARTED);
+                if (gnssConfigureComplete()) {
+                    // baseStatusLedOn(); // Turn on the base/status LED
+                    changeState(STATE_BASE_FIXED_TRANSMITTING);
                 }
+            } break;
+            // Leave base fixed transmitting if user has enabled WiFi/NTRIP
+            case (STATE_BASE_FIXED_TRANSMITTING): {
             } break;
 
             /* WEB CONFIG STATES */

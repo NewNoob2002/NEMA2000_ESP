@@ -37,10 +37,14 @@ void systemPrintln(String myString);
 #endif
 void clearBuffer();
 
-void reportFatalError(const char* errorMsg);
+void geodeticToEcef(double lat, double lon, double alt, double* x, double* y, double* z);
+void ecefToGeodetic(double x, double y, double z, double* lat, double* lon, double* alt);
+
+const char* getHpaUnits(double hpa, char* buffer, int length, int decimals, bool limit);
+
 void reportHeapNow(bool alwaysPrint);
 void reportHeap();
-
+void reportFatalError(const char* errorMsg);
 // Get the timestamp
 const char* getTimeStamp();
 

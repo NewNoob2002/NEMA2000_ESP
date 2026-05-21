@@ -170,7 +170,7 @@ gnssUpdate(UnicoreUM980* gnss) {
         if (gnssConfigureRequested(GNSS_CONFIG_BASE)) {
             if (gnss->configureBase()) {
                 gnssConfigureClear(GNSS_CONFIG_BASE);
-                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA);
+                // gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA);
                 gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
             }
         }
