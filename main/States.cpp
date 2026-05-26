@@ -398,10 +398,10 @@ changeState(SystemState_t newState) {
         endingState = getState(newState);
 
         if (!online_devices.rtc) {
-            systemPrintf("%s%s%s%s\r\n", asterisk, initialState, arrow, endingState);
+            systemPrintf("[State] %s%s%s%s\r\n", asterisk, initialState, arrow, endingState);
         } else {
             // Timestamp the state change
-            systemPrintf("%s%s%s%s, %s\r\n", asterisk, initialState, arrow, endingState, getTimeStamp());
+            systemPrintf("[State] %s%s%s%s, %s\r\n", asterisk, initialState, arrow, endingState, getTimeStamp());
         }
     }
 }

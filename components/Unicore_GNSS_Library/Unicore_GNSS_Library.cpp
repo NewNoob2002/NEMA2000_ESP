@@ -442,6 +442,14 @@ UnicoreGNSSLibrary::isOnline() {
 }
 
 bool
+UnicoreGNSSLibrary::isNmeaFixed() const {
+    if (nmeaPositionStatus >= 1) {
+        return (true);
+    }
+    return (false);
+}
+
+bool
 UnicoreGNSSLibrary::disableOutput() {
     for (int x = 0; x < 3; x++) {
         if (unlogPort() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
@@ -914,6 +922,63 @@ UnicoreGNSSLibrary::getLastRecTimeMs() const {
 uint32_t
 UnicoreGNSSLibrary::getLastVersionMs() const {
     return lastUpdateVersion;
+}
+
+void
+UnicoreGNSSLibrary::stopAutoReports() {
+    if (_bestNav != nullptr) {
+        delete _bestNav;
+        _bestNav = nullptr;
+    }
+    if (_bestNavXyz != nullptr) {
+        delete _bestNavXyz;
+        _bestNavXyz = nullptr;
+    }
+    if (_recTime != nullptr) {
+        delete _recTime;
+        _recTime = nullptr;
+    }
+}
+
+bool
+UnicoreGNSSLibrary::initBestnav(float rate) {
+    if ((startBinaryBeforeFix == false) && (isNmeaFixed() == false)) {
+        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "bestnav init delayed until fix");
+        return (false);
+    }
+
+    _bestNav = new UNICORE_BESTNAV_data_t;
+    if (_bestNav == nullptr) {
+        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "failed to allocate bestnav data");
+        return (false);
+    }
+
+    // Start outputting BESTNAV in Binary on this COM port
+    char command[50];
+    snprintf(command, sizeof(command), "BESTNAVB %0.2f", rate);
+    if (sendCommandAndWait(command, 2000) != Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        delete _bestNav;
+        _bestNav = nullptr; // Remove pointer so we will re-init next check
+        return (false);
+    }
+
+    log(UnicoreLogLevel::Info, UNICORE_LOG_COMMAND, "bestnav init ok");
+
+    return true;
+}
+
+bool
+UnicoreGNSSLibrary::initBestnavXyz(float rate) {
+    if ((startBinaryBeforeFix == false) && (isNmeaFixed() == false)) {
+        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "bestnavxyz init delayed until fix");
+        return (false);
+    }
+
+    _bestNavXyz = new UNICORE_BESTNAVXYZ_data_t;
+    if (_bestNavXyz == nullptr) {
+        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "failed to allocate bestnavxyz data");
+        return (false);
+    }
 }
 
 void

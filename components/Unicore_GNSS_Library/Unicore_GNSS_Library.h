@@ -84,6 +84,7 @@ class UnicoreGNSSLibrary {
     void end();
     bool isConnected() const;
     bool isOnline();
+    bool isNmeaFixed() const;
     bool disableOutput();
 
     bool startRxTask(uint32_t stackSize = 4096, UBaseType_t priority = 3, BaseType_t coreId = 0);
@@ -176,9 +177,13 @@ class UnicoreGNSSLibrary {
     uint32_t getLastRecTimeMs() const;
     uint32_t getLastVersionMs() const;
 
-    UNICORE_BESTNAV_data_t _bestNav = {};
-    UNICORE_BESTNAVXYZ_data_t _bestNavXyz = {};
-    UNICORE_RECTIME_data_t _recTime = {};
+    void stopAutoReports();
+    bool initBestnav(float rate = 1.0);
+    bool initBestnavXyz(float rate = 1.0);
+    bool initRecTime(float rate = 1.0);
+    UNICORE_BESTNAV_data_t* _bestNav = nullptr;
+    UNICORE_BESTNAVXYZ_data_t* _bestNavXyz = nullptr;
+    UNICORE_RECTIME_data_t* _recTime = nullptr;
     UNICORE_VERSION_data_t _version = {};
     float _horizontalAccuracy = 0.0f;
     bool _validDate = false;

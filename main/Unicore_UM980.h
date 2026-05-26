@@ -147,6 +147,8 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     double getLatitude() const;
     double getLongitude() const;
     double getAltitude() const;
+    float getLatitudeDeviation() const;
+    float getLongitudeDeviation() const;
     float getHorizontalAccuracy() const;
     float getSurveyInMeanAccuracy() const;
     uint32_t getSurveyInObservationTimeSeconds() const;

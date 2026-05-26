@@ -775,9 +775,37 @@ UnicoreUM980::getAltitude() const {
 }
 
 float
+UnicoreUM980::getLatitudeDeviation() const {
+    return _bestNav.latitudeDeviation;
+}
+
+float
+UnicoreUM980::getLongitudeDeviation() const {
+    return _bestNav.longitudeDeviation;
+}
+
+float
 UnicoreUM980::getHorizontalAccuracy() const {
-    // Return the current HPA instead
-    return 0.0f;
+    if (_online) {
+        float latitudeDeviation = getLatitudeDeviation();
+        float longitudeDeviation = getLongitudeDeviation();
+
+        // The binary message may contain all 0xFFs leading to a very large negative
+        // number.
+        if (longitudeDeviation < -0.01) {
+            longitudeDeviation = 50.0;
+        }
+        if (latitudeDeviation < -0.01) {
+            latitudeDeviation = 50.0;
+        }
+
+        // Return the lower of the two Lat/Long deviations
+        if (longitudeDeviation < latitudeDeviation) {
+            return (longitudeDeviation);
+        }
+        return (latitudeDeviation);
+    }
+    return 0;
 }
 
 float
