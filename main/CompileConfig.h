@@ -1,7 +1,14 @@
 #pragma once
 
+#ifndef COMPILE_WEBSERVER
+// #define COMPILE_WEBSERVER
+#endif
+
 #ifndef COMPILE_WIFI
-// #define COMPILE_WIFI
+#define COMPILE_WIFI
+#if defined(COMPILE_WEBSERVER)
+#define COMPILE_WIFI
+#endif
 #endif
 
 #ifndef COMPILE_BT
@@ -12,6 +19,6 @@
 // #define COMPILE_NTP
 #endif
 
-#ifndef COMPILE_I2C
+// #ifndef COMPILE_I2C
 // #define COMPILE_I2C
-#endif
+// #endif
