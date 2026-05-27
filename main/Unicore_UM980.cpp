@@ -145,8 +145,14 @@ UnicoreUM980::configureOnceTime() {
     UnicoreResult_t result = disableAllOutput();
 
     result = firstError(result, setElevation(15));
-    if (queryConfigContains("CONFIG SIGNALGROUP 2") != Unicore_RESULT_CONFIG_PRESENT) {
-        result = firstError(result, sendCommandAndWait("CONFIG SIGNALGROUP 2", 1500));
+    if (_version.modelType == 18 || _version.modelType == 26) {
+        if (queryConfigContains("CONFIG SIGNALGROUP 2") != Unicore_RESULT_CONFIG_PRESENT) {
+            result = firstError(result, sendCommandAndWait("CONFIG SIGNALGROUP 2", 1500));
+        }
+    } else if (_version.modelType == 17) {
+        if (queryConfigContains("CONFIG SIGNALGROUP 4 5") != Unicore_RESULT_CONFIG_PRESENT) {
+            result = firstError(result, sendCommandAndWait("CONFIG SIGNALGROUP 4 5", 1500));
+        }
     }
 
     if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
@@ -761,27 +767,47 @@ UnicoreUM980::isGgaActive() const {
 
 double
 UnicoreUM980::getLatitude() const {
-    return _bestNav.latitude;
+    if (_bestNav) {
+        return _bestNav->latitude;
+    } else {
+        return 0.0f;
+    }
 }
 
 double
 UnicoreUM980::getLongitude() const {
-    return _bestNav.longitude;
+    if (_bestNav) {
+        return _bestNav->longitude;
+    } else {
+        return 0.0f;
+    }
 }
 
 double
 UnicoreUM980::getAltitude() const {
-    return _bestNav.altitude;
+    if (_bestNav) {
+        return _bestNav->altitude;
+    } else {
+        return 0.0f;
+    }
 }
 
 float
 UnicoreUM980::getLatitudeDeviation() const {
-    return _bestNav.latitudeDeviation;
+    if (_bestNav) {
+        return _bestNav->latitudeDeviation;
+    } else {
+        return 0.0f;
+    }
 }
 
 float
 UnicoreUM980::getLongitudeDeviation() const {
-    return _bestNav.longitudeDeviation;
+    if (_bestNav) {
+        return _bestNav->longitudeDeviation;
+    } else {
+        return 0.0f;
+    }
 }
 
 float
@@ -829,52 +855,92 @@ UnicoreUM980::isSurveyInComplete() const {
 
 uint8_t
 UnicoreUM980::getFixType() const {
-    return _bestNav.positionType;
+    if (_bestNav) {
+        return _bestNav->positionType;
+    } else {
+        return 0;
+    }
 }
 
 uint8_t
 UnicoreUM980::getCarrierSolution() const {
-    return _bestNav.rtkSolution;
+    if (_bestNav) {
+        return _bestNav->rtkSolution;
+    } else {
+        return 0;
+    }
 }
 
 uint8_t
 UnicoreUM980::getSatellitesInView() const {
-    return _bestNav.satellitesTracked;
+    if (_bestNav) {
+        return _bestNav->satellitesTracked;
+    } else {
+        return 0;
+    }
 }
 
 uint8_t
 UnicoreUM980::getDay() const {
-    return _recTime.day;
+    if (_recTime) {
+        return _recTime->day;
+    } else {
+        return 0;
+    }
 }
 
 uint8_t
 UnicoreUM980::getMonth() const {
-    return _recTime.month;
+    if (_recTime) {
+        return _recTime->month;
+    } else {
+        return 0;
+    }
 }
 
 uint16_t
 UnicoreUM980::getYear() const {
-    return _recTime.year;
+    if (_recTime) {
+        return _recTime->year;
+    } else {
+        return 0;
+    }
 }
 
 uint8_t
 UnicoreUM980::getHour() const {
-    return _recTime.hour;
+    if (_recTime) {
+        return _recTime->hour;
+    } else {
+        return 0;
+    }
 }
 
 uint8_t
 UnicoreUM980::getMinute() const {
-    return _recTime.minute;
+    if (_recTime) {
+        return _recTime->minute;
+    } else {
+        return 0;
+    }
 }
 
 uint8_t
 UnicoreUM980::getSecond() const {
-    return _recTime.second;
+    if (_recTime) {
+        return _recTime->second;
+    } else {
+        return 0;
+    }
 }
 
 uint16_t
 UnicoreUM980::getMillisecond() const {
-    return _recTime.millisecond;
+    if (_recTime) {
+        return _recTime->millisecond;
+    } else {
+        return 0;
+    }
 }
 
 uint8_t
@@ -884,17 +950,29 @@ UnicoreUM980::getLeapSeconds() const {
 
 double
 UnicoreUM980::getEcefX() const {
-    return _bestNavXyz.ecefX;
+    if (_bestNavXyz) {
+        return _bestNavXyz->ecefX;
+    } else {
+        return 0;
+    }
 }
 
 double
 UnicoreUM980::getEcefY() const {
-    return _bestNavXyz.ecefY;
+    if (_bestNavXyz) {
+        return _bestNavXyz->ecefY;
+    } else {
+        return 0;
+    }
 }
 
 double
 UnicoreUM980::getEcefZ() const {
-    return _bestNavXyz.ecefZ;
+    if (_bestNavXyz) {
+        return _bestNavXyz->ecefZ;
+    } else {
+        return 0;
+    }
 }
 
 uint16_t
@@ -1044,10 +1122,6 @@ void
 UnicoreUM980::handleModeSentence(const char* sentence, uint16_t length) {
     (void)length;
 
-    if (!sentence || (strncmp(sentence, "#MODE,", 6) != 0)) {
-        return;
-    }
-
     const char* modePayload = strchr(sentence, ';');
     if (!modePayload) {
         return;
@@ -1086,7 +1160,24 @@ UnicoreUM980::handleModeSentence(const char* sentence, uint16_t length) {
         _mode = Um980Mode::Unknown;
     }
 
-    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Mode sentence received. Mode: %s, Model: %s", mode, model);
+    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "[Mode] sentence received. Mode: %s, Model: %s", mode, model);
+}
+
+void
+UnicoreUM980::handleDevicenameSentence(const char* sentence, uint16_t length) {
+    const char* modePayload = strchr(sentence, ',');
+    if (!modePayload) {
+        return;
+    }
+    modePayload++;
+
+    char comName[16] = {};
+
+    copyModeToken(comName, sizeof(comName), modePayload);
+
+    setConnectCom(comName);
+
+    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "[devicename] sentence received Current Connect  %s", comName);
 }
 
 void
@@ -1151,8 +1242,11 @@ UnicoreUM980::processNmeaSentence(const char* sentence, uint16_t length) {
     if (!sentence) {
         return;
     }
-#endif // UNICORE_NULLPTR_CHECK
-    // external callback for users to receive NMEA sentences directly as they are received by the module, before any internal processing
+#endif
+
+    if (sentence && (strncmp(sentence, "$devicename,", 12) == 0)) {
+        handleDevicenameSentence(sentence, length);
+    }
     // log(UnicoreLogLevel::Debug, UNICORE_LOG_CHILD_CLASS, "NMEA %s sentence received.", msgName);
     if (_userNmeaCallback) {
         _userNmeaCallback(sentence, length, _userNmeaContext);

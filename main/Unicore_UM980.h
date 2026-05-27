@@ -201,6 +201,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     void processHashSentence(const char* sentence, uint16_t length = 0);
     //handle
     void handleModeSentence(const char* sentence, uint16_t length);
+    void handleDevicenameSentence(const char* sentence, uint16_t length);
 
   private:
     gpio_num_t _powerPin;

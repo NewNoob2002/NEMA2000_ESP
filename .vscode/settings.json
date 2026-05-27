@@ -1,6 +1,6 @@
 {
-  "C_Cpp.errorSquiggles": "enabled",
-  "idf.portWin": "COM7",
-  "idf.customExtraVars": {},
-  "idf.currentSetup": "C:\\.espressif\\v5.5.4\\esp-idf"
+    "idf.customExtraVars": {},
+    "idf.currentSetup": "/home/gtc/.espressif/v5.5.4/esp-idf",
+    "idf.port": "/dev/ttyACM0",
+    "idf.flashType": "UART"
 }

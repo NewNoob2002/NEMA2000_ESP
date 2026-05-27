@@ -24,6 +24,6 @@
 #define I2C_TIMEOUT_MS           200
 
 // GNSS Module Config
-#define GNSS_POWER_PIN           (gpio_num_t)25
-#define GNSS_TX_PIN              (gpio_num_t)17
-#define GNSS_RX_PIN              (gpio_num_t)16
+#define GNSS_POWER_PIN           (gpio_num_t)5
+#define GNSS_TX_PIN              (gpio_num_t)10
+#define GNSS_RX_PIN              (gpio_num_t)9
