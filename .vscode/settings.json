@@ -1,4 +1,5 @@
 {
+    "clangd.path": "/home/gtc/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
     "idf.customExtraVars": {},
     "idf.currentSetup": "/home/gtc/.espressif/v5.5.4/esp-idf",
     "idf.port": "/dev/ttyACM0",

@@ -1,6 +1,0 @@
-interface:
-  display_name: "NMEA2000 ESP-IDF"
-  short_description: "Maintain this ESP-IDF NMEA2000 firmware"
-  default_prompt: "Use $nema2000-esp-idf to modify, debug, or build the NEMA2000_ESP ESP-IDF firmware."
-policy:
-  allow_implicit_invocation: true

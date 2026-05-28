@@ -1,0 +1,12 @@
+CompileFlags:
+  CompilationDatabase: build
+  Compiler: /home/gtc/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clang++
+  Remove:
+    - -mlongcalls
+    - -fno-shrink-wrap
+    - -fstrict-volatile-bitfields
+    - -fno-tree-switch-conversion
+  Add:
+    - --target=xtensa-esp-unknown-elf
+    - -isystem
+    - /home/gtc/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/xtensa-esp-elf/include

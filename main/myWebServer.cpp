@@ -6,6 +6,7 @@
 #include "Support.h"
 #include "form.h"
 #include "mcu_settings.h"
+#include "myWIFI.h"
 
 //----------------------------------------
 // Constants
@@ -2666,7 +2667,7 @@ webServerUpdate() {
         // Wait for connection to the network
         case WEBSERVER_STATE_WAIT_FOR_NETWORK:
             // Wait until the network is connected to the internet or has WiFi AP
-            if (connected || wifiSoftApRunning) {
+            if (connected || wifiSoftApRunning()) {
                 if (settings.debugWebServer) {
                     systemPrintln("Web Server connected to network");
                 }
@@ -2679,7 +2680,7 @@ webServerUpdate() {
         // Start the web server
         case WEBSERVER_STATE_NETWORK_CONNECTED: {
             // Determine if the network has failed
-            if (connected == false && wifiSoftApRunning == false) {
+            if (connected == false && wifiSoftApRunning() == false) {
                 networkUserRemove(NETCONSUMER_WEB_CONFIG, __FILE__, __LINE__);
                 webServerSetState(WEBSERVER_STATE_WAIT_FOR_NETWORK);
             }
@@ -2693,7 +2694,7 @@ webServerUpdate() {
         // Allow web services
         case WEBSERVER_STATE_RUNNING:
             // Determine if the network has failed
-            if (connected == false && wifiSoftApRunning == false) {
+            if (connected == false && wifiSoftApRunning() == false) {
                 webServerReleaseResources(); // Release web server resources
                 webServerSetState(WEBSERVER_STATE_WAIT_FOR_NETWORK);
             }

@@ -92,7 +92,8 @@ HAL_Update(void* e) {
 
     gnssUpdate();
 
-    bluetoothUpdate();
+    // bluetoothUpdate();
+    wifiUpdate();
 }
 
 void
@@ -117,17 +118,20 @@ HAL_Init() {
     DMW_b("gnssInit");
     gnssInit();
 
-    DMW_b("bluetoothInit");
-    bluetoothInit();
+    // DMW_b("bluetoothInit");
+    // bluetoothInit();
 
     DMW_b("stateInit");
     stateInit();
-    // DMW_b("wifiUpdateSettings");
-    // wifiUpdateSettings();
-    // if (settings.wifiConfigOverAP) {
-    //     DMW_b("WebServer_Start");
-    //     webServerStart();
-    // }
+    DMW_b("wifiUpdateSettings");
+    wifiUpdateSettings();
+    if (settings.wifiConfigOverAP) {
+        DMW_b("wifiSoftApOn");
+        wifiSoftApOn(__FILE__, __LINE__);
+    } else if (wifiNetworkCount() > 0) {
+        DMW_b("wifiStationOn");
+        wifiStationOn(__FILE__, __LINE__);
+    }
 
     showBootTimes();
 }
