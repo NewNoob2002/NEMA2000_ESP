@@ -94,6 +94,8 @@ HAL_Update(void* e) {
 
     // bluetoothUpdate();
     wifiUpdate();
+
+    webServerUpdate();
 }
 
 void
@@ -132,6 +134,10 @@ HAL_Init() {
         DMW_b("wifiStationOn");
         wifiStationOn(__FILE__, __LINE__);
     }
+    DMW_b("webServerStart");
+    webServerStart();
+    DMW_b("webServerUpdate");
+    webServerUpdate();
 
     showBootTimes();
 }

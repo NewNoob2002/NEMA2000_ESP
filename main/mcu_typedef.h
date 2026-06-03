@@ -275,6 +275,7 @@ typedef struct online_devices_t {
     bool bq40z50 = false;
     bool mp2762a = false;
     bool rtc = false;
+    bool webServer = false;
     online_wifi_t wifi;
 } online_devices_t;
 
@@ -622,10 +623,10 @@ typedef struct settings_t {
     uint8_t ubxConstellationsEnabled[MAX_UBX_CONSTELLATIONS] = {
         254};                                     // Mark first record with key so defaults will be applied.
     uint8_t ubxMessageRates[MAX_UBX_MSG] = {254}; // Mark first record with key so defaults will be applied.
-    uint8_t ubxMessageRatesBase[MAX_UBX_MSG_RTCM] = {
-        254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-              // rates for RTCM Base. Default to u-blox recommended rates.
-#endif        // COMPILE_ZED
+    uint8_t ubxMessageRatesBase[MAX_UBX_MSG_RTCM] =
+        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+               // rates for RTCM Base. Default to u-blox recommended rates.
+#endif         // COMPILE_ZED
 
     // UDP Server
     bool debugUdpServer = false;
@@ -640,13 +641,13 @@ typedef struct settings_t {
     uint8_t um980Constellations[MAX_UM980_CONSTELLATIONS] = {
         254};                                                // Mark first record with key so defaults will be applied.
     float um980MessageRatesNMEA[MAX_UM980_NMEA_MSG] = {254}; // Mark first record with key so defaults will be applied.
-    float um980MessageRatesRTCMBase[MAX_UM980_RTCM_MSG] = {
-        254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-              // rates for RTCM Base. Default to Unicore recommended rates.
-    float um980MessageRatesRTCMRover[MAX_UM980_RTCM_MSG] = {
-        254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-              // rates for RTCM Base. Default to Unicore recommended rates.
-#endif        // COMPILE_UM980
+    float um980MessageRatesRTCMBase[MAX_UM980_RTCM_MSG] =
+        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+               // rates for RTCM Base. Default to Unicore recommended rates.
+    float um980MessageRatesRTCMRover[MAX_UM980_RTCM_MSG] =
+        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+               // rates for RTCM Base. Default to Unicore recommended rates.
+#endif         // COMPILE_UM980
 
     // mosaic
 #ifdef COMPILE_MOSAICX5
@@ -724,12 +725,12 @@ typedef struct settings_t {
     uint8_t lg290pConstellations[MAX_LG290P_CONSTELLATIONS] = {
         254};                                                // Mark first record with key so defaults will be applied.
     int lg290pMessageRatesNMEA[MAX_LG290P_NMEA_MSG] = {254}; // Mark first record with key so defaults will be applied.
-    int lg290pMessageRatesRTCMBase[MAX_LG290P_RTCM_MSG] = {
-        254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-              // rates for RTCM Base. Default to Quectel recommended rates.
-    int lg290pMessageRatesRTCMRover[MAX_LG290P_RTCM_MSG] = {
-        254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-              // rates for RTCM Base. Default to Quectel recommended rates.
+    int lg290pMessageRatesRTCMBase[MAX_LG290P_RTCM_MSG] =
+        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+               // rates for RTCM Base. Default to Quectel recommended rates.
+    int lg290pMessageRatesRTCMRover[MAX_LG290P_RTCM_MSG] =
+        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+               // rates for RTCM Base. Default to Quectel recommended rates.
     int lg290pMessageRatesPQTM[MAX_LG290P_PQTM_MSG] = {254}; // Mark first record with key so defaults will be applied.
 #endif                                                       // COMPILE_LG290P
 

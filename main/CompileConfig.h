@@ -1,11 +1,10 @@
 #pragma once
 
 #ifndef COMPILE_WEBSERVER
-// #define COMPILE_WEBSERVER
+#define COMPILE_WEBSERVER
 #endif
 
 #ifndef COMPILE_WIFI
-#define COMPILE_WIFI
 #if defined(COMPILE_WEBSERVER)
 #define COMPILE_WIFI
 #endif

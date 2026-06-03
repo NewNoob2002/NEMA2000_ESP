@@ -2061,9 +2061,39 @@ function confirmDataReceipt() {
 
 function firmwareUploadWait() {
     var file = ge("submitFirmwareFile").files[0];
+    if (!file) {
+        ge("firmwareUploadMsg").innerHTML = "Select a firmware BIN file first.";
+        return;
+    }
+
     var formdata = new FormData();
     formdata.append("submitFirmwareFile", file);
     var ajax = new XMLHttpRequest();
+
+    ajax.upload.addEventListener("progress", function (event) {
+        if (event.lengthComputable) {
+            var percent = Math.round((event.loaded / event.total) * 100);
+            ge("firmwareUploadMsg").innerHTML = "<br>Uploading, " + percent + "% complete...";
+        }
+    }, false);
+
+    ajax.onload = function () {
+        if (ajax.status >= 200 && ajax.status < 300) {
+            ge("firmwareUploadMsg").innerHTML = "<br>Upload complete. Restarting...";
+        }
+        else {
+            ge("firmwareUploadMsg").innerHTML = "<br>Upload failed: " + ajax.responseText;
+        }
+    };
+
+    ajax.onerror = function () {
+        ge("firmwareUploadMsg").innerHTML = "<br>Upload failed.";
+    };
+
+    ajax.onabort = function () {
+        ge("firmwareUploadMsg").innerHTML = "<br>Upload aborted.";
+    };
+
     ajax.open("POST", "/uploadFirmware");
     ajax.send(formdata);
 
