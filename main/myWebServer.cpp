@@ -43,6 +43,7 @@ const uint8_t webServerCaptiveUrlCount = sizeof(webServerCaptiveUrls) / sizeof(w
 // Forward routines
 //----------------------------------------
 static esp_err_t webServerHandlerWebSockets(httpd_req_t* req);
+static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req);
 //----------------------------------------
 // Web page descriptions
 //----------------------------------------
@@ -82,14 +83,14 @@ const GET_PAGE_HANDLER webServerPages[] = {
     WEB_PAGE(21, "/src/style.css", text_css, style_css),
 
     // File pages
-    PAGE_HANDLER(22, "/listfiles", HTTP_GET, text_plain, webServerHandlerFileList),
-    PAGE_HANDLER(23, "/file", HTTP_GET, text_plain, webServerHandlerFileManager),
+    // PAGE_HANDLER(22, "/listfiles", HTTP_GET, text_plain, webServerHandlerFileList),
+    // PAGE_HANDLER(23, "/file", HTTP_GET, text_plain, webServerHandlerFileManager),
     PAGE_HANDLER(24, UPLOAD_FIRMWARE, HTTP_POST, text_plain, webServerHandlerFirmwareUpload),
 
     // Message handlers
-    PAGE_HANDLER(25, "/listMessages", HTTP_GET, text_plain, webServerHandlerListMessages),
-    PAGE_HANDLER(26, "/listMessagesBase", HTTP_GET, text_plain, webServerHandlerListBaseMessages),
-    PAGE_HANDLER(27, UPLOAD_PATH, HTTP_POST, text_plain, webServerHandlerFileUpload),
+    // PAGE_HANDLER(25, "/listMessages", HTTP_GET, text_plain, webServerHandlerListMessages),
+    // PAGE_HANDLER(26, "/listMessagesBase", HTTP_GET, text_plain, webServerHandlerListBaseMessages),
+    // PAGE_HANDLER(27, UPLOAD_PATH, HTTP_POST, text_plain, webServerHandlerFileUpload),
 
     // Add pages above this line
     WEB_PAGE(28, "/", text_html, index_html),
