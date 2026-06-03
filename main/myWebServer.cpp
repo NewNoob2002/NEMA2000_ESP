@@ -6,6 +6,9 @@
 #include <ESPmDNS.h>
 #include <Update.h>
 #include <esp_http_server.h>
+#include <esp_log.h>
+#include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include "Support.h"
 #include "form.h"
@@ -19,6 +22,7 @@
 static const size_t webServerStackSize = 1024 * 20;
 static const size_t firmwareBufferLength = 16 * 1024;
 
+static const char* const TAG = "WebServer";
 static const char* const image_png = "image/png";
 static const char* const text_css = "text/css";
 static const char* const text_html = "text/html";
@@ -32,6 +36,7 @@ static const char* const text_plain = "text/plain";
 //----------------------------------------
 
 static httpd_handle_t webServerHandle;
+static int webServerClientSocket = -1;
 static WebServerState webServerState = WEBSERVER_STATE_OFF;
 
 static const char* const webServerStateNames[] = {
@@ -49,6 +54,9 @@ static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req);
 static esp_err_t webServerHandlerGetPage(httpd_req_t* req);
 static esp_err_t webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error);
 static esp_err_t webServerHandlerWebSockets(httpd_req_t* req);
+static bool webServerAppendField(char* buffer, size_t bufferLength, const char* key, const char* value);
+static bool webServerApplyField(const char* key, const char* value);
+static bool webServerBuildSettingsCsv(char* buffer, size_t bufferLength);
 static void webServerHandleClientMessage(const char* message);
 
 //----------------------------------------
@@ -78,6 +86,445 @@ static const httpd_uri_t webServerWebSocketPage = {.uri = "/ws",
                                                    .is_websocket = true,
                                                    .handle_ws_control_frames = true,
                                                    .supported_subprotocol = NULL};
+
+//----------------------------------------
+// Web settings field API
+//----------------------------------------
+
+typedef bool (*WebFieldGetter)(char* value, size_t valueLength);
+typedef bool (*WebFieldSetter)(const char* value);
+
+typedef struct WebFieldBinding {
+    const char* section;
+    const char* id;
+    WebFieldGetter getter;
+    WebFieldSetter setter;
+} WebFieldBinding;
+
+static bool textToBool(const char* value) {
+    return (strcmp(value, "true") == 0) || (strcmp(value, "1") == 0) || (strcmp(value, "on") == 0);
+}
+
+static bool getBool(char* value, size_t valueLength, bool setting) {
+    snprintf(value, valueLength, "%s", setting ? "true" : "false");
+    return true;
+}
+
+static bool getInt(char* value, size_t valueLength, int setting) {
+    snprintf(value, valueLength, "%d", setting);
+    return true;
+}
+
+static bool getDouble(char* value, size_t valueLength, double setting, int decimals) {
+    snprintf(value, valueLength, "%.*f", decimals, setting);
+    return true;
+}
+
+static bool getString(char* value, size_t valueLength, const char* setting) {
+    snprintf(value, valueLength, "%s", setting ? setting : "");
+    return true;
+}
+
+static bool getProfileName(char* value, size_t valueLength) {
+    return getString(value, valueLength, settings.profileName);
+}
+
+static bool setProfileName(const char* value) {
+    snprintf(settings.profileName, sizeof(settings.profileName), "%s", value);
+    return true;
+}
+
+static bool getMeasurementRateHz(char* value, size_t valueLength) {
+    if (settings.measurementRateMs == 0) {
+        return getDouble(value, valueLength, 0.0, 3);
+    }
+    return getDouble(value, valueLength, static_cast<double>(MILLISECONDS_IN_A_SECOND) / settings.measurementRateMs, 3);
+}
+
+static bool setMeasurementRateHz(const char* value) {
+    const double hz = strtod(value, nullptr);
+    if (hz <= 0.0) {
+        return false;
+    }
+    settings.measurementRateMs = static_cast<uint16_t>(lround(static_cast<double>(MILLISECONDS_IN_A_SECOND) / hz));
+    return true;
+}
+
+static bool getMeasurementRateSec(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, static_cast<double>(settings.measurementRateMs) / MILLISECONDS_IN_A_SECOND, 3);
+}
+
+static bool setMeasurementRateSec(const char* value) {
+    const double seconds = strtod(value, nullptr);
+    if (seconds <= 0.0) {
+        return false;
+    }
+    settings.measurementRateMs = static_cast<uint16_t>(lround(seconds * MILLISECONDS_IN_A_SECOND));
+    return true;
+}
+
+static bool getDynamicModel(char* value, size_t valueLength) {
+    return getInt(value, valueLength, settings.dynamicModel);
+}
+
+static bool setDynamicModel(const char* value) {
+    settings.dynamicModel = static_cast<uint8_t>(strtoul(value, nullptr, 10));
+    return true;
+}
+
+static bool getMinElev(char* value, size_t valueLength) {
+    return getInt(value, valueLength, settings.minElev);
+}
+
+static bool setMinElev(const char* value) {
+    settings.minElev = static_cast<uint8_t>(strtoul(value, nullptr, 10));
+    return true;
+}
+
+static bool getMinCN0(char* value, size_t valueLength) {
+    return getInt(value, valueLength, settings.minCN0);
+}
+
+static bool setMinCN0(const char* value) {
+    settings.minCN0 = static_cast<int16_t>(strtol(value, nullptr, 10));
+    return true;
+}
+
+static bool getRtcmMinElev(char* value, size_t valueLength) {
+    return getInt(value, valueLength, settings.rtcmMinElev);
+}
+
+static bool setRtcmMinElev(const char* value) {
+    settings.rtcmMinElev = static_cast<int>(strtol(value, nullptr, 10));
+    return true;
+}
+
+static bool getUseMSM7(char* value, size_t valueLength) {
+    return getBool(value, valueLength, settings.useMSM7);
+}
+
+static bool setUseMSM7(const char* value) {
+    settings.useMSM7 = textToBool(value);
+    return true;
+}
+
+static bool getBaseTypeSurveyIn(char* value, size_t valueLength) {
+    return getBool(value, valueLength, !settings.fixedBase);
+}
+
+static bool setBaseTypeSurveyIn(const char* value) {
+    if (textToBool(value) || (strcmp(value, "0") == 0)) {
+        settings.fixedBase = false;
+    }
+    return true;
+}
+
+static bool getBaseTypeFixed(char* value, size_t valueLength) {
+    return getBool(value, valueLength, settings.fixedBase);
+}
+
+static bool setBaseTypeFixed(const char* value) {
+    if (textToBool(value) || (strcmp(value, "1") == 0)) {
+        settings.fixedBase = true;
+    }
+    return true;
+}
+
+static bool getCoordinateTypeECEF(char* value, size_t valueLength) {
+    return getBool(value, valueLength, settings.fixedBaseCoordinateType == COORD_TYPE_ECEF);
+}
+
+static bool setCoordinateTypeECEF(const char* value) {
+    if (textToBool(value) || (strcmp(value, "0") == 0)) {
+        settings.fixedBaseCoordinateType = COORD_TYPE_ECEF;
+    }
+    return true;
+}
+
+static bool getCoordinateTypeGeo(char* value, size_t valueLength) {
+    return getBool(value, valueLength, settings.fixedBaseCoordinateType == COORD_TYPE_GEODETIC);
+}
+
+static bool setCoordinateTypeGeo(const char* value) {
+    if (textToBool(value) || (strcmp(value, "1") == 0)) {
+        settings.fixedBaseCoordinateType = COORD_TYPE_GEODETIC;
+    }
+    return true;
+}
+
+static bool getObservationSeconds(char* value, size_t valueLength) {
+    return getInt(value, valueLength, settings.observationSeconds);
+}
+
+static bool setObservationSeconds(const char* value) {
+    settings.observationSeconds = static_cast<int>(strtol(value, nullptr, 10));
+    return true;
+}
+
+static bool getObservationAccuracy(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, settings.observationPositionAccuracy, 2);
+}
+
+static bool setObservationAccuracy(const char* value) {
+    settings.observationPositionAccuracy = static_cast<float>(strtod(value, nullptr));
+    return true;
+}
+
+static bool getFixedEcefX(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, settings.fixedEcefX, 3);
+}
+
+static bool setFixedEcefX(const char* value) {
+    settings.fixedEcefX = strtod(value, nullptr);
+    return true;
+}
+
+static bool getFixedEcefY(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, settings.fixedEcefY, 3);
+}
+
+static bool setFixedEcefY(const char* value) {
+    settings.fixedEcefY = strtod(value, nullptr);
+    return true;
+}
+
+static bool getFixedEcefZ(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, settings.fixedEcefZ, 3);
+}
+
+static bool setFixedEcefZ(const char* value) {
+    settings.fixedEcefZ = strtod(value, nullptr);
+    return true;
+}
+
+static bool getFixedLat(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, settings.fixedLat, 8);
+}
+
+static bool setFixedLat(const char* value) {
+    settings.fixedLat = strtod(value, nullptr);
+    return true;
+}
+
+static bool getFixedLong(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, settings.fixedLong, 8);
+}
+
+static bool setFixedLong(const char* value) {
+    settings.fixedLong = strtod(value, nullptr);
+    return true;
+}
+
+static bool getFixedAltitude(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, settings.fixedAltitude, 3);
+}
+
+static bool setFixedAltitude(const char* value) {
+    settings.fixedAltitude = strtod(value, nullptr);
+    return true;
+}
+
+static bool getFixedHAEAPC(char* value, size_t valueLength) {
+    const double totalHeight = settings.fixedAltitude + ((settings.antennaHeight_mm + settings.antennaPhaseCenter_mm) / 1000.0);
+    return getDouble(value, valueLength, totalHeight, 3);
+}
+
+static bool setReadOnlyField(const char* value) {
+    (void)value;
+    return false;
+}
+
+static bool getAntennaPhaseCenter(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, settings.antennaPhaseCenter_mm, 1);
+}
+
+static bool setAntennaPhaseCenter(const char* value) {
+    settings.antennaPhaseCenter_mm = static_cast<float>(strtod(value, nullptr));
+    return true;
+}
+
+static bool getAntennaHeightM(char* value, size_t valueLength) {
+    return getDouble(value, valueLength, static_cast<double>(settings.antennaHeight_mm) / 1000.0, 3);
+}
+
+static bool setAntennaHeightM(const char* value) {
+    settings.antennaHeight_mm = static_cast<int16_t>(lround(strtod(value, nullptr) * 1000.0));
+    return true;
+}
+
+static SystemState_t webUiLastStateToSystemState(uint32_t value) {
+    switch (value) {
+        case 0: return STATE_ROVER_NOT_STARTED;
+        case 1: return STATE_BASE_NOT_STARTED;
+#ifdef COMPILE_NTP
+        case 2: return STATE_NTPSERVER_NOT_STARTED;
+#endif
+        case 3: return STATE_BASE_CASTER_NOT_STARTED;
+        default: return STATE_NOT_SET;
+    }
+}
+
+static uint32_t systemStateToWebUiLastState(SystemState_t value) {
+    switch (value) {
+        case STATE_ROVER_NOT_STARTED: return 0;
+        case STATE_BASE_NOT_STARTED: return 1;
+#ifdef COMPILE_NTP
+        case STATE_NTPSERVER_NOT_STARTED: return 2;
+#endif
+        case STATE_BASE_CASTER_NOT_STARTED: return 3;
+        default: return 0;
+    }
+}
+
+static bool getLastState(char* value, size_t valueLength) {
+    return getInt(value, valueLength, systemStateToWebUiLastState(settings.lastState));
+}
+
+static bool setLastState(const char* value) {
+    settings.lastState = webUiLastStateToSystemState(strtoul(value, nullptr, 10));
+    return true;
+}
+
+static bool getMeasurementScale(char* value, size_t valueLength) {
+    return getInt(value, valueLength, settings.measurementScale);
+}
+
+static bool setMeasurementScale(const char* value) {
+    settings.measurementScale = static_cast<uint8_t>(strtoul(value, nullptr, 10));
+    return true;
+}
+
+static bool getEnableBeeper(char* value, size_t valueLength) {
+    return getBool(value, valueLength, settings.enableBeeper);
+}
+
+static bool setEnableBeeper(const char* value) {
+    settings.enableBeeper = textToBool(value);
+    return true;
+}
+
+static const WebFieldBinding webFieldBindings[] = {
+    {"Profile Configuration", "profileName", getProfileName, setProfileName},
+    {"GNSS Configuration", "measurementRateHz", getMeasurementRateHz, setMeasurementRateHz},
+    {"GNSS Configuration", "measurementRateSec", getMeasurementRateSec, setMeasurementRateSec},
+    {"GNSS Configuration", "dynamicModel", getDynamicModel, setDynamicModel},
+    {"GNSS Configuration", "minElev", getMinElev, setMinElev},
+    {"GNSS Configuration", "minCN0", getMinCN0, setMinCN0},
+    {"GNSS Configuration", "rtcmMinElev", getRtcmMinElev, setRtcmMinElev},
+    {"GNSS Configuration", "useMSM7", getUseMSM7, setUseMSM7},
+    {"Base Configuration", "baseTypeSurveyIn", getBaseTypeSurveyIn, setBaseTypeSurveyIn},
+    {"Base Configuration", "baseTypeFixed", getBaseTypeFixed, setBaseTypeFixed},
+    {"Base Configuration", "observationSeconds", getObservationSeconds, setObservationSeconds},
+    {"Base Configuration", "observationPositionAccuracy", getObservationAccuracy, setObservationAccuracy},
+    {"Base Configuration", "fixedBaseCoordinateTypeECEF", getCoordinateTypeECEF, setCoordinateTypeECEF},
+    {"Base Configuration", "fixedBaseCoordinateTypeGeo", getCoordinateTypeGeo, setCoordinateTypeGeo},
+    {"Base Configuration", "fixedEcefX", getFixedEcefX, setFixedEcefX},
+    {"Base Configuration", "fixedEcefY", getFixedEcefY, setFixedEcefY},
+    {"Base Configuration", "fixedEcefZ", getFixedEcefZ, setFixedEcefZ},
+    {"Base Configuration", "fixedLatText", getFixedLat, setFixedLat},
+    {"Base Configuration", "fixedLongText", getFixedLong, setFixedLong},
+    {"Base Configuration", "fixedAltitude", getFixedAltitude, setFixedAltitude},
+    {"Base Configuration", "fixedHAEAPC", getFixedHAEAPC, setReadOnlyField},
+    {"Base Configuration", "antennaPhaseCenter", getAntennaPhaseCenter, setAntennaPhaseCenter},
+    {"Base Configuration", "antennaHeightM", getAntennaHeightM, setAntennaHeightM},
+    {"System Configuration", "lastState", getLastState, setLastState},
+    {"System Configuration", "measurementScale", getMeasurementScale, setMeasurementScale},
+    {"System Configuration", "enableBeeper", getEnableBeeper, setEnableBeeper},
+};
+
+static const int webFieldBindingsCount = sizeof(webFieldBindings) / sizeof(webFieldBindings[0]);
+
+static bool webServerAppendField(char* buffer, size_t bufferLength, const char* key, const char* value) {
+    const size_t used = strlen(buffer);
+    if (used >= bufferLength) {
+        return false;
+    }
+
+    const int written = snprintf(&buffer[used], bufferLength - used, "%s,%s,", key, value ? value : "");
+    return (written > 0) && (static_cast<size_t>(written) < (bufferLength - used));
+}
+
+static bool webServerBuildSettingsCsv(char* buffer, size_t bufferLength) {
+    buffer[0] = 0;
+
+    char value[96];
+    for (int index = 0; index < webFieldBindingsCount; index++) {
+        value[0] = 0;
+        if ((webFieldBindings[index].getter != nullptr) && webFieldBindings[index].getter(value, sizeof(value))) {
+            if (!webServerAppendField(buffer, bufferLength, webFieldBindings[index].id, value)) {
+                ESP_LOGW(TAG, "Settings CSV buffer full at field %s", webFieldBindings[index].id);
+                return false;
+            }
+        }
+    }
+
+    const char* displayName = productPropertiesTable[productType].displayName[0] ? productPropertiesTable[productType].displayName
+                                                                                  : productPropertiesTable[productType].name;
+    webServerAppendField(buffer, bufferLength, "hostMessage", "settings-synced");
+    webServerAppendField(buffer, bufferLength, "productBrand", "SingularXYZ");
+    webServerAppendField(buffer, bufferLength, "platformPrefix", displayName);
+    return true;
+}
+
+static bool webServerApplyAction(const char* key, const char* value) {
+    if (strcmp(key, "clientReady") == 0) {
+        webServerSendSettings();
+        webServerSendFirmwareVersion();
+        return true;
+    }
+
+    if (strcmp(key, "resetProfile") == 0) {
+        ESP_LOGI(TAG, "TODO action resetProfile = %s", value);
+        return true;
+    }
+
+    if (strcmp(key, "factoryDefaultReset") == 0) {
+        ESP_LOGI(TAG, "TODO action factoryDefaultReset = %s", value);
+        return true;
+    }
+
+    if (strcmp(key, "exitAndReset") == 0) {
+        ESP_LOGI(TAG, "TODO action exitAndReset = %s", value);
+        return true;
+    }
+
+    if (strcmp(key, "profileNumber") == 0) {
+        ESP_LOGI(TAG, "TODO action profileNumber = %s", value);
+        return true;
+    }
+
+    if (strcmp(key, "enableFactoryDefaults") == 0) {
+        return true;
+    }
+
+    if (strncmp(key, "constellation_", strlen("constellation_")) == 0) {
+        ESP_LOGI(TAG, "TODO constellation field %s = %s", key, value);
+        return true;
+    }
+
+    return false;
+}
+
+static bool webServerApplyField(const char* key, const char* value) {
+    for (int index = 0; index < webFieldBindingsCount; index++) {
+        if (strcmp(key, webFieldBindings[index].id) == 0) {
+            if ((webFieldBindings[index].setter != nullptr) && webFieldBindings[index].setter(value)) {
+                ESP_LOGI(TAG, "%s updated: %s = %s", webFieldBindings[index].section, key, value);
+                return true;
+            }
+
+            ESP_LOGW(TAG, "Rejected field update: %s = %s", key, value);
+            return false;
+        }
+    }
+
+    if (webServerApplyAction(key, value)) {
+        return true;
+    }
+
+    ESP_LOGW(TAG, "Unhandled web field: %s = %s", key, value);
+    return false;
+}
 
 //----------------------------------------
 // Multipart helpers
@@ -166,7 +613,7 @@ static esp_err_t webServerHandlerGetPage(httpd_req_t* req) {
 
     const GET_PAGE_HANDLER* page = &webServerPages[index];
     if (settings.debugWebServer) {
-        systemPrintf("WebServer GET %s (%u bytes)\r\n", req->uri, static_cast<unsigned>(page->_length));
+        ESP_LOGI(TAG, "GET %s (%u bytes)", req->uri, static_cast<unsigned>(page->_length));
     }
 
     httpd_resp_set_type(req, *page->_type);
@@ -184,7 +631,7 @@ static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req) {
     size_t firmwareBytes = 0;
 
     if (settings.debugWebServer) {
-        systemPrintf("WebServer POST %s, content length %u\r\n", req->uri, static_cast<unsigned>(req->content_len));
+        ESP_LOGI(TAG, "POST %s, content length %u", req->uri, static_cast<unsigned>(req->content_len));
     }
 
     do {
@@ -290,7 +737,7 @@ static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req) {
             break;
         }
 
-        systemPrintf("Firmware update complete: %u bytes. Restarting\r\n", static_cast<unsigned>(firmwareBytes));
+        ESP_LOGI(TAG, "Firmware update complete: %u bytes. Restarting", static_cast<unsigned>(firmwareBytes));
         httpd_resp_set_type(req, text_plain);
         httpd_resp_sendstr(req, "Firmware uploaded successfully. Restarting.");
         delay(500);
@@ -306,14 +753,15 @@ static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req) {
         rtkFree(buffer, "OTA upload buffer");
     }
 
-    systemPrintf("ERROR: Firmware upload failed: %s\r\n", errorMessage ? errorMessage : "unknown error");
+    ESP_LOGE(TAG, "Firmware upload failed: %s", errorMessage ? errorMessage : "unknown error");
     httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, errorMessage ? errorMessage : "Firmware upload failed");
     return ESP_FAIL;
 }
 
 static esp_err_t webServerHandlerWebSockets(httpd_req_t* req) {
     if (req->method == HTTP_GET) {
-        systemPrintln("WebServer WS connected");
+        webServerClientSocket = httpd_req_to_sockfd(req);
+        ESP_LOGI(TAG, "WS connected, socket=%d", webServerClientSocket);
         return ESP_OK;
     }
 
@@ -345,14 +793,17 @@ static esp_err_t webServerHandlerWebSockets(httpd_req_t* req) {
         response.type = HTTPD_WS_TYPE_TEXT;
         response.payload = reinterpret_cast<uint8_t*>(ack);
         response.len = strlen(ack);
-        httpd_ws_send_frame(req, &response);
+        const esp_err_t sendStatus = httpd_ws_send_frame(req, &response);
+        if (sendStatus != ESP_OK) {
+            ESP_LOGW(TAG, "WS ACK send failed: %s", esp_err_to_name(sendStatus));
+        }
     }
     rtkFree(payload, "WebSocket payload");
     return readStatus;
 }
 
 static void webServerHandleClientMessage(const char* message) {
-    systemPrintf("WebServer WS RX: %s\r\n", message);
+    ESP_LOGI(TAG, "WS RX: %s", message);
 
     const char* cursor = message;
     while ((cursor != nullptr) && (*cursor != 0)) {
@@ -377,8 +828,8 @@ static void webServerHandleClientMessage(const char* message) {
         memcpy(key, cursor, keyLength);
         memcpy(settingValue, value, valueLength);
 
-        // Placeholder dispatch point. Implement setting handlers here as each feature is wired up.
-        systemPrintf("  action: %s = %s\r\n", key, settingValue);
+        ESP_LOGI(TAG, "action: %s = %s", key, settingValue);
+        webServerApplyField(key, settingValue);
         cursor = next + 1;
     }
 }
@@ -397,8 +848,7 @@ static esp_err_t webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t
 static bool webServerRegisterErrorHandler(httpd_err_code_t error, httpd_err_handler_func_t handler) {
     const esp_err_t status = httpd_register_err_handler(webServerHandle, error, handler);
     if (settings.debugWebServer) {
-        systemPrintf("WebServer %s %d error handler\r\n", (status == ESP_OK) ? "registered" : "failed to register",
-                     error);
+        ESP_LOGI(TAG, "%s %d error handler", (status == ESP_OK) ? "registered" : "failed to register", error);
     }
     return status == ESP_OK;
 }
@@ -406,8 +856,7 @@ static bool webServerRegisterErrorHandler(httpd_err_code_t error, httpd_err_hand
 static bool webServerRegisterPageHandler(const httpd_uri_t* page) {
     const esp_err_t status = httpd_register_uri_handler(webServerHandle, page);
     if (settings.debugWebServer) {
-        systemPrintf("WebServer %s %s handler\r\n", (status == ESP_OK) ? "registered" : "failed to register",
-                     page->uri);
+        ESP_LOGI(TAG, "%s %s handler", (status == ESP_OK) ? "registered" : "failed to register", page->uri);
     }
     return status == ESP_OK;
 }
@@ -422,7 +871,7 @@ static bool webServerAssignResources() {
 
     if (settings.debugWebServer) {
         webServerHttpdDisplayConfig(&config);
-        systemPrintf("Web server starting on port: %d\r\n", config.server_port);
+        ESP_LOGI(TAG, "Starting on port: %d", config.server_port);
     }
 
     if (MDNS.begin(&settings.mdnsHostName[0]) && settings.mdnsEnable) {
@@ -431,7 +880,7 @@ static bool webServerAssignResources() {
 
     esp_err_t status = httpd_start(&webServerHandle, &config);
     if (status != ESP_OK) {
-        systemPrintf("ERROR: Web server failed to start: %s\r\n", esp_err_to_name(status));
+        ESP_LOGE(TAG, "Failed to start: %s", esp_err_to_name(status));
         return false;
     }
 
@@ -447,7 +896,7 @@ static bool webServerAssignResources() {
     }
 
     webServerState = WEBSERVER_STATE_RUNNING;
-    systemPrintln("Web Server Started");
+    ESP_LOGI(TAG, "Started");
     return true;
 }
 
@@ -469,8 +918,9 @@ void webServerStop() {
         httpd_stop(webServerHandle);
         webServerHandle = nullptr;
     }
+    webServerClientSocket = -1;
     webServerState = WEBSERVER_STATE_OFF;
-    systemPrintln("Web Server Stopped");
+    ESP_LOGI(TAG, "Stopped");
 }
 
 void webServerUpdate() {
@@ -496,12 +946,57 @@ bool webServerIsConnected() {
 }
 
 void webServerSendString(const char* stringToSend) {
-    (void)stringToSend;
+    if ((stringToSend == nullptr) || (webServerHandle == nullptr) || (webServerClientSocket < 0)) {
+        return;
+    }
+
+    httpd_ws_frame_t packet = {};
+    packet.type = HTTPD_WS_TYPE_TEXT;
+    packet.payload = reinterpret_cast<uint8_t*>(const_cast<char*>(stringToSend));
+    packet.len = strlen(stringToSend);
+
+    const esp_err_t status = httpd_ws_send_frame_async(webServerHandle, webServerClientSocket, &packet);
+    if (status != ESP_OK) {
+        ESP_LOGW(TAG, "WS TX failed on socket %d: %s", webServerClientSocket, esp_err_to_name(status));
+        webServerClientSocket = -1;
+    } else if (settings.debugWebServer) {
+        ESP_LOGI(TAG, "WS TX: %s", stringToSend);
+    }
 }
 
-void webServerSendSettings() {}
+void webServerSendField(const char* fieldId, const char* value) {
+    if ((fieldId == nullptr) || (value == nullptr)) {
+        return;
+    }
 
-void webServerSendFirmwareVersion() {}
+    char message[160] = {};
+    if (webServerAppendField(message, sizeof(message), fieldId, value)) {
+        webServerSendString(message);
+    }
+}
+
+void webServerSendFieldInt(const char* fieldId, int value) {
+    char text[24];
+    snprintf(text, sizeof(text), "%d", value);
+    webServerSendField(fieldId, text);
+}
+
+void webServerSendFieldDouble(const char* fieldId, double value, int decimals) {
+    char text[40];
+    snprintf(text, sizeof(text), "%.*f", decimals, value);
+    webServerSendField(fieldId, text);
+}
+
+void webServerSendSettings() {
+    char settingsCsv[2048];
+    if (webServerBuildSettingsCsv(settingsCsv, sizeof(settingsCsv))) {
+        webServerSendString(settingsCsv);
+    }
+}
+
+void webServerSendFirmwareVersion() {
+    webServerSendString("rtkFirmwareVersion,v0.0,gnssFirmwareVersion,v0.0,");
+}
 
 void webServerVerifyTables() {
     const int webServerStateEntries = sizeof(webServerStateNames) / sizeof(webServerStateNames[0]);
@@ -511,8 +1006,8 @@ void webServerVerifyTables() {
 }
 
 void webServerHttpdDisplayConfig(struct httpd_config* config) {
-    systemPrintf("httpd_config: port=%d stack=%d handlers=%d sockets=%d\r\n", config->server_port, config->stack_size,
-                 config->max_uri_handlers, config->max_open_sockets);
+    ESP_LOGI(TAG, "httpd_config: port=%d stack=%d handlers=%d sockets=%d", config->server_port, config->stack_size,
+             config->max_uri_handlers, config->max_open_sockets);
 }
 
 #endif // COMPILE_WEBSERVER

@@ -26,6 +26,8 @@ function setValue(id, value) {
     if (!element) return;
     if (element.type === "checkbox") {
         element.checked = value === true || value === "true" || value === "1";
+    } else if (element.type === "radio") {
+        element.checked = value === true || value === "true" || value === "1" || element.value === value;
     } else {
         element.value = value;
     }
@@ -40,7 +42,10 @@ function getValue(element) {
 function initWebSocket() {
     try {
         websocket = new WebSocket(gateway);
-        websocket.onopen = () => setText("wsStatus", "Connected");
+        websocket.onopen = () => {
+            setText("wsStatus", "Connected");
+            websocket.send("clientReady,true,");
+        };
         websocket.onclose = () => setText("wsStatus", "Disconnected");
         websocket.onerror = () => setText("wsStatus", "Error");
         websocket.onmessage = (message) => parseIncoming(message.data);
@@ -57,6 +62,8 @@ function parseIncoming(message) {
 
         if (id === "ack") {
             setText("wsLastAck", `Last ACK: ${value}`);
+        } else if (id === "hostMessage") {
+            setText("hostData", value);
         } else if (id === "productBrand") {
             ge("pageLogo").src = "singularxyz.png";
         } else if (id.startsWith("profile") && id.endsWith("Name")) {
@@ -75,6 +82,7 @@ function parseIncoming(message) {
             setValue(id, value);
         }
     }
+    refreshDependentControls();
     saveInitialSettings();
 }
 
@@ -201,6 +209,26 @@ function setupCollapseButtons() {
     });
 }
 
+function refreshDependentControls() {
+    if (ge("baseTypeFixed").checked) {
+        hide("surveyInConfig");
+        show("fixedConfig");
+    } else {
+        show("surveyInConfig");
+        hide("fixedConfig");
+    }
+
+    if (ge("fixedBaseCoordinateTypeGeo").checked) {
+        hide("ecefConfig");
+        show("geodeticConfig");
+    } else {
+        show("ecefConfig");
+        hide("geodeticConfig");
+    }
+
+    ge("factoryDefaults").disabled = !ge("enableFactoryDefaults").checked;
+}
+
 function setupBaseControls() {
     const updateBaseMode = () => {
         if (ge("baseTypeFixed").checked) {
@@ -225,8 +253,7 @@ function setupBaseControls() {
     ge("baseTypeFixed").addEventListener("change", updateBaseMode);
     ge("fixedBaseCoordinateTypeECEF").addEventListener("change", updateCoordinateMode);
     ge("fixedBaseCoordinateTypeGeo").addEventListener("change", updateCoordinateMode);
-    updateBaseMode();
-    updateCoordinateMode();
+    refreshDependentControls();
 }
 
 function setupMeasurementRateSync() {
