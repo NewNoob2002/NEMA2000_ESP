@@ -63,6 +63,7 @@ typedef void (*UnicoreNmeaCallback)(const char* sentence, uint16_t length, void*
 typedef void (*UnicoreBinaryCallback)(const UnicoreBinaryHeader& header, const uint8_t* payload, uint16_t length,
                                       void* userdata);
 typedef void (*UnicoreHashCallback)(const char* sentence, uint16_t length, void* userdata);
+typedef void (*UnicoreLogCallback)(UnicoreLogLevel level, uint32_t mask, const char* message, void* userdata);
 
 class UnicoreGNSSLibrary {
   public:
@@ -70,17 +71,13 @@ class UnicoreGNSSLibrary {
     virtual ~UnicoreGNSSLibrary();
 
     /**
-     * @brief Begin communication with the GNSS module over the specified serial port. Optionally provide Print objects for
-     * debugging and error output.
+     * @brief Begin communication with the GNSS module over the specified serial port.
      * 
      * @param serialPort The HardwareSerial port connected to the GNSS module
-     * @param parserDebug  Print object for debugging output from the message parser (optional)
-     * @param parserError Print object for error output from the message parser (optional)
      * @return true 
      * @return false 
      */
-    bool begin(HardwareSerial& serialPort, Print* parserDebug = nullptr, Print* parserError = &Serial,
-               uint16_t rxBufferSize = 512);
+    bool begin(HardwareSerial& serialPort, uint16_t rxBufferSize = 1024);
     void end();
     bool isConnected() const;
     bool isOnline();
@@ -141,12 +138,12 @@ class UnicoreGNSSLibrary {
     void enableBinaryBeforeFix();
     void disableBinaryBeforeFix();
 
-    void setLogOutput(Print* logPort);
+    void setLogCallback(UnicoreLogCallback callback, void* context = nullptr);
     void setLogLevel(UnicoreLogLevel level);
     void setLogMask(uint32_t mask);
     void enableLogCategory(uint32_t mask);
     void disableLogCategory(uint32_t mask);
-    void enableDebugLogging(Print& logPort, UnicoreLogLevel level = UnicoreLogLevel::Debug,
+    void enableDebugLogging(UnicoreLogLevel level = UnicoreLogLevel::Debug,
                             uint32_t mask = UNICORE_LOG_COMMAND | UNICORE_LOG_RX | UNICORE_LOG_TASK);
     void disableDebugLogging();
     UnicoreLogLevel getLogLevel() const;
@@ -192,11 +189,11 @@ class UnicoreGNSSLibrary {
     unsigned long _pvtArrivalMillis = 0;
 
   private:
-    Print* _debugPort = nullptr;
+    UnicoreLogCallback _logCallback = nullptr;
+    void* _logCallbackUserdata = nullptr;
     UnicoreLogLevel _logLevel = UnicoreLogLevel::Off;
     uint32_t _logMask = UNICORE_LOG_NONE;
     SEMP_PARSE_STATE* _sempParse = nullptr;
-    Print* _parserErrorPort = nullptr;
     unsigned long lastUpdateGeodetic = 0;
     unsigned long lastUpdateEcef = 0;
     unsigned long lastUpdateDateTime = 0;

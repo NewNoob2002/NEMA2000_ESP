@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include "esp32-hal.h"
+#include "esp_log.h"
 #include "freertos/task.h"
 
 namespace {
@@ -281,16 +282,20 @@ binaryMessageName(const uint16_t messageId) {
     }
 }
 
-const char*
-logLevelName(const UnicoreLogLevel level) {
+void
+espLogCallback(const UnicoreLogLevel level, const uint32_t mask, const char* message, void* userdata) {
+    (void)mask;
+    (void)userdata;
+
+    static constexpr const char* kTag = "UnicoreLibrary";
     switch (level) {
-        case UnicoreLogLevel::Error: return "E";
-        case UnicoreLogLevel::Warn: return "W";
-        case UnicoreLogLevel::Info: return "I";
-        case UnicoreLogLevel::Debug: return "D";
-        case UnicoreLogLevel::Verbose: return "V";
+        case UnicoreLogLevel::Error: ESP_LOGE(kTag, "%s", message); break;
+        case UnicoreLogLevel::Warn: ESP_LOGW(kTag, "%s", message); break;
+        case UnicoreLogLevel::Info: ESP_LOGI(kTag, "%s", message); break;
+        case UnicoreLogLevel::Debug: ESP_LOGD(kTag, "%s", message); break;
+        case UnicoreLogLevel::Verbose: ESP_LOGV(kTag, "%s", message); break;
         case UnicoreLogLevel::Off:
-        default: return "-";
+        default: break;
     }
 }
 
@@ -327,8 +332,9 @@ UnicoreGNSSLibrary::UnicoreGNSSLibrary() = default;
 UnicoreGNSSLibrary::~UnicoreGNSSLibrary() { end(); }
 
 bool
-UnicoreGNSSLibrary::begin(HardwareSerial& serialPort, Print* parserDebug, Print* parserError, uint16_t rxBufferSize) {
-    Print* configuredDebugPort = _debugPort;
+UnicoreGNSSLibrary::begin(HardwareSerial& serialPort, uint16_t rxBufferSize) {
+    UnicoreLogCallback configuredLogCallback = _logCallback;
+    void* configuredLogCallbackUserdata = _logCallbackUserdata;
     end();
 
     if (_activeInstance && (_activeInstance != this)) {
@@ -338,8 +344,8 @@ UnicoreGNSSLibrary::begin(HardwareSerial& serialPort, Print* parserDebug, Print*
 
     _hwSerialPort = &serialPort;
     _rxBufferSize = rxBufferSize;
-    _debugPort = parserDebug ? parserDebug : configuredDebugPort;
-    _parserErrorPort = parserError;
+    _logCallback = configuredLogCallback;
+    _logCallbackUserdata = configuredLogCallbackUserdata;
     _activeInstance = this;
 
     _rxBuffer = static_cast<uint8_t*>(malloc(_rxBufferSize));
@@ -347,7 +353,7 @@ UnicoreGNSSLibrary::begin(HardwareSerial& serialPort, Print* parserDebug, Print*
     _sempParse = sempBeginParser(kParserTable, sizeof(kParserTable) / sizeof(kParserTable[0]), kParserNames,
                                  sizeof(kParserNames) / sizeof(kParserNames[0]), kParserScratchBytes,
                                  kParserBufferBytes, parserEomCallback, "UnicoreGNSS", parserErrorPrintf,
-                                 parserDebug ? parserDebugPrintf : nullptr, parserBadChecksumCallback);
+                                 parserDebugPrintf, parserBadChecksumCallback);
 
     if (!_sempParse || !_rxBuffer) {
         _activeInstance = nullptr;
@@ -418,7 +424,6 @@ UnicoreGNSSLibrary::end() {
     }
 
     _hwSerialPort = nullptr;
-    _parserErrorPort = nullptr;
 }
 
 bool
@@ -824,8 +829,9 @@ UnicoreGNSSLibrary::disableBinaryBeforeFix() {
 }
 
 void
-UnicoreGNSSLibrary::setLogOutput(Print* logPort) {
-    _debugPort = logPort;
+UnicoreGNSSLibrary::setLogCallback(UnicoreLogCallback callback, void* context) {
+    _logCallback = callback;
+    _logCallbackUserdata = callback ? context : nullptr;
 }
 
 void
@@ -849,14 +855,17 @@ UnicoreGNSSLibrary::disableLogCategory(const uint32_t mask) {
 }
 
 void
-UnicoreGNSSLibrary::enableDebugLogging(Print& logPort, const UnicoreLogLevel level, const uint32_t mask) {
-    _debugPort = &logPort;
+UnicoreGNSSLibrary::enableDebugLogging(const UnicoreLogLevel level, const uint32_t mask) {
+    _logCallback = espLogCallback;
+    _logCallbackUserdata = nullptr;
     _logLevel = level;
     _logMask = mask;
 }
 
 void
 UnicoreGNSSLibrary::disableDebugLogging() {
+    _logCallback = nullptr;
+    _logCallbackUserdata = nullptr;
     _logLevel = UnicoreLogLevel::Off;
     _logMask = UNICORE_LOG_NONE;
 }
@@ -873,7 +882,7 @@ UnicoreGNSSLibrary::getLogMask() const {
 
 bool
 UnicoreGNSSLibrary::isLogEnabled(const UnicoreLogLevel level, const uint32_t mask) const {
-    return _debugPort && (level != UnicoreLogLevel::Off)
+    return _logCallback && (level != UnicoreLogLevel::Off)
            && (static_cast<uint8_t>(level) <= static_cast<uint8_t>(_logLevel)) && ((_logMask & mask) != 0);
 }
 
@@ -1046,7 +1055,7 @@ UnicoreGNSSLibrary::parserBadChecksumCallback(SEMP_PARSE_STATE* parse) {
 
 void
 UnicoreGNSSLibrary::parserDebugPrintf(const char* format, ...) {
-    if (!_activeInstance || !_activeInstance->_debugPort || !format) {
+    if (!_activeInstance || !format) {
         return;
     }
 
@@ -1055,12 +1064,12 @@ UnicoreGNSSLibrary::parserDebugPrintf(const char* format, ...) {
     va_start(args, format);
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-    _activeInstance->_debugPort->print(buffer);
+    _activeInstance->log(UnicoreLogLevel::Debug, UNICORE_LOG_PARSER, "%s", buffer);
 }
 
 void
 UnicoreGNSSLibrary::parserErrorPrintf(const char* format, ...) {
-    if (!_activeInstance || !_activeInstance->_parserErrorPort || !format) {
+    if (!_activeInstance || !format) {
         return;
     }
 
@@ -1069,7 +1078,7 @@ UnicoreGNSSLibrary::parserErrorPrintf(const char* format, ...) {
     va_start(args, format);
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-    _activeInstance->_parserErrorPort->print(buffer);
+    _activeInstance->log(UnicoreLogLevel::Error, UNICORE_LOG_PARSER, "%s", buffer);
 }
 
 void
@@ -1527,5 +1536,5 @@ UnicoreGNSSLibrary::log(const UnicoreLogLevel level, const uint32_t mask, const 
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
 
-    _debugPort->printf("[%ld][Unicore][%s] %s\r\n", millis(), logLevelName(level), buffer);
+    _logCallback(level, mask, buffer, _logCallbackUserdata);
 }

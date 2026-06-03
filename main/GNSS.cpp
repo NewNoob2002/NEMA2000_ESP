@@ -90,11 +90,11 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
     if (pUm980 == nullptr) {
         pUm980 = new UnicoreUM980(GNSS_POWER_PIN);
     }
-    pUm980->enableDebugLogging(Serial, UnicoreLogLevel::Debug,
+    pUm980->enableDebugLogging(UnicoreLogLevel::Debug,
                                UNICORE_LOG_COMMAND | UNICORE_LOG_TX | UNICORE_LOG_DATA | UNICORE_LOG_CHILD_CLASS);
     pUm980->init();
     pUm980->powerOn();
-    if (pUm980->begin(*pGnssSerial, nullptr, &Serial)) {
+    if (pUm980->begin(*pGnssSerial)) {
         if (pUm980->requestVersion(2000) == Unicore_RESULT_RESPONSE_COMMAND_OK) {
             online_devices.gnss = true;
             pUm980->isOnline(true);
