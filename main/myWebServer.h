@@ -72,6 +72,7 @@ void webServerSendString(const char* stringToSend);
 void webServerSendField(const char* fieldId, const char* value);
 void webServerSendFieldInt(const char* fieldId, int value);
 void webServerSendFieldDouble(const char* fieldId, double value, int decimals);
+void webServerSendStatus();
 void webServerSendSettings();
 void webServerSendFirmwareVersion();
 void webServerVerifyTables();

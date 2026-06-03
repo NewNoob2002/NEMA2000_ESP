@@ -881,6 +881,15 @@ UnicoreUM980::getSatellitesInView() const {
 }
 
 uint8_t
+UnicoreUM980::getSatellitesUsed() const {
+    if (_bestNav) {
+        return _bestNav->satellitesUsed;
+    } else {
+        return 0;
+    }
+}
+
+uint8_t
 UnicoreUM980::getDay() const {
     if (_recTime) {
         return _recTime->day;

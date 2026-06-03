@@ -11,15 +11,58 @@
 <body>
     <main class="page" id="mainPage">
         <header class="header">
-            <img id="pageLogo" src="singularxyz.png" alt="SingularXYZ">
-            <div class="status">
-                <span>Model: <b id="platformPrefix">Loading</b></span>
-                <span>RTK Firmware: <b id="rtkFirmwareVersion">v0.0</b></span>
-                <span id="gnssFirmwareVersion">GNSS Firmware: v0.0</span>
-                <span id="deviceBTID">Device ID: 0000</span>
-                <span>WebSocket: <b id="wsStatus">Disconnected</b></span>
-                <span>Host Data: <b id="hostData">Waiting</b></span>
-                <span id="wsLastAck"></span>
+            <div class="brand-row">
+                <img id="pageLogo" src="singularxyz.png" alt="SingularXYZ">
+                <div class="brand-copy">
+                    <p class="brand-label">SingularXYZ</p>
+                    <h1>AP-Config</h1>
+                </div>
+            </div>
+            <div class="status-grid">
+                <div class="status-card">
+                    <span class="status-label">Model</span>
+                    <b id="platformPrefix" class="status-value">Loading</b>
+                </div>
+                <div class="status-card">
+                    <span class="status-label">RTK Firmware</span>
+                    <b id="rtkFirmwareVersion" class="status-value">v0.0</b>
+                </div>
+                <div class="status-card">
+                    <span class="status-label">GNSS Firmware</span>
+                    <b id="gnssFirmwareVersion" class="status-value">v0.0</b>
+                </div>
+                <div class="status-card">
+                    <span class="status-label">Device ID</span>
+                    <b id="deviceBTID" class="status-value">0000</b>
+                </div>
+                <div class="status-card">
+                    <span class="status-label">UTC</span>
+                    <b id="utcTime" class="status-value">Waiting</b>
+                </div>
+                <div class="status-card">
+                    <span class="status-label">Uptime</span>
+                    <b id="systemUptime" class="status-value">00:00:00</b>
+                </div>
+                <div class="status-card">
+                    <span class="status-label">Satellites</span>
+                    <b class="status-value"><span id="satellitesInView">0</span> / <span id="satellitesUsed">0</span></b>
+                </div>
+                <div class="status-card wide">
+                    <span class="status-label">RTK Position</span>
+                    <b id="rtkPosition" class="status-value">Waiting</b>
+                </div>
+                <div class="status-card">
+                    <span class="status-label">WebSocket</span>
+                    <b id="wsStatus" class="status-value">Disconnected</b>
+                </div>
+                <div class="status-card">
+                    <span class="status-label">Host Data</span>
+                    <b id="hostData" class="status-value">Waiting</b>
+                </div>
+                <div class="status-card wide">
+                    <span class="status-label">Last ACK</span>
+                    <b id="wsLastAck" class="status-value">Waiting</b>
+                </div>
             </div>
         </header>
 
@@ -47,8 +90,16 @@
                     <p id="profileChangeMessage" class="inlineSuccess"></p>
                 </div>
 
-                <button type="button" id="btnResetProfile" class="primary" onclick="btnResetProfile()">Reset Profile</button>
+                <div class="actions compact">
+                    <button type="button" id="btnResetProfile" class="primary" onclick="btnResetProfile()">Reset Profile</button>
+                    <button type="button" id="btnDeleteProfile" class="outline danger" onclick="deleteProfile()">Delete Profile</button>
+                </div>
+                <label class="file-button">
+                    <input type="file" name="profileFile" id="submitProfileFile" onchange="profileUploadWait()">
+                    Upload Profile
+                </label>
                 <p id="resetProfileMsg" class="inlineSuccess"></p>
+                <p id="profileUploadMsg" class="inlineSuccess"></p>
             </div>
         </section>
 
@@ -64,35 +115,9 @@
                         <p id="measurementRateHzError" class="inlineError"></p>
                     </div>
                     <div class="field">
-                        <label for="measurementRateSec">Seconds Between Measurements</label>
-                        <input type="number" id="measurementRateSec" min="0.1" max="8196" step="0.1">
-                        <p id="measurementRateSecError" class="inlineError"></p>
-                    </div>
-                    <div class="field">
-                        <label for="dynamicModel">Dynamic Model</label>
-                        <select id="dynamicModel">
-                            <option value="0">Portable</option>
-                            <option value="1">Stationary</option>
-                            <option value="2">Pedestrian</option>
-                            <option value="3">Automotive</option>
-                            <option value="4">Sea</option>
-                            <option value="5">Airborne</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label for="minElev">Min SV Elevation</label>
-                        <input type="number" id="minElev" min="0" max="90">
-                        <p id="minElevError" class="inlineError"></p>
-                    </div>
-                    <div class="field">
                         <label for="minCN0">Min C/N0</label>
                         <input type="number" id="minCN0" min="0" max="90">
                         <p id="minCN0Error" class="inlineError"></p>
-                    </div>
-                    <div class="field">
-                        <label for="rtcmMinElev">RTCM Min SV Elevation</label>
-                        <input type="number" id="rtcmMinElev" min="-90" max="90">
-                        <p id="rtcmMinElevError" class="inlineError"></p>
                     </div>
                 </div>
 
@@ -188,26 +213,16 @@
                     <p id="firmwareUploadMsg" class="inlineSuccess"></p>
                 </div>
 
-                <div class="grid">
-                    <div class="field">
-                        <label for="lastState">System Initial State</label>
-                        <select id="lastState">
-                            <option value="0">Rover</option>
-                            <option value="1">Base</option>
-                            <option value="2">NTP</option>
-                            <option value="3">BaseCast</option>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label for="measurementScale">Units</label>
-                        <select id="measurementScale">
-                            <option value="0">Meters</option>
-                            <option value="1">Feet/Inches</option>
-                        </select>
-                    </div>
+                <div class="field">
+                    <label for="lastState">System Initial State</label>
+                    <select id="lastState">
+                        <option value="0">Rover</option>
+                        <option value="1">Base</option>
+                        <option value="2">NTP</option>
+                        <option value="3">BaseCast</option>
+                    </select>
                 </div>
 
-                <label class="check-line"><input type="checkbox" id="enableBeeper"> Enable Audible Beeper</label>
                 <label class="check-line"><input type="checkbox" id="enableFactoryDefaults"> Enable Factory Defaults</label>
                 <button type="button" id="factoryDefaults" class="primary" onclick="resetToFactoryDefaults()" disabled>Reset to Factory Defaults</button>
                 <p id="factoryDefaultsMsg" class="inlineSuccess"></p>

@@ -156,6 +156,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     uint8_t getFixType() const;
     uint8_t getCarrierSolution() const;
     uint8_t getSatellitesInView() const;
+    uint8_t getSatellitesUsed() const;
     uint8_t getDay() const;
     uint8_t getMonth() const;
     uint16_t getYear() const;

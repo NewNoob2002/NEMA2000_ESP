@@ -10,10 +10,16 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "HAL.h"
 #include "Support.h"
 #include "form.h"
 #include "mcu_settings.h"
+#include "Unicore_UM980.h"
 #include "myWIFI.h"
+
+namespace HAL {
+extern UnicoreUM980* gUm980;
+}
 
 //----------------------------------------
 // Constants
@@ -38,6 +44,7 @@ static const char* const text_plain = "text/plain";
 static httpd_handle_t webServerHandle;
 static int webServerClientSocket = -1;
 static WebServerState webServerState = WEBSERVER_STATE_OFF;
+static uint32_t webServerLastStatusPushMs = 0;
 
 static const char* const webServerStateNames[] = {
     "WEBSERVER_STATE_OFF",
@@ -57,6 +64,7 @@ static esp_err_t webServerHandlerWebSockets(httpd_req_t* req);
 static bool webServerAppendField(char* buffer, size_t bufferLength, const char* key, const char* value);
 static bool webServerApplyField(const char* key, const char* value);
 static bool webServerBuildSettingsCsv(char* buffer, size_t bufferLength);
+static void webServerSendLiveStatus();
 static void webServerHandleClientMessage(const char* message);
 
 //----------------------------------------
@@ -150,52 +158,12 @@ static bool setMeasurementRateHz(const char* value) {
     return true;
 }
 
-static bool getMeasurementRateSec(char* value, size_t valueLength) {
-    return getDouble(value, valueLength, static_cast<double>(settings.measurementRateMs) / MILLISECONDS_IN_A_SECOND, 3);
-}
-
-static bool setMeasurementRateSec(const char* value) {
-    const double seconds = strtod(value, nullptr);
-    if (seconds <= 0.0) {
-        return false;
-    }
-    settings.measurementRateMs = static_cast<uint16_t>(lround(seconds * MILLISECONDS_IN_A_SECOND));
-    return true;
-}
-
-static bool getDynamicModel(char* value, size_t valueLength) {
-    return getInt(value, valueLength, settings.dynamicModel);
-}
-
-static bool setDynamicModel(const char* value) {
-    settings.dynamicModel = static_cast<uint8_t>(strtoul(value, nullptr, 10));
-    return true;
-}
-
-static bool getMinElev(char* value, size_t valueLength) {
-    return getInt(value, valueLength, settings.minElev);
-}
-
-static bool setMinElev(const char* value) {
-    settings.minElev = static_cast<uint8_t>(strtoul(value, nullptr, 10));
-    return true;
-}
-
 static bool getMinCN0(char* value, size_t valueLength) {
     return getInt(value, valueLength, settings.minCN0);
 }
 
 static bool setMinCN0(const char* value) {
     settings.minCN0 = static_cast<int16_t>(strtol(value, nullptr, 10));
-    return true;
-}
-
-static bool getRtcmMinElev(char* value, size_t valueLength) {
-    return getInt(value, valueLength, settings.rtcmMinElev);
-}
-
-static bool setRtcmMinElev(const char* value) {
-    settings.rtcmMinElev = static_cast<int>(strtol(value, nullptr, 10));
     return true;
 }
 
@@ -385,32 +353,10 @@ static bool setLastState(const char* value) {
     return true;
 }
 
-static bool getMeasurementScale(char* value, size_t valueLength) {
-    return getInt(value, valueLength, settings.measurementScale);
-}
-
-static bool setMeasurementScale(const char* value) {
-    settings.measurementScale = static_cast<uint8_t>(strtoul(value, nullptr, 10));
-    return true;
-}
-
-static bool getEnableBeeper(char* value, size_t valueLength) {
-    return getBool(value, valueLength, settings.enableBeeper);
-}
-
-static bool setEnableBeeper(const char* value) {
-    settings.enableBeeper = textToBool(value);
-    return true;
-}
-
 static const WebFieldBinding webFieldBindings[] = {
     {"Profile Configuration", "profileName", getProfileName, setProfileName},
     {"GNSS Configuration", "measurementRateHz", getMeasurementRateHz, setMeasurementRateHz},
-    {"GNSS Configuration", "measurementRateSec", getMeasurementRateSec, setMeasurementRateSec},
-    {"GNSS Configuration", "dynamicModel", getDynamicModel, setDynamicModel},
-    {"GNSS Configuration", "minElev", getMinElev, setMinElev},
     {"GNSS Configuration", "minCN0", getMinCN0, setMinCN0},
-    {"GNSS Configuration", "rtcmMinElev", getRtcmMinElev, setRtcmMinElev},
     {"GNSS Configuration", "useMSM7", getUseMSM7, setUseMSM7},
     {"Base Configuration", "baseTypeSurveyIn", getBaseTypeSurveyIn, setBaseTypeSurveyIn},
     {"Base Configuration", "baseTypeFixed", getBaseTypeFixed, setBaseTypeFixed},
@@ -428,8 +374,6 @@ static const WebFieldBinding webFieldBindings[] = {
     {"Base Configuration", "antennaPhaseCenter", getAntennaPhaseCenter, setAntennaPhaseCenter},
     {"Base Configuration", "antennaHeightM", getAntennaHeightM, setAntennaHeightM},
     {"System Configuration", "lastState", getLastState, setLastState},
-    {"System Configuration", "measurementScale", getMeasurementScale, setMeasurementScale},
-    {"System Configuration", "enableBeeper", getEnableBeeper, setEnableBeeper},
 };
 
 static const int webFieldBindingsCount = sizeof(webFieldBindings) / sizeof(webFieldBindings[0]);
@@ -466,15 +410,136 @@ static bool webServerBuildSettingsCsv(char* buffer, size_t bufferLength) {
     return true;
 }
 
+static void webServerFormatUptime(char* buffer, size_t bufferLength) {
+    const uint32_t uptimeSeconds = millis() / 1000U;
+    const uint32_t days = uptimeSeconds / 86400U;
+    const uint32_t hours = (uptimeSeconds % 86400U) / 3600U;
+    const uint32_t minutes = (uptimeSeconds % 3600U) / 60U;
+    const uint32_t seconds = uptimeSeconds % 60U;
+
+    if (days > 0U) {
+        snprintf(buffer, bufferLength, "%lu d %02lu:%02lu:%02lu", static_cast<unsigned long>(days),
+                 static_cast<unsigned long>(hours), static_cast<unsigned long>(minutes),
+                 static_cast<unsigned long>(seconds));
+    } else {
+        snprintf(buffer, bufferLength, "%02lu:%02lu:%02lu", static_cast<unsigned long>(hours),
+                 static_cast<unsigned long>(minutes), static_cast<unsigned long>(seconds));
+    }
+}
+
+static void webServerFormatUtcTime(char* buffer, size_t bufferLength) {
+    const UnicoreUM980* gnss = HAL::gUm980;
+    if ((gnss == nullptr) || !gnss->isValidDate() || !gnss->isValidTime()) {
+        snprintf(buffer, bufferLength, "Waiting for GNSS");
+        return;
+    }
+
+    snprintf(buffer, bufferLength, "%04u-%02u-%02u %02u:%02u:%02u.%03u UTC", gnss->getYear(), gnss->getMonth(),
+             gnss->getDay(), gnss->getHour(), gnss->getMinute(), gnss->getSecond(), gnss->getMillisecond());
+}
+
+static const char* webServerFixText(const UnicoreUM980* gnss) {
+    if (gnss == nullptr) {
+        return "GNSS offline";
+    }
+    if (gnss->isRTKFix()) {
+        return "RTK Fix";
+    }
+    if (gnss->isRTKFloat()) {
+        return "RTK Float";
+    }
+    if (gnss->isDgpsFixed()) {
+        return "DGPS";
+    }
+    if (gnss->isFixed()) {
+        return "Fixed";
+    }
+    return "No fix";
+}
+
+static void webServerFormatPosition(char* buffer, size_t bufferLength) {
+    const UnicoreUM980* gnss = HAL::gUm980;
+    if (gnss == nullptr) {
+        snprintf(buffer, bufferLength, "GNSS offline");
+        return;
+    }
+
+    const char* fixText = webServerFixText(gnss);
+    if (!gnss->isFixed()) {
+        snprintf(buffer, bufferLength, "%s | waiting for valid position", fixText);
+        return;
+    }
+
+    snprintf(buffer, bufferLength, "%s | Lat %.8f Lon %.8f Alt %.3f m", fixText, gnss->getLatitude(),
+             gnss->getLongitude(), gnss->getAltitude());
+}
+
+static void webServerSendLiveStatus() {
+    if ((webServerHandle == nullptr) || (webServerClientSocket < 0)) {
+        return;
+    }
+
+    const uint32_t now = millis();
+    if ((webServerLastStatusPushMs != 0U) && ((now - webServerLastStatusPushMs) < 1000U)) {
+        return;
+    }
+    webServerLastStatusPushMs = now;
+
+    const UnicoreUM980* gnss = HAL::gUm980;
+    char utcTime[64] = {};
+    char uptime[32] = {};
+    char position[160] = {};
+
+    webServerFormatUtcTime(utcTime, sizeof(utcTime));
+    webServerFormatUptime(uptime, sizeof(uptime));
+    webServerFormatPosition(position, sizeof(position));
+
+    char packet[320] = {};
+    char satellitesInViewText[16] = {};
+    char satellitesUsedText[16] = {};
+    snprintf(satellitesInViewText, sizeof(satellitesInViewText), "%u", gnss ? gnss->getSatellitesInView() : 0U);
+    snprintf(satellitesUsedText, sizeof(satellitesUsedText), "%u", gnss ? gnss->getSatellitesUsed() : 0U);
+
+    webServerAppendField(packet, sizeof(packet), "utcTime", utcTime);
+    webServerAppendField(packet, sizeof(packet), "systemUptime", uptime);
+    webServerAppendField(packet, sizeof(packet), "satellitesInView", satellitesInViewText);
+    webServerAppendField(packet, sizeof(packet), "satellitesUsed", satellitesUsedText);
+    webServerAppendField(packet, sizeof(packet), "rtkPosition", position);
+
+    webServerSendString(packet);
+}
+
 static bool webServerApplyAction(const char* key, const char* value) {
     if (strcmp(key, "clientReady") == 0) {
         webServerSendSettings();
         webServerSendFirmwareVersion();
+        webServerLastStatusPushMs = 0;
+        webServerSendLiveStatus();
         return true;
     }
 
     if (strcmp(key, "resetProfile") == 0) {
         ESP_LOGI(TAG, "TODO action resetProfile = %s", value);
+        return true;
+    }
+
+    if (strcmp(key, "deleteProfile") == 0) {
+        ESP_LOGI(TAG, "TODO action deleteProfile profile=%s", value);
+        return true;
+    }
+
+    if (strcmp(key, "uploadProfile") == 0) {
+        ESP_LOGI(TAG, "TODO action uploadProfile profile=%s", value);
+        return true;
+    }
+
+    if (strcmp(key, "profileUploadName") == 0) {
+        ESP_LOGI(TAG, "TODO action profileUploadName = %s", value);
+        return true;
+    }
+
+    if (strcmp(key, "profileUploadData") == 0) {
+        ESP_LOGI(TAG, "TODO action profileUploadData length=%u", static_cast<unsigned>(strlen(value)));
         return true;
     }
 
@@ -935,6 +1000,8 @@ void webServerUpdate() {
         webServerState = WEBSERVER_STATE_NETWORK_CONNECTED;
         webServerAssignResources();
     }
+
+    webServerSendLiveStatus();
 }
 
 bool webServerIsRunning() {
@@ -987,6 +1054,10 @@ void webServerSendFieldDouble(const char* fieldId, double value, int decimals) {
     webServerSendField(fieldId, text);
 }
 
+void webServerSendStatus() {
+    webServerSendLiveStatus();
+}
+
 void webServerSendSettings() {
     char settingsCsv[2048];
     if (webServerBuildSettingsCsv(settingsCsv, sizeof(settingsCsv))) {
@@ -995,7 +1066,11 @@ void webServerSendSettings() {
 }
 
 void webServerSendFirmwareVersion() {
-    webServerSendString("rtkFirmwareVersion,v0.0,gnssFirmwareVersion,v0.0,");
+    const UnicoreUM980* gnss = HAL::gUm980;
+    char message[160] = {};
+    webServerAppendField(message, sizeof(message), "rtkFirmwareVersion", "v0.0");
+    webServerAppendField(message, sizeof(message), "gnssFirmwareVersion", (gnss && gnss->getFirmwareVersion()) ? gnss->getFirmwareVersion() : "v0.0");
+    webServerSendString(message);
 }
 
 void webServerVerifyTables() {

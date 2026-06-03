@@ -61,19 +61,18 @@ function parseIncoming(message) {
         const value = fields[index + 1];
 
         if (id === "ack") {
-            setText("wsLastAck", `Last ACK: ${value}`);
+            setText("wsLastAck", value);
         } else if (id === "hostMessage") {
             setText("hostData", value);
         } else if (id === "productBrand") {
             ge("pageLogo").src = "singularxyz.png";
-        } else if (id.startsWith("profile") && id.endsWith("Name")) {
-            setText(id, value);
         } else if (id === "rtkFirmwareVersion") {
             setText("rtkFirmwareVersion", value);
             setText("rtkFirmwareVersionUpgrade", value);
-        } else if (id === "gnssFirmwareVersion") {
-            setText("gnssFirmwareVersion", `GNSS Firmware: ${value}`);
-        } else if (id === "platformPrefix" || id === "deviceBTID") {
+        } else if (["platformPrefix", "deviceBTID", "gnssFirmwareVersion", "wsStatus", "hostData", "wsLastAck",
+                    "utcTime", "systemUptime", "satellitesInView", "satellitesUsed", "rtkPosition"].includes(id)) {
+            setText(id, value);
+        } else if (id.startsWith("profile") && id.endsWith("Name")) {
             setText(id, value);
         } else if (id === "profileNumber") {
             const radio = document.querySelector(`input[name="profileRadio"][value="${value}"]`);
@@ -133,6 +132,35 @@ function btnResetProfile() {
     setText("resetProfileMsg", "Profile reset requested.");
 }
 
+function selectedProfileNumber() {
+    const activeProfile = document.querySelector('input[name="profileRadio"]:checked');
+    return activeProfile ? activeProfile.value : "0";
+}
+
+function deleteProfile() {
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send(`deleteProfile,${selectedProfileNumber()},`);
+    }
+    setText("resetProfileMsg", "Profile delete requested.");
+}
+
+function profileUploadWait() {
+    const input = ge("submitProfileFile");
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+        const encodedProfile = encodeURIComponent(reader.result);
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+            websocket.send(`uploadProfile,${selectedProfileNumber()},profileUploadName,${encodeURIComponent(file.name)},profileUploadData,${encodedProfile},`);
+        }
+        setText("profileUploadMsg", "Profile upload requested.");
+    };
+    reader.onerror = () => setText("profileUploadMsg", "Profile upload failed.");
+    reader.readAsText(file);
+}
+
 function resetToFactoryDefaults() {
     if (!ge("enableFactoryDefaults").checked) return;
     if (websocket && websocket.readyState === WebSocket.OPEN) websocket.send("factoryDefaultReset,true,");
@@ -187,10 +215,7 @@ function validateNumber(id, min, max, message) {
 function validateConfig() {
     let valid = true;
     valid = validateNumber("measurementRateHz", 0.00012, 10, "Must be between 0.00012 and 10.") && valid;
-    valid = validateNumber("measurementRateSec", 0.1, 8196, "Must be between 0.1 and 8196.") && valid;
-    valid = validateNumber("minElev", 0, 90, "Must be between 0 and 90.") && valid;
     valid = validateNumber("minCN0", 0, 90, "Must be between 0 and 90.") && valid;
-    valid = validateNumber("rtcmMinElev", -90, 90, "Must be between -90 and 90.") && valid;
     valid = validateNumber("observationSeconds", 60, 600, "Must be between 60 and 600.") && valid;
     valid = validateNumber("observationPositionAccuracy", 1, 5, "Must be between 1 and 5.") && valid;
     valid = validateNumber("antennaPhaseCenter", -200, 200, "Must be between -200 and 200.") && valid;
@@ -257,14 +282,7 @@ function setupBaseControls() {
 }
 
 function setupMeasurementRateSync() {
-    ge("measurementRateHz").addEventListener("change", () => {
-        const hz = Number(ge("measurementRateHz").value);
-        if (hz > 0) ge("measurementRateSec").value = (1 / hz).toFixed(3);
-    });
-    ge("measurementRateSec").addEventListener("change", () => {
-        const seconds = Number(ge("measurementRateSec").value);
-        if (seconds > 0) ge("measurementRateHz").value = (1 / seconds).toFixed(3);
-    });
+    ge("measurementRateHz").addEventListener("change", () => {});
 }
 
 function setupSystemControls() {
