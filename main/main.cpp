@@ -17,7 +17,7 @@ SendGatewayMessage(tNMEA2000_esp32& nmea2000, const tN2kMsg& message, const char
     (void)name;
     if (nmea2000.SendMsg(message)) {
         sent++;
-        //ESP_LOGI(kTag, "queued %s PGN=%lu", name, message.PGN);
+        ESP_LOGI(kTag, "queued %s PGN=%lu", name, message.PGN);
         return true;
     }
 

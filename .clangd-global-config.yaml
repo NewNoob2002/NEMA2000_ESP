@@ -1,5 +1,7 @@
+If:
+  PathMatch: /home/gtc/esp/esp-idf/.*
 CompileFlags:
-  CompilationDatabase: build
+  CompilationDatabase: /home/gtc/Desktop/workspace/NEMA2000_ESP/build
   Remove:
     - --target=*
     - -mlongcalls
@@ -8,11 +10,11 @@ CompileFlags:
     - -fno-tree-switch-conversion
 ---
 If:
-  PathMatch: .*\.(c|h)$
+  PathMatch: /home/gtc/esp/esp-idf/.*\.(c|h)$
 CompileFlags:
   Compiler: /home/gtc/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc
 ---
 If:
-  PathMatch: .*\.(cpp|hpp|hh|hxx)$
+  PathMatch: /home/gtc/esp/esp-idf/.*\.(cpp|hpp|hh|hxx)$
 CompileFlags:
   Compiler: /home/gtc/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-g++

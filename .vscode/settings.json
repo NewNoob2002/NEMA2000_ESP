@@ -1,7 +1,7 @@
 {
     "clangd.path": "/home/gtc/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
-    "idf.customExtraVars": {},
-    "idf.currentSetup": "/home/gtc/.espressif/v5.5.4/esp-idf",
-    "idf.port": "/dev/ttyACM0",
-    "idf.flashType": "UART"
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/build",
+        "--query-driver=/home/gtc/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-*"
+    ]
 }
