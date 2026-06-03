@@ -8,7 +8,7 @@
 #include "Support.h"
 
 static const char* wifiSoftApSsid = "S20 Config";
-static const char* wifiSoftApPassword = "123456789";
+static const char* wifiSoftApPassword = "12345678";
 static const char* wifiSoftApName = "Soft AP";
 
 static DNSServer dnsServer;
@@ -244,8 +244,8 @@ wifiVerifyTables() {
 }
 
 RTK_WIFI::RTK_WIFI(bool verbose)
-    : _apDnsAddress{IPAddress((uint32_t)0)}, _apFirstDhcpAddress{IPAddress("192.168.4.32")},
-      _apGatewayAddress{IPAddress("192.168.4.1")}, _apIpAddress{IPAddress("192.168.4.1")},
+    : _apDnsAddress{IPAddress((uint32_t)0)}, _apFirstDhcpAddress{IPAddress("192.168.10.32")},
+      _apGatewayAddress{IPAddress("192.168.10.12")}, _apIpAddress{IPAddress("192.168.10.12")},
       _apSubnetMask{IPAddress("255.255.255.0")}, _apChannel{WIFI_DEFAULT_CHANNEL}, _apSsid{0}, _stationChannel{0},
       _staIpAddress{IPAddress((uint32_t)0)}, _staRemoteApSsid{0}, _eventRegistered{false}, _verbose{verbose} {
     wifiChannel = 0;
