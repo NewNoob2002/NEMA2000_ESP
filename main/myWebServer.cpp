@@ -12,14 +12,27 @@
 #include "mcu_settings.h"
 #include "myWIFI.h"
 
+//----------------------------------------
+// Constants
+//----------------------------------------
+
 static const size_t webServerStackSize = 1024 * 20;
-static const size_t firmwareBufferLength = 16384;
+static const size_t firmwareBufferLength = 16 * 1024;
+
+static const char* const image_png = "image/png";
+static const char* const text_css = "text/css";
+static const char* const text_html = "text/html";
+static const char* const text_javascript = "text/javascript";
+static const char* const text_plain = "text/plain";
+
+#define UPLOAD_FIRMWARE "/uploadFirmware"
+
+//----------------------------------------
+// Locals
+//----------------------------------------
 
 static httpd_handle_t webServerHandle;
-static SemaphoreHandle_t webServerMutex;
-static WEB_SOCKETS_CLIENT* webServerClientListHead;
-static WEB_SOCKETS_CLIENT* webServerClientListTail;
-static WebServerState webServerStarted = WEBSERVER_STATE_OFF;
+static WebServerState webServerState = WEBSERVER_STATE_OFF;
 
 static const char* const webServerStateNames[] = {
     "WEBSERVER_STATE_OFF",
@@ -27,112 +40,303 @@ static const char* const webServerStateNames[] = {
     "WEBSERVER_STATE_NETWORK_CONNECTED",
     "WEBSERVER_STATE_RUNNING",
 };
-static const int webServerStateEntries = sizeof(webServerStateNames) / sizeof(webServerStateNames[0]);
-
-// These are the various files or endpoints that browsers will attempt to
-// access to see if internet access is available.  If one is requested,
-// redirect user to captive portal (main page "/").
-const char* webServerCaptiveUrls[] = {
-    "canonical.html", "check_network_status.txt", "chrome-variations/seed",    "connecttest.txt",
-    "generate_204",   "hotspot-detect.html",      "library/test/success.html", "ncsi.txt",
-    "success.txt",
-};
-const uint8_t webServerCaptiveUrlCount = sizeof(webServerCaptiveUrls) / sizeof(webServerCaptiveUrls[0]);
 
 //----------------------------------------
 // Forward routines
 //----------------------------------------
-static esp_err_t webServerHandlerWebSockets(httpd_req_t* req);
+
 static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req);
+static esp_err_t webServerHandlerGetPage(httpd_req_t* req);
+static esp_err_t webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error);
+static esp_err_t webServerHandlerWebSockets(httpd_req_t* req);
+
 //----------------------------------------
 // Web page descriptions
 //----------------------------------------
-const char* const image_png = "image/png";
-const char* const text_css = "text/css";
-const char* const text_html = "text/html";
-const char* const text_javascript = "text/javascript";
-const char* const text_plain = "text/plain";
-
-#define UPLOAD_FIRMWARE "/uploadFirmware"
-#define UPLOAD_PATH     "/uploadFile"
-const char* fileNameParameter = "filename=\"";
 
 const GET_PAGE_HANDLER webServerPages[] = {
-    WEB_PAGE(0, "/src/sparkpnt_device_setup.png", image_png, sparkpnt_device_setup_png),
-    WEB_PAGE(1, "/src/sparkfun_device_setup.png", image_png, sparkfun_device_setup_png),
+    // Page shell and branding
+    WEB_PAGE(0, "/", text_html, index_html),
+    WEB_PAGE(1, "/favicon.ico", image_png, favicon_ico),
+    WEB_PAGE(2, "/singularxyz.png", image_png, singularxyz_png),
 
-    // Page icon
-    WEB_PAGE(2, "/favicon.ico", text_plain, favicon_ico),
+    // JavaScript and style sheets
+    WEB_PAGE(3, "/src/main.js", text_javascript, main_js),
+    WEB_PAGE(4, "/src/style.css", text_css, style_css),
 
-    // Fonts
-    WEB_PAGE(3, "/src/fonts/icomoon.eot", text_plain, icomoon_eot),
-    WEB_PAGE(4, "/src/fonts/icomoon.svg", text_plain, icomoon_svg),
-    WEB_PAGE(5, "/src/fonts/icomoon.ttf", text_plain, icomoon_ttf),
-    WEB_PAGE(6, "/src/fonts/icomoon.woof", text_plain, icomoon_woof),
-
-    // Bootstrap
-    WEB_PAGE(16, "/src/bootstrap.bundle.min.js", text_javascript, bootstrap_bundle_min_js),
-    WEB_PAGE(17, "/src/bootstrap.min.js", text_javascript, bootstrap_min_js),
-
-    // Java script
-    WEB_PAGE(18, "/src/jquery-3.6.0.min.js", text_javascript, jquery_js),
-    WEB_PAGE(19, "/src/main.js", text_javascript, main_js),
-
-    // Style sheets
-    WEB_PAGE(20, "/src/bootstrap.min.css", text_css, bootstrap_min_css),
-    WEB_PAGE(21, "/src/style.css", text_css, style_css),
-
-    // File pages
-    // PAGE_HANDLER(22, "/listfiles", HTTP_GET, text_plain, webServerHandlerFileList),
-    // PAGE_HANDLER(23, "/file", HTTP_GET, text_plain, webServerHandlerFileManager),
-    PAGE_HANDLER(24, UPLOAD_FIRMWARE, HTTP_POST, text_plain, webServerHandlerFirmwareUpload),
-
-    // Message handlers
-    // PAGE_HANDLER(25, "/listMessages", HTTP_GET, text_plain, webServerHandlerListMessages),
-    // PAGE_HANDLER(26, "/listMessagesBase", HTTP_GET, text_plain, webServerHandlerListBaseMessages),
-    // PAGE_HANDLER(27, UPLOAD_PATH, HTTP_POST, text_plain, webServerHandlerFileUpload),
-
-    // Add pages above this line
-    WEB_PAGE(28, "/", text_html, index_html),
+    // OTA
+    PAGE_HANDLER(5, UPLOAD_FIRMWARE, HTTP_POST, text_plain, webServerHandlerFirmwareUpload),
 };
 
-const int webServerTotalPages = (sizeof(webServerPages) / sizeof(GET_PAGE_HANDLER));
+const int webServerTotalPages = sizeof(webServerPages) / sizeof(webServerPages[0]);
 
-static const httpd_uri_t webServerPage = {.uri = "/ws",
-                                          .method = HTTP_GET,
-                                          .handler = webServerHandlerWebSockets,
-                                          .user_ctx = NULL,
-                                          .is_websocket = true,
-                                          .handle_ws_control_frames = true,
-                                          .supported_subprotocol = NULL};
+static const httpd_uri_t webServerWebSocketPage = {.uri = "/ws",
+                                                   .method = HTTP_GET,
+                                                   .handler = webServerHandlerWebSockets,
+                                                   .user_ctx = NULL,
+                                                   .is_websocket = true,
+                                                   .handle_ws_control_frames = true,
+                                                   .supported_subprotocol = NULL};
 
-static esp_err_t
-webServerHandlerGetStatic(httpd_req_t* req) {
-    const STATIC_PAGE* page = static_cast<const STATIC_PAGE*>(req->user_ctx);
+//----------------------------------------
+// Multipart helpers
+//----------------------------------------
 
-    if (settings.debugWebServer) {
-        systemPrintf("WebServer GET %s (%u bytes)\r\n", req->uri, static_cast<unsigned>(page->length));
+static int recvByte(httpd_req_t* req, char* value, size_t* received) {
+    const int bytes = httpd_req_recv(req, value, 1);
+    if (bytes == 1) {
+        (*received)++;
+    }
+    return bytes;
+}
+
+static bool extractMultipartBoundary(httpd_req_t* req, char* boundary, size_t boundaryLength) {
+    const size_t contentTypeLength = httpd_req_get_hdr_value_len(req, "Content-Type");
+    if ((contentTypeLength == 0) || (contentTypeLength >= 160)) {
+        return false;
     }
 
-    httpd_resp_set_type(req, page->contentType);
-    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    return httpd_resp_send(req, reinterpret_cast<const char*>(page->data), page->length);
+    char contentType[160] = {};
+    if (httpd_req_get_hdr_value_str(req, "Content-Type", contentType, sizeof(contentType)) != ESP_OK) {
+        return false;
+    }
+
+    const char* marker = strstr(contentType, "boundary=");
+    if (marker == nullptr) {
+        return false;
+    }
+
+    marker += strlen("boundary=");
+    snprintf(boundary, boundaryLength, "\r\n--%s", marker);
+    return true;
+}
+
+static bool readMultipartHeader(httpd_req_t* req, char* header, size_t headerLength, size_t* received) {
+    size_t index = 0;
+    uint8_t matched = 0;
+
+    while (index + 1 < headerLength) {
+        char value;
+        if (recvByte(req, &value, received) != 1) {
+            return false;
+        }
+
+        header[index++] = value;
+        switch (matched) {
+            case 0: matched = (value == '\r') ? 1 : 0; break;
+            case 1: matched = (value == '\n') ? 2 : ((value == '\r') ? 1 : 0); break;
+            case 2: matched = (value == '\r') ? 3 : 0; break;
+            case 3:
+                if (value == '\n') {
+                    header[index] = 0;
+                    return true;
+                }
+                matched = 0;
+                break;
+        }
+    }
+
+    header[headerLength - 1] = 0;
+    return false;
+}
+
+static int findBytes(const uint8_t* data, size_t dataLength, const char* needle, size_t needleLength) {
+    if ((needleLength == 0) || (dataLength < needleLength)) {
+        return -1;
+    }
+
+    for (size_t index = 0; index <= dataLength - needleLength; index++) {
+        if (memcmp(&data[index], needle, needleLength) == 0) {
+            return static_cast<int>(index);
+        }
+    }
+    return -1;
 }
 
 //----------------------------------------
-// Handler for file uploads (firmware or general files)
+// Handlers
 //----------------------------------------
-static esp_err_t
-webServerHandlerFirmwareUpload(httpd_req_t* req) {}
 
-//----------------------------------------
-// Handler for web sockets requests
-//----------------------------------------
-static esp_err_t
-webServerHandlerWebSockets(httpd_req_t* req) {}
+static esp_err_t webServerHandlerGetPage(httpd_req_t* req) {
+    const uintptr_t index = reinterpret_cast<uintptr_t>(req->user_ctx);
+    if (index >= static_cast<uintptr_t>(webServerTotalPages)) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid page index");
+    }
 
-static esp_err_t
-webServerHandlerNotFound(httpd_req_t* req, httpd_err_code_t error) {
+    const GET_PAGE_HANDLER* page = &webServerPages[index];
+    if (settings.debugWebServer) {
+        systemPrintf("WebServer GET %s (%u bytes)\r\n", req->uri, static_cast<unsigned>(page->_length));
+    }
+
+    httpd_resp_set_type(req, *page->_type);
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    return httpd_resp_send(req, reinterpret_cast<const char*>(page->_data), page->_length);
+}
+
+static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req) {
+    char boundary[96] = {};
+    char header[768] = {};
+    uint8_t* buffer = nullptr;
+    const char* errorMessage = nullptr;
+    bool updateRunning = false;
+    size_t received = 0;
+    size_t firmwareBytes = 0;
+
+    if (settings.debugWebServer) {
+        systemPrintf("WebServer POST %s, content length %u\r\n", req->uri, static_cast<unsigned>(req->content_len));
+    }
+
+    do {
+        if (!extractMultipartBoundary(req, boundary, sizeof(boundary))) {
+            errorMessage = "Invalid multipart boundary";
+            break;
+        }
+        if (!readMultipartHeader(req, header, sizeof(header), &received)) {
+            errorMessage = "Invalid multipart header";
+            break;
+        }
+
+        const char* fileName = strstr(header, "filename=\"");
+        if (fileName == nullptr) {
+            errorMessage = "Missing firmware filename";
+            break;
+        }
+        fileName += strlen("filename=\"");
+        const char* fileNameEnd = strchr(fileName, '"');
+        if ((fileNameEnd == nullptr) || (fileNameEnd <= fileName) || (strstr(fileName, ".bin") == nullptr)) {
+            errorMessage = "Firmware must be a .bin file";
+            break;
+        }
+
+        buffer = static_cast<uint8_t*>(rtkMalloc(firmwareBufferLength, "OTA upload buffer"));
+        if (buffer == nullptr) {
+            errorMessage = "Failed to allocate OTA upload buffer";
+            break;
+        }
+
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+            errorMessage = "Failed to start OTA update";
+            break;
+        }
+        updateRunning = true;
+
+        const size_t boundaryLength = strlen(boundary);
+        const size_t overlapLength = boundaryLength - 1;
+        size_t buffered = 0;
+
+        while (received < req->content_len) {
+            const size_t remainingRequest = req->content_len - received;
+            size_t requestBytes = firmwareBufferLength - buffered;
+            if (requestBytes > remainingRequest) {
+                requestBytes = remainingRequest;
+            }
+
+            const int bytesRead = httpd_req_recv(req, reinterpret_cast<char*>(&buffer[buffered]), requestBytes);
+            if (bytesRead <= 0) {
+                errorMessage = "Failed to receive firmware data";
+                break;
+            }
+            received += bytesRead;
+            buffered += bytesRead;
+
+            const int boundaryIndex = findBytes(buffer, buffered, boundary, boundaryLength);
+            if (boundaryIndex >= 0) {
+                if (boundaryIndex > 0) {
+                    const size_t written = Update.write(buffer, boundaryIndex);
+                    if (written != static_cast<size_t>(boundaryIndex)) {
+                        errorMessage = "Failed to write final OTA data";
+                        break;
+                    }
+                    firmwareBytes += written;
+                }
+                buffered = 0;
+                break;
+            }
+
+            if (buffered > overlapLength) {
+                const size_t writable = buffered - overlapLength;
+                const size_t written = Update.write(buffer, writable);
+                if (written != writable) {
+                    errorMessage = "Failed to write OTA data";
+                    break;
+                }
+                firmwareBytes += written;
+                memmove(buffer, &buffer[writable], overlapLength);
+                buffered = overlapLength;
+            }
+        }
+
+        if (errorMessage != nullptr) {
+            break;
+        }
+
+        while (received < req->content_len) {
+            const size_t remainingRequest = req->content_len - received;
+            const size_t requestBytes = (remainingRequest > firmwareBufferLength) ? firmwareBufferLength : remainingRequest;
+            const int bytesRead = httpd_req_recv(req, reinterpret_cast<char*>(buffer), requestBytes);
+            if (bytesRead <= 0) {
+                errorMessage = "Failed to drain OTA request";
+                break;
+            }
+            received += bytesRead;
+        }
+        if (errorMessage != nullptr) {
+            break;
+        }
+
+        if (!Update.end(true)) {
+            errorMessage = Update.errorString();
+            break;
+        }
+
+        systemPrintf("Firmware update complete: %u bytes. Restarting\r\n", static_cast<unsigned>(firmwareBytes));
+        httpd_resp_set_type(req, text_plain);
+        httpd_resp_sendstr(req, "Firmware uploaded successfully. Restarting.");
+        delay(500);
+        ESP.restart();
+        return ESP_OK;
+    } while (0);
+
+    if (updateRunning) {
+        Update.abort();
+        Update.printError(Serial);
+    }
+    if (buffer != nullptr) {
+        rtkFree(buffer, "OTA upload buffer");
+    }
+
+    systemPrintf("ERROR: Firmware upload failed: %s\r\n", errorMessage ? errorMessage : "unknown error");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, errorMessage ? errorMessage : "Firmware upload failed");
+    return ESP_FAIL;
+}
+
+static esp_err_t webServerHandlerWebSockets(httpd_req_t* req) {
+    if (req->method == HTTP_GET) {
+        return ESP_OK;
+    }
+
+    httpd_ws_frame_t packet = {};
+    const esp_err_t status = httpd_ws_recv_frame(req, &packet, 0);
+    if (status != ESP_OK) {
+        return status;
+    }
+
+    if (packet.len == 0) {
+        return ESP_OK;
+    }
+
+    uint8_t* payload = static_cast<uint8_t*>(rtkMalloc(packet.len + 1, "WebSocket payload"));
+    if (payload == nullptr) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    packet.payload = payload;
+    const esp_err_t readStatus = httpd_ws_recv_frame(req, &packet, packet.len);
+    rtkFree(payload, "WebSocket payload");
+    return readStatus;
+}
+
+static esp_err_t webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error) {
     (void)error;
     httpd_resp_set_status(req, "302 Found");
     httpd_resp_set_hdr(req, "Location", "/");
@@ -140,243 +344,128 @@ webServerHandlerNotFound(httpd_req_t* req, httpd_err_code_t error) {
 }
 
 //----------------------------------------
-// Register an error handler
+// Registration
 //----------------------------------------
-bool
-webServerRegisterErrorHandler(httpd_err_code_t error, httpd_err_handler_func_t handler) {
-    esp_err_t status;
 
-    // Register the error handler
-    status = httpd_register_err_handler(webServerHandle, error, handler);
-    if (settings.debugWebServer == true) {
-        if (status == ESP_OK) {
-            systemPrintf("WebServer registered %d error handler\r\n", error);
-        } else {
-            systemPrintf("WebServer Failed to register %d error handler!\r\n", error);
-        }
-    }
-    return (status == ESP_OK);
-}
-
-//----------------------------------------
-// Register a webpage handler
-//----------------------------------------
-bool
-webServerRegisterPageHandler(const httpd_uri_t* page) {
-    esp_err_t status;
-
-    // Register the handler
-    status = httpd_register_uri_handler(webServerHandle, page);
-    if (settings.debugWebServer == true) {
-        if (status == ESP_OK) {
-            systemPrintf("WebServer registered %s handler\r\n", page->uri);
-        } else {
-            systemPrintf("WebServer Failed to register %s handler!\r\n", page->uri);
-        }
-    }
-    return (status == ESP_OK);
-}
-
-static bool
-webServerAssignResources() {
+static bool webServerRegisterErrorHandler(httpd_err_code_t error, httpd_err_handler_func_t handler) {
+    const esp_err_t status = httpd_register_err_handler(webServerHandle, error, handler);
     if (settings.debugWebServer) {
-        systemPrintln("Assigning web server resources");
+        systemPrintf("WebServer %s %d error handler\r\n", (status == ESP_OK) ? "registered" : "failed to register",
+                     error);
     }
-    do {
-        httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-        config.server_port = settings.httpPort ? settings.httpPort : 80;
-        config.stack_size = webServerStackSize;
-        config.max_uri_handlers = (sizeof(staticPages) / sizeof(staticPages[0])) + 4;
-        config.max_open_sockets = 4;
-        config.lru_purge_enable = true;
-
-        if (settings.debugWebServer == true) {
-            webServerHttpdDisplayConfig(&config);
-            reportHeapNow(true);
-        }
-
-        if (MDNS.begin(&settings.mdnsHostName[0]) && settings.mdnsEnable) {
-            MDNS.addService("http", "tcp", config.server_port);
-            if (settings.debugNetworkLayer) {
-                systemPrintf("mDNS started as %s.local\r\n", settings.mdnsHostName);
-            }
-        }
-
-        // Allocate the mutex
-        if (webServerMutex == nullptr) {
-            webServerMutex = xSemaphoreCreateMutex();
-            if (webServerMutex == nullptr) {
-                if (settings.debugWebServer) {
-                    systemPrintf("ERROR: Web server failed to allocate the mutex!\r\n");
-                }
-                break;
-            }
-        }
-
-        // Start the web server
-        if (settings.debugWebServer == true) {
-            systemPrintf("Web server starting on port: %d\r\n", config.server_port);
-        }
-        esp_err_t status = httpd_start(&webServerHandle, &config);
-        if (status != ESP_OK) {
-            systemPrintf("ERROR: Web server failed to start: %s\r\n", esp_err_to_name(status));
-            return false;
-        }
-
-        if (settings.debugWebServer == true) {
-            systemPrintln("WebServer registering page handlers");
-        }
-
-        // Register the page not found (404) error handler
-        httpd_register_err_handler(webServerHandle, HTTPD_404_NOT_FOUND, webServerHandlerNotFound);
-
-        // Register the web socket handler
-        if (!webServerRegisterPageHandler(&webServerPage)) {
-            break;
-        }
-
-        // Register the main pages
-        for (i = 0; i < webServerTotalPages; i++) {
-            if (!webServerRegisterPageHandler(&webServerPages[i]._page)) {
-                break;
-            }
-        }
-        if (i < webServerTotalPages) {
-            break;
-        }
-
-        if (settings.debugWebServer == true) {
-            systemPrintln("Web Server Started");
-            reportHeapNow(true);
-        }
-        online_devices.webServer = true;
-        webServerStarted = true;
-        return true;
-    } while (0);
-
-    // Release the resources
-    if (settings.debugWebServer == true) {
-        reportHeapNow(true);
-    }
-    // webServerReleaseResources();
-    return false;
+    return status == ESP_OK;
 }
 
-void
-webServerStart() {
+static bool webServerRegisterPageHandler(const httpd_uri_t* page) {
+    const esp_err_t status = httpd_register_uri_handler(webServerHandle, page);
+    if (settings.debugWebServer) {
+        systemPrintf("WebServer %s %s handler\r\n", (status == ESP_OK) ? "registered" : "failed to register",
+                     page->uri);
+    }
+    return status == ESP_OK;
+}
+
+static bool webServerAssignResources() {
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.server_port = settings.httpPort ? settings.httpPort : 80;
+    config.stack_size = webServerStackSize;
+    config.max_uri_handlers = webServerTotalPages + 4;
+    config.max_open_sockets = 4;
+    config.lru_purge_enable = true;
+
+    if (settings.debugWebServer) {
+        webServerHttpdDisplayConfig(&config);
+        systemPrintf("Web server starting on port: %d\r\n", config.server_port);
+    }
+
+    if (MDNS.begin(&settings.mdnsHostName[0]) && settings.mdnsEnable) {
+        MDNS.addService("http", "tcp", config.server_port);
+    }
+
+    esp_err_t status = httpd_start(&webServerHandle, &config);
+    if (status != ESP_OK) {
+        systemPrintf("ERROR: Web server failed to start: %s\r\n", esp_err_to_name(status));
+        return false;
+    }
+
+    bool success = webServerRegisterErrorHandler(HTTPD_404_NOT_FOUND, webServerHandlerPageNotFound)
+                   && webServerRegisterPageHandler(&webServerWebSocketPage);
+    for (int index = 0; success && (index < webServerTotalPages); index++) {
+        success = webServerRegisterPageHandler(&webServerPages[index]._page);
+    }
+
+    if (!success) {
+        webServerStop();
+        return false;
+    }
+
+    webServerState = WEBSERVER_STATE_RUNNING;
+    systemPrintln("Web Server Started");
+    return true;
+}
+
+//----------------------------------------
+// State machine
+//----------------------------------------
+
+void webServerStart() {
     if (!wifiSoftApRunning()) {
         wifiSoftApOn(__FILE__, __LINE__);
     }
-}
-
-void
-webServerStop() {
-    if (webServerHandle != nullptr) {
-        httpd_stop(webServerHandle);
-        webServerHandle = nullptr;
-        webServerStarted = false;
-        systemPrintln("Web Server Stopped");
+    if (webServerState == WEBSERVER_STATE_OFF) {
+        webServerState = WEBSERVER_STATE_WAIT_FOR_NETWORK;
     }
 }
 
-void
-webServerUpdate() {
+void webServerStop() {
+    if (webServerHandle != nullptr) {
+        httpd_stop(webServerHandle);
+        webServerHandle = nullptr;
+    }
+    webServerState = WEBSERVER_STATE_OFF;
+    systemPrintln("Web Server Stopped");
+}
+
+void webServerUpdate() {
     if (!wifiSoftApRunning()) {
-        if (webServerStarted) {
+        if (webServerState == WEBSERVER_STATE_RUNNING) {
             webServerStop();
         }
         return;
     }
 
-    if (!webServerStarted) {
+    if ((webServerState == WEBSERVER_STATE_WAIT_FOR_NETWORK) || (webServerState == WEBSERVER_STATE_NETWORK_CONNECTED)) {
+        webServerState = WEBSERVER_STATE_NETWORK_CONNECTED;
         webServerAssignResources();
     }
 }
 
-bool
-webServerIsRunning() {
-    return webServerStarted;
+bool webServerIsRunning() {
+    return webServerState == WEBSERVER_STATE_RUNNING;
 }
 
-bool
-webServerIsConnected() {
-    return webServerStarted;
+bool webServerIsConnected() {
+    return webServerIsRunning();
 }
 
-void
-webServerSendString(const char* stringToSend) {
+void webServerSendString(const char* stringToSend) {
     (void)stringToSend;
 }
 
-void
-webServerSendSettings() {}
+void webServerSendSettings() {}
 
-void
-webServerSendFirmwareVersion() {}
+void webServerSendFirmwareVersion() {}
 
-void
-webServerVerifyTables() {}
+void webServerVerifyTables() {
+    const int webServerStateEntries = sizeof(webServerStateNames) / sizeof(webServerStateNames[0]);
+    if (webServerStateEntries != WEBSERVER_STATE_MAX) {
+        reportFatalError("Fix webServerStateNames to match WebServerState");
+    }
+}
 
-//----------------------------------------
-// Display the HTTPD configuration
-//----------------------------------------
-void
-webServerHttpdDisplayConfig(struct httpd_config* config) {
-    /*
-    httpd_config object:
-            5: task_priority
-        20480: stack_size
-    2147483647: core_id
-            81: server_port
-        32768: ctrl_port
-            7: max_open_sockets
-            8: max_uri_handlers
-            8: max_resp_headers
-            5: backlog_conn
-        false: lru_purge_enable
-            5: recv_wait_timeout
-            5: send_wait_timeout
-    0x0: global_user_ctx
-    0x0: global_user_ctx_free_fn
-    0x0: global_transport_ctx
-    0x0: global_transport_ctx_free_fn
-        false: enable_so_linger
-            0: linger_timeout
-        false: keep_alive_enable
-            0: keep_alive_idle
-            0: keep_alive_interval
-            0: keep_alive_count
-    0x0: open_fn
-    0x0: close_fn
-    0x0: uri_match_fn
-    */
-    systemPrintf("httpd_config object:\r\n");
-    systemPrintf("%10d: task_priority\r\n", config->task_priority);
-    systemPrintf("%10d: stack_size\r\n", config->stack_size);
-    systemPrintf("%10d: core_id\r\n", config->core_id);
-    systemPrintf("%10d: server_port\r\n", config->server_port);
-    systemPrintf("%10d: ctrl_port\r\n", config->ctrl_port);
-    systemPrintf("%10d: max_open_sockets\r\n", config->max_open_sockets);
-    systemPrintf("%10d: max_uri_handlers\r\n", config->max_uri_handlers);
-    systemPrintf("%10d: max_resp_headers\r\n", config->max_resp_headers);
-    systemPrintf("%10d: backlog_conn\r\n", config->backlog_conn);
-    systemPrintf("%10s: lru_purge_enable\r\n", config->lru_purge_enable ? "true" : "false");
-    systemPrintf("%10d: recv_wait_timeout\r\n", config->recv_wait_timeout);
-
-    systemPrintf("%10d: send_wait_timeout\r\n", config->send_wait_timeout);
-    systemPrintf("%p: global_user_ctx\r\n", config->global_user_ctx);
-    systemPrintf("%p: global_user_ctx_free_fn\r\n", config->global_user_ctx_free_fn);
-    systemPrintf("%p: global_transport_ctx\r\n", config->global_transport_ctx);
-    systemPrintf("%p: global_transport_ctx_free_fn\r\n", (void*)config->global_transport_ctx_free_fn);
-    systemPrintf("%10s: enable_so_linger\r\n", config->enable_so_linger ? "true" : "false");
-    systemPrintf("%10d: linger_timeout\r\n", config->linger_timeout);
-    systemPrintf("%10s: keep_alive_enable\r\n", config->keep_alive_enable ? "true" : "false");
-    systemPrintf("%10d: keep_alive_idle\r\n", config->keep_alive_idle);
-    systemPrintf("%10d: keep_alive_interval\r\n", config->keep_alive_interval);
-    systemPrintf("%10d: keep_alive_count\r\n", config->keep_alive_count);
-    systemPrintf("%p: open_fn\r\n", (void*)config->open_fn);
-    systemPrintf("%p: close_fn\r\n", (void*)config->close_fn);
-    systemPrintf("%p: uri_match_fn\r\n", (void*)config->uri_match_fn);
+void webServerHttpdDisplayConfig(struct httpd_config* config) {
+    systemPrintf("httpd_config: port=%d stack=%d handlers=%d sockets=%d\r\n", config->server_port, config->stack_size,
+                 config->max_uri_handlers, config->max_open_sockets);
 }
 
 #endif // COMPILE_WEBSERVER
