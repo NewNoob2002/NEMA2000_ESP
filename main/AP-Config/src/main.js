@@ -40,6 +40,9 @@ function getValue(element) {
 function initWebSocket() {
     try {
         websocket = new WebSocket(gateway);
+        websocket.onopen = () => setText("wsStatus", "Connected");
+        websocket.onclose = () => setText("wsStatus", "Disconnected");
+        websocket.onerror = () => setText("wsStatus", "Error");
         websocket.onmessage = (message) => parseIncoming(message.data);
     } catch (error) {
         console.log("WebSocket unavailable", error);
@@ -52,7 +55,9 @@ function parseIncoming(message) {
         const id = fields[index];
         const value = fields[index + 1];
 
-        if (id === "productBrand") {
+        if (id === "ack") {
+            setText("wsLastAck", `Last ACK: ${value}`);
+        } else if (id === "productBrand") {
             ge("pageLogo").src = "singularxyz.png";
         } else if (id.startsWith("profile") && id.endsWith("Name")) {
             setText(id, value);

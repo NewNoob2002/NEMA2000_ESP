@@ -49,6 +49,7 @@ static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req);
 static esp_err_t webServerHandlerGetPage(httpd_req_t* req);
 static esp_err_t webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error);
 static esp_err_t webServerHandlerWebSockets(httpd_req_t* req);
+static void webServerHandleClientMessage(const char* message);
 
 //----------------------------------------
 // Web page descriptions
@@ -312,6 +313,7 @@ static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req) {
 
 static esp_err_t webServerHandlerWebSockets(httpd_req_t* req) {
     if (req->method == HTTP_GET) {
+        systemPrintln("WebServer WS connected");
         return ESP_OK;
     }
 
@@ -332,8 +334,53 @@ static esp_err_t webServerHandlerWebSockets(httpd_req_t* req) {
 
     packet.payload = payload;
     const esp_err_t readStatus = httpd_ws_recv_frame(req, &packet, packet.len);
+    if (readStatus == ESP_OK) {
+        payload[packet.len] = 0;
+        webServerHandleClientMessage(reinterpret_cast<const char*>(payload));
+
+        char ack[160];
+        snprintf(ack, sizeof(ack), "ack,%s", reinterpret_cast<const char*>(payload));
+
+        httpd_ws_frame_t response = {};
+        response.type = HTTPD_WS_TYPE_TEXT;
+        response.payload = reinterpret_cast<uint8_t*>(ack);
+        response.len = strlen(ack);
+        httpd_ws_send_frame(req, &response);
+    }
     rtkFree(payload, "WebSocket payload");
     return readStatus;
+}
+
+static void webServerHandleClientMessage(const char* message) {
+    systemPrintf("WebServer WS RX: %s\r\n", message);
+
+    const char* cursor = message;
+    while ((cursor != nullptr) && (*cursor != 0)) {
+        const char* comma = strchr(cursor, ',');
+        if (comma == nullptr) {
+            break;
+        }
+
+        const char* value = comma + 1;
+        const char* next = strchr(value, ',');
+        if (next == nullptr) {
+            break;
+        }
+
+        char key[64] = {};
+        char settingValue[96] = {};
+        const size_t keyLength = (static_cast<size_t>(comma - cursor) >= sizeof(key)) ? sizeof(key) - 1
+                                                                                       : static_cast<size_t>(comma - cursor);
+        const size_t valueLength = (static_cast<size_t>(next - value) >= sizeof(settingValue))
+                                       ? sizeof(settingValue) - 1
+                                       : static_cast<size_t>(next - value);
+        memcpy(key, cursor, keyLength);
+        memcpy(settingValue, value, valueLength);
+
+        // Placeholder dispatch point. Implement setting handlers here as each feature is wired up.
+        systemPrintf("  action: %s = %s\r\n", key, settingValue);
+        cursor = next + 1;
+    }
 }
 
 static esp_err_t webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error) {
