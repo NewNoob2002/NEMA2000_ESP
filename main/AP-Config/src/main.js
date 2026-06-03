@@ -1,301 +1,361 @@
-const gateway = `ws://${window.location.hostname}:80/ws`;
-let websocket;
+/* ── Shortcuts ────────────────────────────── */
+const $ = (id) => document.getElementById(id);
+const TXT = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+const VAL = (id, v) => {
+  const e = $(id);
+  if (!e) return;
+  if (e.type === "checkbox") e.checked = (v === true || v === "true" || v === "1");
+  else if (e.type === "radio") e.checked = (v === true || v === "true" || v === "1" || String(e.value) === String(v));
+  else e.value = v;
+};
+const GET = (e) => {
+  if (e.type === "checkbox") return e.checked ? "true" : "false";
+  if (e.type === "radio") return e.checked ? e.value : null;
+  return e.value;
+};
+const SHOW = (id) => { const e = $(id); if (e) e.classList.remove("hidden"); };
+const HIDE = (id) => { const e = $(id); if (e) e.classList.add("hidden"); };
+
+/* ── WebSocket ────────────────────────────── */
+const WS_URL = `ws://${window.location.hostname}:80/ws`;
+let ws = null;
 let initialSettings = {};
+let reconnectTimer = null;
+let reconnectDelay = 2000;
 
-function ge(id) {
-    return document.getElementById(id);
+function wsConnect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  try {
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => {
+      TXT("wsStatus", "Connected");
+      $("connDot").className = "dot live";
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; reconnectDelay = 2000; }
+      ws.send("clientReady,true,");
+    };
+    ws.onclose = () => {
+      TXT("wsStatus", "Reconnecting…");
+      $("connDot").className = "dot dead";
+      scheduleReconnect();
+    };
+    ws.onerror = () => {
+      TXT("wsStatus", "Error");
+      $("connDot").className = "dot dead";
+    };
+    ws.onmessage = (ev) => handleMessage(ev.data);
+  } catch (e) {
+    console.warn("WS init failed:", e);
+    scheduleReconnect();
+  }
 }
 
-function show(id) {
-    const element = ge(id);
-    if (element) element.classList.remove("hidden");
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    reconnectDelay = Math.min(reconnectDelay * 1.5, 30000);
+    wsConnect();
+  }, reconnectDelay);
 }
 
-function hide(id) {
-    const element = ge(id);
-    if (element) element.classList.add("hidden");
-}
+/* ── Message parser ───────────────────────── */
+function handleMessage(raw) {
+  const parts = raw.split(",");
+  for (let i = 0; i + 1 < parts.length; i += 2) {
+    const key = parts[i];
+    const val = parts[i + 1];
+    if (!key) continue;
 
-function setText(id, value) {
-    const element = ge(id);
-    if (element) element.textContent = value;
-}
+    switch (key) {
+      /* ── Live telemetry ── */
+      case "utcTime":          TXT("utcTime", val); break;
+      case "systemUptime":     TXT("systemUptime", val); break;
+      case "satellitesInView": TXT("satellitesInView", val); updateSatBar(); break;
+      case "satellitesUsed":   TXT("satellitesUsed", val); updateSatBar(); break;
+      case "rtkPosition":      updateFixDisplay(val); break;
 
-function setValue(id, value) {
-    const element = ge(id);
-    if (!element) return;
-    if (element.type === "checkbox") {
-        element.checked = value === true || value === "true" || value === "1";
-    } else if (element.type === "radio") {
-        element.checked = value === true || value === "true" || value === "1" || element.value === value;
-    } else {
-        element.value = value;
-    }
-}
+      /* ── Firmware ── */
+      case "rtkFirmwareVersion":   TXT("rtkFirmwareVersion", val); break;
+      case "gnssFirmwareVersion":  TXT("gnssFirmwareVersion", val); break;
 
-function getValue(element) {
-    if (element.type === "checkbox") return element.checked ? "true" : "false";
-    if (element.type === "radio") return element.checked ? element.value : null;
-    return element.value;
-}
+      /* ── Identity ── */
+      case "platformPrefix":       TXT("platformPrefix", val); break;
+      case "hostMessage":          TXT("hostMessage", val); break;
 
-function initWebSocket() {
-    try {
-        websocket = new WebSocket(gateway);
-        websocket.onopen = () => {
-            setText("wsStatus", "Connected");
-            websocket.send("clientReady,true,");
-        };
-        websocket.onclose = () => setText("wsStatus", "Disconnected");
-        websocket.onerror = () => setText("wsStatus", "Error");
-        websocket.onmessage = (message) => parseIncoming(message.data);
-    } catch (error) {
-        console.log("WebSocket unavailable", error);
-    }
-}
+      /* ── ACK from server ── */
+      case "ack": break;
 
-function parseIncoming(message) {
-    const fields = message.split(",");
-    for (let index = 0; index + 1 < fields.length; index += 2) {
-        const id = fields[index];
-        const value = fields[index + 1];
-
-        if (id === "ack") {
-            setText("wsLastAck", value);
-        } else if (id === "hostMessage") {
-            setText("hostData", value);
-        } else if (id === "productBrand") {
-            ge("pageLogo").src = "singularxyz.png";
-        } else if (id === "rtkFirmwareVersion") {
-            setText("rtkFirmwareVersion", value);
-            setText("rtkFirmwareVersionUpgrade", value);
-        } else if (["platformPrefix", "deviceBTID", "gnssFirmwareVersion", "wsStatus", "hostData", "wsLastAck",
-                    "utcTime", "systemUptime", "satellitesInView", "satellitesUsed", "rtkPosition"].includes(id)) {
-            setText(id, value);
-        } else if (id.startsWith("profile") && id.endsWith("Name")) {
-            setText(id, value);
-        } else if (id === "profileNumber") {
-            const radio = document.querySelector(`input[name="profileRadio"][value="${value}"]`);
-            if (radio) radio.checked = true;
+      /* ── Profile names ── */
+      default:
+        if (key.startsWith("profile") && key.endsWith("Name")) {
+          TXT(key, val);
+        } else if (key === "profileNumber") {
+          const radio = document.querySelector(`input[name="profileRadio"][value="${val}"]`);
+          if (radio) radio.checked = true;
         } else {
-            setValue(id, value);
+          VAL(key, val);
         }
     }
-    refreshDependentControls();
-    saveInitialSettings();
+  }
+  refreshUI();
+  snapshotSettings();
 }
 
-function saveInitialSettings() {
-    initialSettings = {};
-    document.querySelectorAll("input, select").forEach((element) => {
-        if (!element.id || element.type === "file") return;
-        const value = getValue(element);
-        if (value !== null) initialSettings[element.id] = value;
-    });
+/* ── Fix display logic ────────────────────── */
+function updateFixDisplay(text) {
+  TXT("rtkPosition", text);
+  const badge = $("fixBadge");
+  const coords = $("positionCoords");
+  if (!badge) return;
+
+  badge.className = "fix-badge";
+  if (!text || text.includes("offline")) {
+    badge.textContent = "Offline";
+    badge.classList.add("nofix");
+  } else if (text.includes("RTK Fix")) {
+    badge.textContent = "RTK Fix";
+    badge.classList.add("rtkfix");
+  } else if (text.includes("RTK Float")) {
+    badge.textContent = "RTK Float";
+    badge.classList.add("float");
+  } else if (text.includes("DGPS")) {
+    badge.textContent = "DGPS";
+    badge.classList.add("dgps");
+  } else if (text.includes("Fixed")) {
+    badge.textContent = "Fixed";
+    badge.classList.add("fix");
+  } else if (text.includes("No fix") || text.includes("waiting")) {
+    badge.textContent = "No Fix";
+    badge.classList.add("nofix");
+  } else {
+    badge.textContent = text;
+  }
+
+  /* Extract coordinates for the detail line */
+  const latMatch = text.match(/Lat\s+(-?\d+\.\d+)/);
+  const lonMatch = text.match(/Lon\s+(-?\d+\.\d+)/);
+  const altMatch = text.match(/Alt\s+(-?\d+\.\d+)/);
+  if (latMatch && lonMatch) {
+    let coordStr = `Lat ${latMatch[1]}  Lon ${lonMatch[1]}`;
+    if (altMatch) coordStr += `  Alt ${altMatch[1]} m`;
+    if (coords) coords.textContent = coordStr;
+  } else {
+    if (coords) coords.textContent = "";
+  }
 }
 
-function changedSettingsCSV() {
-    let csv = "";
-    document.querySelectorAll("input, select").forEach((element) => {
-        if (!element.id || element.type === "file") return;
-        const value = getValue(element);
-        if (value === null) return;
-        if (initialSettings[element.id] !== value) {
-            csv += `${element.id},${value},`;
-            initialSettings[element.id] = value;
-        }
-    });
+/* ── Satellite bar ────────────────────────── */
+function updateSatBar() {
+  const used = parseInt($("satellitesUsed")?.textContent) || 0;
+  const view = parseInt($("satellitesInView")?.textContent) || 0;
+  const bar = $("satBar");
+  if (!bar) return;
+  const pct = view > 0 ? Math.min(100, (used / Math.max(view, 1)) * 100) : 0;
+  bar.style.width = `${pct}%`;
+  bar.style.background = used >= 12 ? "var(--success)" : used >= 6 ? "var(--warning)" : "var(--primary)";
+}
 
-    const activeProfile = document.querySelector('input[name="profileRadio"]:checked');
-    if (activeProfile && initialSettings.profileNumber !== activeProfile.value) {
-        csv += `profileNumber,${activeProfile.value},`;
-        initialSettings.profileNumber = activeProfile.value;
+/* ── UI refresh helpers ───────────────────── */
+function refreshUI() {
+  /* Base mode toggle */
+  const isFixed = $("baseTypeFixed")?.checked;
+  if ($("surveyInCfg")) isFixed ? HIDE("surveyInCfg") : SHOW("surveyInCfg");
+  if ($("fixedCfg"))    isFixed ? SHOW("fixedCfg")    : HIDE("fixedCfg");
+
+  /* Coordinate type toggle */
+  const isGeo = $("fixedBaseCoordinateTypeGeo")?.checked;
+  if ($("ecefCfg")) isGeo ? HIDE("ecefCfg") : SHOW("ecefCfg");
+  if ($("geoCfg"))  isGeo ? SHOW("geoCfg")  : HIDE("geoCfg");
+
+  /* Factory defaults button */
+  const chk = $("enableFactoryDefaults");
+  const btn = $("factoryDefaults");
+  if (chk && btn) btn.disabled = !chk.checked;
+}
+
+function snapshotSettings() {
+  initialSettings = {};
+  document.querySelectorAll("input, select").forEach((el) => {
+    if (!el.id || el.type === "file") return;
+    const v = GET(el);
+    if (v !== null) initialSettings[el.id] = v;
+  });
+}
+
+/* ── Build profile radio buttons ──────────── */
+function buildProfileRadios() {
+  const container = $("profileList");
+  if (!container) return;
+  for (let i = 0; i < 8; i++) {
+    const label = document.createElement("label");
+    label.className = "radio-item";
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "profileRadio";
+    input.value = String(i);
+    if (i === 0) input.checked = true;
+    const span = document.createElement("span");
+    span.id = `profile${i}Name`;
+    span.textContent = `Profile ${i + 1}`;
+    label.appendChild(input);
+    label.appendChild(span);
+    container.appendChild(label);
+  }
+}
+
+/* ── Panel collapse ───────────────────────── */
+function setupPanels() {
+  document.querySelectorAll(".panel-hdr").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = $(btn.dataset.target);
+      if (!target) return;
+      target.classList.toggle("open");
+      const arrow = btn.querySelector(".panel-arrow");
+      if (arrow) arrow.textContent = target.classList.contains("open") ? "▴" : "▾";
+    });
+  });
+}
+
+/* ── Base / coordinate listeners ──────────── */
+function setupBaseToggles() {
+  $("baseTypeSurveyIn")?.addEventListener("change", refreshUI);
+  $("baseTypeFixed")?.addEventListener("change", refreshUI);
+  $("fixedBaseCoordinateTypeECEF")?.addEventListener("change", refreshUI);
+  $("fixedBaseCoordinateTypeGeo")?.addEventListener("change", refreshUI);
+  $("enableFactoryDefaults")?.addEventListener("change", refreshUI);
+}
+
+/* ── Validation ───────────────────────────── */
+function validateNum(id, min, max, msg) {
+  const el = $(id);
+  const errEl = $(`${id}Error`);
+  if (!el || el.value === "") { if (errEl) errEl.textContent = ""; return true; }
+  const v = Number(el.value);
+  const ok = Number.isFinite(v) && v >= min && v <= max;
+  if (errEl) errEl.textContent = ok ? "" : msg;
+  return ok;
+}
+
+function validateAll() {
+  let ok = true;
+  ok = validateNum("measurementRateHz", 0.00012, 10, "0.00012 – 10 Hz") && ok;
+  ok = validateNum("minCN0", 0, 90, "0 – 90 dBHz") && ok;
+  ok = validateNum("observationSeconds", 60, 600, "60 – 600 s") && ok;
+  ok = validateNum("observationPositionAccuracy", 1, 5, "1 – 5 m") && ok;
+  ok = validateNum("antennaPhaseCenter", -200, 200, "-200 – 200 mm") && ok;
+  ok = validateNum("antennaHeightM", -15, 15, "-15 – 15 m") && ok;
+  return ok;
+}
+
+/* ── Changed-settings CSV ─────────────────── */
+function changedCSV() {
+  let csv = "";
+  document.querySelectorAll("input, select").forEach((el) => {
+    if (!el.id || el.type === "file") return;
+    const v = GET(el);
+    if (v === null) return;
+    if (initialSettings[el.id] !== v) {
+      csv += `${el.id},${v},`;
+      initialSettings[el.id] = v;
     }
-    return csv;
+  });
+  const active = document.querySelector('input[name="profileRadio"]:checked');
+  if (active && initialSettings["profileNumber"] !== active.value) {
+    csv += `profileNumber,${active.value},`;
+    initialSettings["profileNumber"] = active.value;
+  }
+  return csv;
 }
 
+/* ── Actions ──────────────────────────────── */
 function saveConfig() {
-    if (!validateConfig()) return;
-    const csv = changedSettingsCSV();
-    if (csv && websocket && websocket.readyState === WebSocket.OPEN) websocket.send(csv);
+  if (!validateAll()) return;
+  const csv = changedCSV();
+  if (csv && ws && ws.readyState === WebSocket.OPEN) ws.send(csv);
 }
 
 function exitConfig() {
-    saveConfig();
-    if (websocket && websocket.readyState === WebSocket.OPEN) websocket.send("exitAndReset,true,");
-    hide("mainPage");
-    show("resetInProcess");
+  saveConfig();
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send("exitAndReset,true,");
+  HIDE("mainApp");
+  SHOW("resetInProcess");
 }
 
 function btnResetProfile() {
-    if (websocket && websocket.readyState === WebSocket.OPEN) websocket.send("resetProfile,true,");
-    setText("resetProfileMsg", "Profile reset requested.");
-}
-
-function selectedProfileNumber() {
-    const activeProfile = document.querySelector('input[name="profileRadio"]:checked');
-    return activeProfile ? activeProfile.value : "0";
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send("resetProfile,true,");
+  TXT("profileMsg", "Profile reset requested.");
 }
 
 function deleteProfile() {
-    if (websocket && websocket.readyState === WebSocket.OPEN) {
-        websocket.send(`deleteProfile,${selectedProfileNumber()},`);
-    }
-    setText("resetProfileMsg", "Profile delete requested.");
+  const active = document.querySelector('input[name="profileRadio"]:checked');
+  const num = active ? active.value : "0";
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(`deleteProfile,${num},`);
+  TXT("profileMsg", "Profile delete requested.");
 }
 
 function profileUploadWait() {
-    const input = ge("submitProfileFile");
-    if (!input.files || input.files.length === 0) return;
-
-    const file = input.files[0];
-    const reader = new FileReader();
-    reader.onload = () => {
-        const encodedProfile = encodeURIComponent(reader.result);
-        if (websocket && websocket.readyState === WebSocket.OPEN) {
-            websocket.send(`uploadProfile,${selectedProfileNumber()},profileUploadName,${encodeURIComponent(file.name)},profileUploadData,${encodedProfile},`);
-        }
-        setText("profileUploadMsg", "Profile upload requested.");
-    };
-    reader.onerror = () => setText("profileUploadMsg", "Profile upload failed.");
-    reader.readAsText(file);
+  const input = $("submitProfileFile");
+  if (!input?.files?.length) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = () => {
+    const data = encodeURIComponent(reader.result);
+    const active = document.querySelector('input[name="profileRadio"]:checked');
+    const num = active ? active.value : "0";
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(`uploadProfile,${num},profileUploadName,${encodeURIComponent(file.name)},profileUploadData,${data},`);
+    }
+    TXT("profileMsg", "Profile upload requested.");
+  };
+  reader.onerror = () => TXT("profileMsg", "Profile upload read error.");
+  reader.readAsText(file);
 }
 
 function resetToFactoryDefaults() {
-    if (!ge("enableFactoryDefaults").checked) return;
-    if (websocket && websocket.readyState === WebSocket.OPEN) websocket.send("factoryDefaultReset,true,");
-    setText("factoryDefaultsMsg", "Factory reset requested.");
+  if (!$("enableFactoryDefaults")?.checked) return;
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send("factoryDefaultReset,true,");
+  TXT("factoryDefaultsMsg", "Factory reset requested.");
 }
 
 function firmwareUploadWait() {
-    const input = ge("submitFirmwareFile");
-    if (!input.files || input.files.length === 0) return;
-
-    const file = input.files[0];
-    if (!file.name.endsWith(".bin")) {
-        setText("firmwareUploadMsg", "Firmware must be a .bin file.");
-        return;
-    }
-
-    const form = new FormData();
-    form.append("binfile", file);
-
-    const request = new XMLHttpRequest();
-    request.open("POST", "/uploadFirmware");
-    request.upload.onprogress = (event) => {
-        if (!event.lengthComputable) return;
-        ge("firmwareUploadProgressBar").value = Math.round((event.loaded / event.total) * 100);
-    };
-    request.onload = () => {
-        if (request.status >= 200 && request.status < 300) {
-            hide("mainPage");
-            show("firmwareUploadComplete");
-        } else {
-            setText("firmwareUploadMsg", request.responseText || "Firmware upload failed.");
-        }
-    };
-    request.onerror = () => setText("firmwareUploadMsg", "Firmware upload failed.");
-    request.send(form);
-    setText("firmwareUploadMsg", "Uploading firmware...");
-}
-
-function validateNumber(id, min, max, message) {
-    const element = ge(id);
-    const error = ge(`${id}Error`);
-    if (!element || element.value === "") {
-        if (error) error.textContent = "";
-        return true;
-    }
-    const value = Number(element.value);
-    const valid = Number.isFinite(value) && value >= min && value <= max;
-    if (error) error.textContent = valid ? "" : message;
-    return valid;
-}
-
-function validateConfig() {
-    let valid = true;
-    valid = validateNumber("measurementRateHz", 0.00012, 10, "Must be between 0.00012 and 10.") && valid;
-    valid = validateNumber("minCN0", 0, 90, "Must be between 0 and 90.") && valid;
-    valid = validateNumber("observationSeconds", 60, 600, "Must be between 60 and 600.") && valid;
-    valid = validateNumber("observationPositionAccuracy", 1, 5, "Must be between 1 and 5.") && valid;
-    valid = validateNumber("antennaPhaseCenter", -200, 200, "Must be between -200 and 200.") && valid;
-    valid = validateNumber("antennaHeightM", -15, 15, "Must be between -15 and 15.") && valid;
-    return valid;
-}
-
-function setupCollapseButtons() {
-    document.querySelectorAll(".section-toggle").forEach((button) => {
-        button.addEventListener("click", () => {
-            const target = ge(button.dataset.target);
-            if (!target) return;
-            target.classList.toggle("open");
-            button.querySelector(".caret").textContent = target.classList.contains("open") ? "^" : "v";
-        });
-    });
-}
-
-function refreshDependentControls() {
-    if (ge("baseTypeFixed").checked) {
-        hide("surveyInConfig");
-        show("fixedConfig");
+  const input = $("submitFirmwareFile");
+  if (!input?.files?.length) return;
+  const file = input.files[0];
+  if (!file.name.endsWith(".bin")) {
+    TXT("firmwareUploadMsg", "Only .bin files are accepted.");
+    return;
+  }
+  const form = new FormData();
+  form.append("binfile", file);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/uploadFirmware");
+  xhr.upload.onprogress = (ev) => {
+    if (ev.lengthComputable) $("firmwareUploadProgressBar").value = Math.round((ev.loaded / ev.total) * 100);
+  };
+  xhr.onload = () => {
+    if (xhr.status >= 200 && xhr.status < 300) {
+      HIDE("mainApp");
+      SHOW("firmwareUploadComplete");
     } else {
-        show("surveyInConfig");
-        hide("fixedConfig");
+      TXT("firmwareUploadMsg", xhr.responseText || "Upload failed.");
     }
-
-    if (ge("fixedBaseCoordinateTypeGeo").checked) {
-        hide("ecefConfig");
-        show("geodeticConfig");
-    } else {
-        show("ecefConfig");
-        hide("geodeticConfig");
-    }
-
-    ge("factoryDefaults").disabled = !ge("enableFactoryDefaults").checked;
+  };
+  xhr.onerror = () => TXT("firmwareUploadMsg", "Upload network error.");
+  xhr.send(form);
+  TXT("firmwareUploadMsg", "Uploading…");
 }
 
-function setupBaseControls() {
-    const updateBaseMode = () => {
-        if (ge("baseTypeFixed").checked) {
-            hide("surveyInConfig");
-            show("fixedConfig");
-        } else {
-            show("surveyInConfig");
-            hide("fixedConfig");
-        }
-    };
-    const updateCoordinateMode = () => {
-        if (ge("fixedBaseCoordinateTypeGeo").checked) {
-            hide("ecefConfig");
-            show("geodeticConfig");
-        } else {
-            show("ecefConfig");
-            hide("geodeticConfig");
-        }
-    };
-
-    ge("baseTypeSurveyIn").addEventListener("change", updateBaseMode);
-    ge("baseTypeFixed").addEventListener("change", updateBaseMode);
-    ge("fixedBaseCoordinateTypeECEF").addEventListener("change", updateCoordinateMode);
-    ge("fixedBaseCoordinateTypeGeo").addEventListener("change", updateCoordinateMode);
-    refreshDependentControls();
-}
-
-function setupMeasurementRateSync() {
-    ge("measurementRateHz").addEventListener("change", () => {});
-}
-
-function setupSystemControls() {
-    ge("enableFactoryDefaults").addEventListener("change", () => {
-        ge("factoryDefaults").disabled = !ge("enableFactoryDefaults").checked;
-    });
-}
-
+/* ── Init ─────────────────────────────────── */
 window.addEventListener("DOMContentLoaded", () => {
-    setupCollapseButtons();
-    setupBaseControls();
-    setupMeasurementRateSync();
-    setupSystemControls();
-    saveInitialSettings();
-    initWebSocket();
+  buildProfileRadios();
+  setupPanels();
+  setupBaseToggles();
+  refreshUI();
+  snapshotSettings();
+  wsConnect();
+
+  /* Periodically refresh WS if stale */
+  setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) wsConnect();
+  }, 10000);
 });
