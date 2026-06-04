@@ -2,17 +2,20 @@
 
 #include <stdint.h>
 
+#include "HAL/HAL.h"
+#include "N2kTimer.h"
 #include "NMEA2000_esp32.h"
+#include "Unicore_UM980.h"
 #include "nmea0183_to_n2k.h"
 
 namespace {
 
-constexpr uint32_t kNmeaFrameBufferSize = 256;
 constexpr uint32_t kNmea2000TimerPeriodMs = 10;
+constexpr uint32_t kNmea2000GnssSendPeriodMs = 1000;
 
-tGatewayNmea0183Parser nmeaParser;
 tNMEA2000_esp32 nmea2000;
 bool nmea2000Ready = false;
+uint32_t lastGnssSendMs = 0;
 uint32_t n2kSent = 0;
 uint32_t n2kFailed = 0;
 
@@ -32,22 +35,22 @@ sendN2kMessage(const tN2kMsg& message) {
 }
 
 void
-onGatewayMessages(const tGatewayN2kMessages& messages, void* userContext) {
-    (void)userContext;
-
+sendGatewayMessages(const tGatewayN2kMessages& messages) {
     sendN2kMessage(messages.LatLonRapid);
     sendN2kMessage(messages.CogSogRapid);
     sendN2kMessage(messages.Gnss);
 }
 
 void
-pullGnssNmea(Account* account) {
-    uint8_t buffer[kNmeaFrameBufferSize] = {};
-    uint32_t size = sizeof(buffer);
+sendGnssSnapshot() {
+    if (!nmea2000Ready || HAL::gUm980 == nullptr) {
+        return;
+    }
 
-    while (account->Pull("GNSS_NMEA", buffer, &size) == Account::RES_OK) {
-        nmeaParser.FeedBytes(buffer, size);
-        size = sizeof(buffer);
+    tGatewayGnssData gnssData;
+    tGatewayN2kMessages messages;
+    if (ReadGatewayGnssData(*HAL::gUm980, gnssData) && BuildGatewayN2kMessages(gnssData, messages)) {
+        sendGatewayMessages(messages);
     }
 }
 
@@ -57,14 +60,14 @@ onEvent(Account* account, Account::EventParam_t* param) {
         return Account::RES_PARAM_ERROR;
     }
 
-    if (param->event == Account::EVENT_PUB_PUBLISH_PULL) {
-        pullGnssNmea(account);
-        return Account::RES_OK;
-    }
-
     if (param->event == Account::EVENT_TIMER) {
         if (nmea2000Ready) {
             nmea2000.ParseMessages();
+        }
+        const uint32_t now = N2kMillis();
+        if (lastGnssSendMs == 0 || (now - lastGnssSendMs) >= kNmea2000GnssSendPeriodMs) {
+            lastGnssSendMs = now;
+            sendGnssSnapshot();
         }
         return Account::RES_OK;
     }
@@ -75,14 +78,8 @@ onEvent(Account* account, Account::EventParam_t* param) {
 } // namespace
 
 DATA_PROC_INIT_DEF(NMEA2000) {
-    account->Subscribe("GNSS_NMEA");
     account->SetEventCallback(onEvent);
     account->SetTimerPeriod(kNmea2000TimerPeriodMs);
-
-    if (!nmeaParser.Begin()) {
-        return;
-    }
-    nmeaParser.SetMessageCallback(onGatewayMessages, nullptr);
 
     ConfigureGatewayNmea2000(nmea2000);
     nmea2000.ClearCANStatus();

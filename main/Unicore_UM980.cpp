@@ -793,6 +793,24 @@ UnicoreUM980::getAltitude() const {
     }
 }
 
+double
+UnicoreUM980::getHorizontalSpeed() const {
+    if (_bestNav) {
+        return _bestNav->horizontalSpeed;
+    } else {
+        return 0.0;
+    }
+}
+
+double
+UnicoreUM980::getTrackGround() const {
+    if (_bestNav) {
+        return _bestNav->trackGround;
+    } else {
+        return 0.0;
+    }
+}
+
 float
 UnicoreUM980::getLatitudeDeviation() const {
     if (_bestNav) {

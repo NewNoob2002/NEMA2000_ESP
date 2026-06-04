@@ -6,7 +6,11 @@
 #include "Support.h"
 
 #ifdef __cplusplus
+class UnicoreUM980;
+
 namespace HAL {
+extern UnicoreUM980* gUm980;
+
 /**
  * @brief Initialize the hardware abstraction layer.
  */
