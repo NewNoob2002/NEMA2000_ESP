@@ -91,9 +91,14 @@
                         <input type="text" id="profileName" maxlength="49">
                         <p class="hint" id="profileNameHint"></p>
                     </div>
+                    <div class="profile-summary">
+                        <span>Current settings profile: <b id="profileCurrent">—</b></span>
+                        <button type="button" class="btn btn-ghost" onclick="refreshProfiles()">Refresh Files</button>
+                    </div>
+                    <div class="profile-file-list" id="profileFileList"></div>
                     <div class="btn-row">
                         <button type="button" id="btnResetProfile" class="btn btn-accent" onclick="btnResetProfile()">Reset</button>
-                        <button type="button" id="btnDeleteProfile" class="btn btn-ghost btn-danger-text" onclick="deleteProfile()">Delete</button>
+                        <button type="button" id="btnDeleteProfile" class="btn btn-ghost btn-danger-text" onclick="deleteProfile()">Delete Active File</button>
                         <label class="btn btn-accent file-btn">
                             Upload <input type="file" id="submitProfileFile" onchange="profileUploadWait()" hidden>
                         </label>

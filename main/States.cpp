@@ -214,9 +214,9 @@ stateUpdate(UnicoreUM980* gnss) {
                 const char* accUnits =
                     getHpaUnits(settings.surveyInStartingAccuracy, accuracy, sizeof(accuracy), 2, false);
 
-                systemPrintf("Waiting for Horz Accuracy < %s (%s): %s%s%s%s, SIV: %d\r\n", accuracy, accUnits, temp,
-                             (accUnits != units) ? " (" : "", (accUnits != units) ? units : "",
-                             (accUnits != units) ? ")" : "", siv);
+                // systemPrintf("Waiting for Horz Accuracy < %s (%s): %s%s%s%s, SIV: %d\r\n", accuracy, accUnits, temp,
+                //              (accUnits != units) ? " (" : "", (accUnits != units) ? units : "",
+                //              (accUnits != units) ? ")" : "", siv);
 
                 // On the mosaic-X5, the HPA is undefined while the GNSS is determining its fixed position
                 // We need to skip the HPA check...

@@ -4,7 +4,9 @@
 
 #include <Arduino.h>
 #include <ESPmDNS.h>
+#include <LittleFS.h>
 #include <Update.h>
+#include <ctype.h>
 #include <esp_http_server.h>
 #include <esp_log.h>
 #include <math.h>
@@ -27,6 +29,9 @@ extern UnicoreUM980* gUm980;
 
 static const size_t webServerStackSize = 1024 * 20;
 static const size_t firmwareBufferLength = 16 * 1024;
+static const size_t profileUploadBufferLength = 1024;
+static const size_t profileMaxFileSize = 32 * 1024;
+static const size_t profileMaxNameLength = 63;
 
 static const char* const TAG = "WebServer";
 static const char* const image_png = "image/png";
@@ -36,6 +41,13 @@ static const char* const text_javascript = "text/javascript";
 static const char* const text_plain = "text/plain";
 
 #define UPLOAD_FIRMWARE "/uploadFirmware"
+#define PROFILE_LIST "/profile/list"
+#define PROFILE_DOWNLOAD "/profile/download"
+#define PROFILE_UPLOAD "/profile/upload"
+#define PROFILE_ACTIVATE "/profile/activate"
+#define PROFILE_DELETE "/profile/delete"
+#define PROFILE_DIR "/littlefs/profiles"
+#define PROFILE_ACTIVE_FILE "/littlefs/profiles/active.txt"
 
 //----------------------------------------
 // Locals
@@ -60,10 +72,16 @@ static const char* const webServerStateNames[] = {
 static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req);
 static esp_err_t webServerHandlerGetPage(httpd_req_t* req);
 static esp_err_t webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error);
+static esp_err_t webServerHandlerProfileActivate(httpd_req_t* req);
+static esp_err_t webServerHandlerProfileDelete(httpd_req_t* req);
+static esp_err_t webServerHandlerProfileDownload(httpd_req_t* req);
+static esp_err_t webServerHandlerProfileList(httpd_req_t* req);
+static esp_err_t webServerHandlerProfileUpload(httpd_req_t* req);
 static esp_err_t webServerHandlerWebSockets(httpd_req_t* req);
 static bool webServerAppendField(char* buffer, size_t bufferLength, const char* key, const char* value);
 static bool webServerApplyField(const char* key, const char* value);
 static bool webServerBuildSettingsCsv(char* buffer, size_t bufferLength);
+static void webServerSendProfileList();
 static void webServerSendLiveStatus();
 static void webServerHandleClientMessage(const char* message);
 
@@ -83,6 +101,11 @@ const GET_PAGE_HANDLER webServerPages[] = {
 
     // OTA
     PAGE_HANDLER(5, UPLOAD_FIRMWARE, HTTP_POST, text_plain, webServerHandlerFirmwareUpload),
+    PAGE_HANDLER(6, PROFILE_LIST, HTTP_GET, text_plain, webServerHandlerProfileList),
+    PAGE_HANDLER(7, PROFILE_DOWNLOAD, HTTP_GET, text_plain, webServerHandlerProfileDownload),
+    PAGE_HANDLER(8, PROFILE_UPLOAD, HTTP_POST, text_plain, webServerHandlerProfileUpload),
+    PAGE_HANDLER(9, PROFILE_ACTIVATE, HTTP_POST, text_plain, webServerHandlerProfileActivate),
+    PAGE_HANDLER(10, PROFILE_DELETE, HTTP_POST, text_plain, webServerHandlerProfileDelete),
 };
 
 const int webServerTotalPages = sizeof(webServerPages) / sizeof(webServerPages[0]);
@@ -461,6 +484,270 @@ webServerBuildSettingsCsv(char* buffer, size_t bufferLength) {
     return true;
 }
 
+//----------------------------------------
+// Profile file API
+//----------------------------------------
+
+static bool
+webServerUrlDecode(const char* source, char* destination, size_t destinationLength) {
+    if ((source == nullptr) || (destination == nullptr) || (destinationLength == 0)) {
+        return false;
+    }
+
+    size_t out = 0;
+    for (size_t in = 0; source[in] != 0; in++) {
+        if (out + 1 >= destinationLength) {
+            return false;
+        }
+
+        if ((source[in] == '%') && isxdigit(static_cast<unsigned char>(source[in + 1]))
+            && isxdigit(static_cast<unsigned char>(source[in + 2]))) {
+            char hex[3] = {source[in + 1], source[in + 2], 0};
+            destination[out++] = static_cast<char>(strtol(hex, nullptr, 16));
+            in += 2;
+        } else if (source[in] == '+') {
+            destination[out++] = ' ';
+        } else {
+            destination[out++] = source[in];
+        }
+    }
+
+    destination[out] = 0;
+    return true;
+}
+
+static bool
+webServerProfileNameIsSafe(const char* name) {
+    if ((name == nullptr) || (name[0] == 0)) {
+        return false;
+    }
+
+    const size_t length = strlen(name);
+    if ((length > profileMaxNameLength) || (strcmp(name, ".") == 0) || (strcmp(name, "..") == 0)) {
+        return false;
+    }
+
+    for (size_t index = 0; index < length; index++) {
+        const char c = name[index];
+        const bool valid = isalnum(static_cast<unsigned char>(c)) || (c == '-') || (c == '_') || (c == '.');
+        if (!valid) {
+            return false;
+        }
+    }
+
+    return (strstr(name, "..") == nullptr) && (strchr(name, '/') == nullptr) && (strchr(name, '\\') == nullptr);
+}
+
+static bool
+webServerGetProfileNameFromQuery(httpd_req_t* req, char* name, size_t nameLength) {
+    char query[160] = {};
+    char encodedName[96] = {};
+
+    if (httpd_req_get_url_query_str(req, query, sizeof(query)) != ESP_OK) {
+        return false;
+    }
+    if (httpd_query_key_value(query, "name", encodedName, sizeof(encodedName)) != ESP_OK) {
+        return false;
+    }
+    if (!webServerUrlDecode(encodedName, name, nameLength)) {
+        return false;
+    }
+    return webServerProfileNameIsSafe(name);
+}
+
+static bool
+webServerBuildProfilePath(const char* name, char* path, size_t pathLength) {
+    if (!webServerProfileNameIsSafe(name)) {
+        return false;
+    }
+    const int written = snprintf(path, pathLength, "%s/%s", PROFILE_DIR, name);
+    return (written > 0) && (static_cast<size_t>(written) < pathLength);
+}
+
+static bool
+webServerEnsureProfileDir() {
+    if (!online_devices.littlefs) {
+        return false;
+    }
+    if (LittleFS.exists(PROFILE_DIR)) {
+        return true;
+    }
+    return LittleFS.mkdir(PROFILE_DIR);
+}
+
+static bool
+webServerReadActiveProfile(char* name, size_t nameLength) {
+    name[0] = 0;
+    if (!online_devices.littlefs || !LittleFS.exists(PROFILE_ACTIVE_FILE)) {
+        return false;
+    }
+
+    File file = LittleFS.open(PROFILE_ACTIVE_FILE, "r");
+    if (!file) {
+        return false;
+    }
+
+    const size_t bytes = file.readBytes(name, nameLength - 1);
+    name[bytes] = 0;
+    file.close();
+
+    char* newline = strpbrk(name, "\r\n");
+    if (newline != nullptr) {
+        *newline = 0;
+    }
+    return webServerProfileNameIsSafe(name);
+}
+
+static bool
+webServerWriteActiveProfile(const char* name) {
+    if (!webServerEnsureProfileDir()) {
+        return false;
+    }
+
+    char path[96] = {};
+    if (!webServerBuildProfilePath(name, path, sizeof(path)) || !LittleFS.exists(path)) {
+        return false;
+    }
+
+    File file = LittleFS.open(PROFILE_ACTIVE_FILE, "w");
+    if (!file) {
+        return false;
+    }
+    const size_t written = file.print(name);
+    file.close();
+    return written == strlen(name);
+}
+
+static const char*
+webServerBaseName(const char* path) {
+    const char* slash = strrchr(path, '/');
+    return (slash == nullptr) ? path : slash + 1;
+}
+
+static bool
+webServerAppendJsonEscaped(char* buffer, size_t bufferLength, const char* value) {
+    size_t used = strlen(buffer);
+    if (used >= bufferLength) {
+        return false;
+    }
+
+    for (size_t index = 0; (value != nullptr) && (value[index] != 0); index++) {
+        if (used + 3 >= bufferLength) {
+            return false;
+        }
+        if ((value[index] == '"') || (value[index] == '\\')) {
+            buffer[used++] = '\\';
+        }
+        buffer[used++] = value[index];
+        buffer[used] = 0;
+    }
+    return true;
+}
+
+static bool
+webServerBuildProfileListJson(char* buffer, size_t bufferLength) {
+    char activeProfile[profileMaxNameLength + 1] = {};
+    int count = 0;
+
+    buffer[0] = 0;
+    snprintf(buffer, bufferLength, "{\"status\":\"%s\",\"current\":\"", online_devices.littlefs ? "ok" : "littlefs-offline");
+    if (!webServerAppendJsonEscaped(buffer, bufferLength, settings.profileName)) {
+        return false;
+    }
+    strlcat(buffer, "\",\"active\":\"", bufferLength);
+
+    if (online_devices.littlefs && webServerEnsureProfileDir() && webServerReadActiveProfile(activeProfile, sizeof(activeProfile))) {
+        if (!webServerAppendJsonEscaped(buffer, bufferLength, activeProfile)) {
+            return false;
+        }
+    }
+    strlcat(buffer, "\",\"files\":[", bufferLength);
+
+    if (!online_devices.littlefs || !webServerEnsureProfileDir()) {
+        strlcat(buffer, "]}", bufferLength);
+        return true;
+    }
+
+    File root = LittleFS.open(PROFILE_DIR, "r");
+    if (!root || !root.isDirectory()) {
+        strlcat(buffer, "]}", bufferLength);
+        return true;
+    }
+
+    File file = root.openNextFile();
+    while (file && (count < 12)) {
+        if (!file.isDirectory()) {
+            const char* name = webServerBaseName(file.name());
+            if (webServerProfileNameIsSafe(name)) {
+                char entry[64] = {};
+                snprintf(entry, sizeof(entry), "%s{\"name\":\"", (count == 0) ? "" : ",");
+                strlcat(buffer, entry, bufferLength);
+                if (!webServerAppendJsonEscaped(buffer, bufferLength, name)) {
+                    return false;
+                }
+                snprintf(entry, sizeof(entry), "\",\"size\":%u}", static_cast<unsigned>(file.size()));
+                strlcat(buffer, entry, bufferLength);
+                count++;
+            }
+        }
+        file = root.openNextFile();
+    }
+
+    strlcat(buffer, "]}", bufferLength);
+    return true;
+}
+
+static void
+webServerSendProfileList() {
+    char packet[1400] = {};
+    char activeProfile[profileMaxNameLength + 1] = {};
+    char value[96] = {};
+    int count = 0;
+
+    webServerAppendField(packet, sizeof(packet), "profileListStatus", online_devices.littlefs ? "ok" : "littlefs-offline");
+    webServerAppendField(packet, sizeof(packet), "profileCurrent", settings.profileName);
+
+    if (!online_devices.littlefs || !webServerEnsureProfileDir()) {
+        webServerAppendField(packet, sizeof(packet), "profileFileCount", "0");
+        webServerSendString(packet);
+        return;
+    }
+
+    if (webServerReadActiveProfile(activeProfile, sizeof(activeProfile))) {
+        webServerAppendField(packet, sizeof(packet), "profileActiveFile", activeProfile);
+    } else {
+        webServerAppendField(packet, sizeof(packet), "profileActiveFile", "");
+    }
+
+    File root = LittleFS.open(PROFILE_DIR, "r");
+    if (!root || !root.isDirectory()) {
+        webServerAppendField(packet, sizeof(packet), "profileFileCount", "0");
+        webServerSendString(packet);
+        return;
+    }
+
+    File file = root.openNextFile();
+    while (file && (count < 12)) {
+        if (!file.isDirectory()) {
+            const char* name = webServerBaseName(file.name());
+            if (webServerProfileNameIsSafe(name)) {
+                char key[32] = {};
+                snprintf(key, sizeof(key), "profileFile%dName", count);
+                webServerAppendField(packet, sizeof(packet), key, name);
+                snprintf(key, sizeof(key), "profileFile%dSize", count);
+                snprintf(value, sizeof(value), "%u", static_cast<unsigned>(file.size()));
+                webServerAppendField(packet, sizeof(packet), key, value);
+                count++;
+            }
+        }
+        file = root.openNextFile();
+    }
+
+    snprintf(value, sizeof(value), "%d", count);
+    webServerAppendField(packet, sizeof(packet), "profileFileCount", value);
+    webServerSendString(packet);
+}
+
 static void
 webServerFormatUptime(char* buffer, size_t bufferLength) {
     const uint32_t uptimeSeconds = millis() / 1000U;
@@ -575,28 +862,43 @@ webServerApplyAction(const char* key, const char* value) {
         return true;
     }
 
+    if (strcmp(key, "refreshProfiles") == 0) {
+        webServerSendField("profileActionStatus", "use-http-list");
+        return true;
+    }
+
     if (strcmp(key, "resetProfile") == 0) {
-        ESP_LOGI(TAG, "TODO action resetProfile = %s", value);
+        (void)value;
+        webServerSendSettings();
+        webServerSendProfileList();
         return true;
     }
 
     if (strcmp(key, "deleteProfile") == 0) {
-        ESP_LOGI(TAG, "TODO action deleteProfile profile=%s", value);
+        (void)value;
+        webServerSendField("profileActionStatus", "use-http-delete");
+        return true;
+    }
+
+    if (strcmp(key, "activateProfile") == 0) {
+        (void)value;
+        webServerSendField("profileActionStatus", "use-http-activate");
         return true;
     }
 
     if (strcmp(key, "uploadProfile") == 0) {
-        ESP_LOGI(TAG, "TODO action uploadProfile profile=%s", value);
+        ESP_LOGI(TAG, "Deprecated WS uploadProfile ignored: %s", value);
+        webServerSendField("profileActionStatus", "use-http-upload");
         return true;
     }
 
     if (strcmp(key, "profileUploadName") == 0) {
-        ESP_LOGI(TAG, "TODO action profileUploadName = %s", value);
+        ESP_LOGI(TAG, "Deprecated WS profileUploadName ignored: %s", value);
         return true;
     }
 
     if (strcmp(key, "profileUploadData") == 0) {
-        ESP_LOGI(TAG, "TODO action profileUploadData length=%u", static_cast<unsigned>(strlen(value)));
+        ESP_LOGI(TAG, "Deprecated WS profileUploadData ignored, length=%u", static_cast<unsigned>(strlen(value)));
         return true;
     }
 
@@ -611,7 +913,7 @@ webServerApplyAction(const char* key, const char* value) {
     }
 
     if (strcmp(key, "profileNumber") == 0) {
-        ESP_LOGI(TAG, "TODO action profileNumber = %s", value);
+        ESP_LOGI(TAG, "Profile radio selection = %s", value);
         return true;
     }
 
@@ -754,6 +1056,164 @@ webServerHandlerGetPage(httpd_req_t* req) {
         httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     }
     return httpd_resp_send(req, reinterpret_cast<const char*>(page->_data), page->_length);
+}
+
+static esp_err_t
+webServerHandlerProfileList(httpd_req_t* req) {
+    char response[1400] = {};
+    if (!webServerBuildProfileListJson(response, sizeof(response))) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to build profile list");
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, response);
+}
+
+static esp_err_t
+webServerHandlerProfileActivate(httpd_req_t* req) {
+    char name[profileMaxNameLength + 1] = {};
+    if (!webServerGetProfileNameFromQuery(req, name, sizeof(name))) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid profile name");
+    }
+    if (!webServerWriteActiveProfile(name)) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to activate profile");
+    }
+
+    httpd_resp_set_type(req, text_plain);
+    return httpd_resp_sendstr(req, "Profile activated");
+}
+
+static esp_err_t
+webServerHandlerProfileDelete(httpd_req_t* req) {
+    char name[profileMaxNameLength + 1] = {};
+    char path[96] = {};
+    char activeProfile[profileMaxNameLength + 1] = {};
+
+    if (!webServerGetProfileNameFromQuery(req, name, sizeof(name)) || !webServerBuildProfilePath(name, path, sizeof(path))) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid profile name");
+    }
+    if (!online_devices.littlefs || !LittleFS.exists(path)) {
+        return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Profile not found");
+    }
+    if (!LittleFS.remove(path)) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to delete profile");
+    }
+    if (webServerReadActiveProfile(activeProfile, sizeof(activeProfile)) && (strcmp(activeProfile, name) == 0)) {
+        LittleFS.remove(PROFILE_ACTIVE_FILE);
+    }
+
+    httpd_resp_set_type(req, text_plain);
+    return httpd_resp_sendstr(req, "Profile deleted");
+}
+
+static esp_err_t
+webServerHandlerProfileDownload(httpd_req_t* req) {
+    char name[profileMaxNameLength + 1] = {};
+    char path[96] = {};
+    char buffer[profileUploadBufferLength] = {};
+
+    if (!online_devices.littlefs) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "LittleFS is not mounted");
+    }
+    if (!webServerGetProfileNameFromQuery(req, name, sizeof(name)) || !webServerBuildProfilePath(name, path, sizeof(path))) {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid profile name");
+    }
+
+    File file = LittleFS.open(path, "r");
+    if (!file || file.isDirectory()) {
+        return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Profile not found");
+    }
+
+    char disposition[128] = {};
+    snprintf(disposition, sizeof(disposition), "attachment; filename=\"%s\"", name);
+    httpd_resp_set_type(req, text_plain);
+    httpd_resp_set_hdr(req, "Content-Disposition", disposition);
+
+    while (file.available()) {
+        const size_t bytes = file.readBytes(buffer, sizeof(buffer));
+        if (httpd_resp_send_chunk(req, buffer, bytes) != ESP_OK) {
+            file.close();
+            return ESP_FAIL;
+        }
+    }
+
+    file.close();
+    return httpd_resp_send_chunk(req, nullptr, 0);
+}
+
+static esp_err_t
+webServerHandlerProfileUpload(httpd_req_t* req) {
+    char name[profileMaxNameLength + 1] = {};
+    char path[96] = {};
+    uint8_t* buffer = nullptr;
+    size_t received = 0;
+    const char* errorMessage = nullptr;
+
+    do {
+        if (!online_devices.littlefs || !webServerEnsureProfileDir()) {
+            errorMessage = "LittleFS is not mounted";
+            break;
+        }
+        if (!webServerGetProfileNameFromQuery(req, name, sizeof(name))
+            || !webServerBuildProfilePath(name, path, sizeof(path))) {
+            errorMessage = "Invalid profile name";
+            break;
+        }
+        if ((req->content_len == 0) || (req->content_len > profileMaxFileSize)) {
+            errorMessage = "Profile file is empty or too large";
+            break;
+        }
+
+        buffer = static_cast<uint8_t*>(rtkMalloc(profileUploadBufferLength, "Profile upload buffer"));
+        if (buffer == nullptr) {
+            errorMessage = "Failed to allocate upload buffer";
+            break;
+        }
+
+        File file = LittleFS.open(path, "w");
+        if (!file) {
+            errorMessage = "Failed to open profile for writing";
+            break;
+        }
+
+        while (received < req->content_len) {
+            const size_t remaining = req->content_len - received;
+            const size_t requestBytes = (remaining > profileUploadBufferLength) ? profileUploadBufferLength : remaining;
+            const int bytesRead = httpd_req_recv(req, reinterpret_cast<char*>(buffer), requestBytes);
+            if (bytesRead <= 0) {
+                errorMessage = "Failed to receive profile data";
+                break;
+            }
+
+            received += bytesRead;
+            const size_t written = file.write(buffer, bytesRead);
+            if (written != static_cast<size_t>(bytesRead)) {
+                errorMessage = "Failed to write profile data";
+                break;
+            }
+        }
+
+        file.close();
+        if (errorMessage != nullptr) {
+            LittleFS.remove(path);
+            break;
+        }
+
+        httpd_resp_set_type(req, text_plain);
+        httpd_resp_sendstr(req, "Profile uploaded");
+        webServerSendField("profileActionStatus", "uploaded");
+        webServerSendProfileList();
+        rtkFree(buffer, "Profile upload buffer");
+        return ESP_OK;
+    } while (0);
+
+    if (buffer != nullptr) {
+        rtkFree(buffer, "Profile upload buffer");
+    }
+
+    ESP_LOGE(TAG, "Profile upload failed: %s", errorMessage ? errorMessage : "unknown error");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, errorMessage ? errorMessage : "Profile upload failed");
+    return ESP_FAIL;
 }
 
 static esp_err_t

@@ -259,6 +259,55 @@ input:disabled, select:disabled {
   gap: 2px 8px;
 }
 
+.profile-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+.profile-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.profile-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.profile-file.active {
+  border-color: var(--success);
+  background: var(--success-dim);
+}
+.profile-file-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.profile-file-meta strong { word-break: break-all; }
+.profile-file-meta span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.profile-file-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 /* Hints */
 .hint      { font-size: 12px; color: var(--text-muted); margin-top: 2px; min-height: 16px; }
 .hint-err  { color: var(--danger); }

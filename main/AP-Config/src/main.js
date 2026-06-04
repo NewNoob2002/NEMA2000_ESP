@@ -22,6 +22,8 @@ let ws = null;
 let initialSettings = {};
 let reconnectTimer = null;
 let reconnectDelay = 2000;
+let profileFiles = [];
+let activeProfileFile = "";
 
 function wsConnect() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
@@ -32,6 +34,7 @@ function wsConnect() {
       $("connDot").className = "dot live";
       if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; reconnectDelay = 2000; }
       ws.send("clientReady,true,");
+      refreshProfiles();
     };
     ws.onclose = () => {
       TXT("wsStatus", "Reconnecting…");
@@ -82,12 +85,27 @@ function handleMessage(raw) {
       case "platformPrefix":       TXT("platformPrefix", val); break;
       case "hostMessage":          TXT("hostMessage", val); break;
 
+      /* ── Profile files ── */
+      case "profileListStatus":     TXT("profileMsg", val === "ok" ? "Profile list refreshed." : val); break;
+      case "profileCurrent":        TXT("profileCurrent", val || "—"); break;
+      case "profileActiveFile":     activeProfileFile = val; break;
+      case "profileFileCount":      renderProfileFiles(parseInt(val) || 0); break;
+      case "profileActionStatus":   TXT("profileMsg", val); break;
+
       /* ── ACK from server ── */
       case "ack": break;
 
       /* ── Profile names ── */
       default:
-        if (key.startsWith("profile") && key.endsWith("Name")) {
+        if (key.match(/^profileFile\d+Name$/)) {
+          const idx = parseInt(key.replace("profileFile", "").replace("Name", ""));
+          profileFiles[idx] = profileFiles[idx] || {};
+          profileFiles[idx].name = val;
+        } else if (key.match(/^profileFile\d+Size$/)) {
+          const idx = parseInt(key.replace("profileFile", "").replace("Size", ""));
+          profileFiles[idx] = profileFiles[idx] || {};
+          profileFiles[idx].size = parseInt(val) || 0;
+        } else if (key.startsWith("profile") && key.endsWith("Name")) {
           TXT(key, val);
         } else if (key === "profileNumber") {
           const radio = document.querySelector(`input[name="profileRadio"][value="${val}"]`);
@@ -203,6 +221,95 @@ function buildProfileRadios() {
   }
 }
 
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function profileUrl(path, name) {
+  return `${path}?name=${encodeURIComponent(name)}`;
+}
+
+function renderProfileFiles(count) {
+  const list = $("profileFileList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  const files = profileFiles.slice(0, count).filter((file) => file && file.name);
+  if (!files.length) {
+    const empty = document.createElement("p");
+    empty.className = "hint";
+    empty.textContent = "No profile files found.";
+    list.appendChild(empty);
+    profileFiles = [];
+    return;
+  }
+
+  files.forEach((file) => {
+    const row = document.createElement("div");
+    row.className = "profile-file";
+    if (file.name === activeProfileFile) row.classList.add("active");
+
+    const meta = document.createElement("div");
+    meta.className = "profile-file-meta";
+    const name = document.createElement("strong");
+    name.textContent = file.name;
+    const size = document.createElement("span");
+    size.textContent = `${formatBytes(file.size)}${file.name === activeProfileFile ? " · next boot" : ""}`;
+    meta.appendChild(name);
+    meta.appendChild(size);
+
+    const actions = document.createElement("div");
+    actions.className = "profile-file-actions";
+
+    const download = document.createElement("button");
+    download.type = "button";
+    download.className = "btn btn-ghost";
+    download.textContent = "Download";
+    download.onclick = () => { window.location.href = profileUrl("/profile/download", file.name); };
+
+    const activate = document.createElement("button");
+    activate.type = "button";
+    activate.className = "btn btn-accent";
+    activate.textContent = "Activate";
+    activate.disabled = file.name === activeProfileFile;
+    activate.onclick = () => activateProfile(file.name);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn-ghost btn-danger-text";
+    remove.textContent = "Delete";
+    remove.onclick = () => deleteProfile(file.name);
+
+    actions.appendChild(download);
+    actions.appendChild(activate);
+    actions.appendChild(remove);
+    row.appendChild(meta);
+    row.appendChild(actions);
+    list.appendChild(row);
+  });
+
+  profileFiles = [];
+}
+
+function applyProfileList(data) {
+  TXT("profileMsg", data.status === "ok" ? "Profile list refreshed." : data.status);
+  TXT("profileCurrent", data.current || "—");
+  activeProfileFile = data.active || "";
+  profileFiles = Array.isArray(data.files) ? data.files : [];
+  renderProfileFiles(profileFiles.length);
+}
+
+function requestProfileAction(path, name, doneMessage) {
+  return fetch(profileUrl(path, name), { method: "POST" })
+    .then((response) => {
+      if (!response.ok) return response.text().then((text) => { throw new Error(text || "Request failed"); });
+      TXT("profileMsg", doneMessage);
+      return refreshProfiles();
+    })
+    .catch((error) => TXT("profileMsg", error.message));
+}
+
 /* ── Panel collapse ───────────────────────── */
 function setupPanels() {
   document.querySelectorAll(".panel-hdr").forEach((btn) => {
@@ -286,29 +393,49 @@ function btnResetProfile() {
   TXT("profileMsg", "Profile reset requested.");
 }
 
-function deleteProfile() {
-  const active = document.querySelector('input[name="profileRadio"]:checked');
-  const num = active ? active.value : "0";
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(`deleteProfile,${num},`);
+function refreshProfiles() {
+  TXT("profileMsg", "Refreshing profile files…");
+  return fetch("/profile/list")
+    .then((response) => {
+      if (!response.ok) return response.text().then((text) => { throw new Error(text || "Profile list failed"); });
+      return response.json();
+    })
+    .then(applyProfileList)
+    .catch((error) => TXT("profileMsg", error.message));
+}
+
+function deleteProfile(name = activeProfileFile) {
+  if (!name) {
+    TXT("profileMsg", "Select a profile file first.");
+    return;
+  }
   TXT("profileMsg", "Profile delete requested.");
+  requestProfileAction("/profile/delete", name, "Profile deleted.");
+}
+
+function activateProfile(name) {
+  if (!name) return;
+  TXT("profileMsg", "Profile activation requested.");
+  requestProfileAction("/profile/activate", name, "Profile activated for next boot.");
 }
 
 function profileUploadWait() {
   const input = $("submitProfileFile");
   if (!input?.files?.length) return;
   const file = input.files[0];
-  const reader = new FileReader();
-  reader.onload = () => {
-    const data = encodeURIComponent(reader.result);
-    const active = document.querySelector('input[name="profileRadio"]:checked');
-    const num = active ? active.value : "0";
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(`uploadProfile,${num},profileUploadName,${encodeURIComponent(file.name)},profileUploadData,${data},`);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", profileUrl("/profile/upload", file.name));
+  xhr.onload = () => {
+    if (xhr.status >= 200 && xhr.status < 300) {
+      TXT("profileMsg", "Profile uploaded.");
+      refreshProfiles();
+    } else {
+      TXT("profileMsg", xhr.responseText || "Profile upload failed.");
     }
-    TXT("profileMsg", "Profile upload requested.");
   };
-  reader.onerror = () => TXT("profileMsg", "Profile upload read error.");
-  reader.readAsText(file);
+  xhr.onerror = () => TXT("profileMsg", "Profile upload network error.");
+  xhr.send(file);
+  TXT("profileMsg", "Uploading profile…");
 }
 
 function resetToFactoryDefaults() {
