@@ -19,6 +19,9 @@
             .method = httpMethod,                                                                                      \
             .handler = routine,                                                                                        \
             .user_ctx = (void*)index,                                                                                  \
+            .is_websocket = false,                                                                                     \
+            .handle_ws_control_frames = false,                                                                         \
+            .supported_subprotocol = NULL,                                                                             \
         },                                                                                                             \
         &type,                                                                                                         \
         nullptr,                                                                                                       \
@@ -32,6 +35,9 @@
             .method = HTTP_GET,                                                                                        \
             .handler = webServerHandlerGetPage,                                                                        \
             .user_ctx = (void*)index,                                                                                  \
+            .is_websocket = false,                                                                                     \
+            .handle_ws_control_frames = false,                                                                         \
+            .supported_subprotocol = NULL,                                                                             \
         },                                                                                                             \
         &type,                                                                                                         \
         (void*)data,                                                                                                   \

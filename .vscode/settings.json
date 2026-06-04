@@ -3,5 +3,8 @@
     "clangd.arguments": [
         "--compile-commands-dir=${workspaceFolder}/build",
         "--query-driver=/home/gtc/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-*"
-    ]
+    ],
+    "idf.currentSetup": "/home/gtc/esp/esp-idf",
+    "idf.flashType": "UART",
+    "idf.port": "/dev/ttyACM0"
 }

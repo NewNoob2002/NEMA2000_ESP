@@ -6,6 +6,9 @@
 #include <string.h>
 #include "HAL.h"
 #include "Support.h"
+#include "mcu_settings.h"
+
+#define MOUNTPOINT "/littlefs"
 
 /**
 * @brief Print the partition table of the ESP32
@@ -66,20 +69,16 @@ beginFileSystem() {
             }
         }
     }
-    // if (online_devices.littlefs == false) {
-    //     if (LittleFS.begin(true, MOUNTPOINT, 5, "littlefs") == false) // Format LittleFS if begin fails
-    //     {
-    //         log_e("Error: LittleFS not online");
-    //     } else {
-    //         log_i("LittleFS Started");
-    //         online_devices.littlefs = true;
-
-    //         if (settings.debugSettings) {
-    //             log_i("LittleFS total bytes: %d KB", LittleFS.totalBytes() >> 10);
-    //             log_i("LittleFS used bytes: %d KB", LittleFS.usedBytes() >> 10);
-    //         }
-    //     }
-    // }
+    if (online_devices.littlefs == true) {
+        if (LittleFS.begin(true, MOUNTPOINT, 5, "littlefs") == false) // Format LittleFS if begin fails
+        {
+            systemPrintln("Error: LittleFS not online");
+        } else {
+            systemPrintln("LittleFS Started");
+            systemPrintf("LittleFS used  / total bytes: %d KB / %d KB\n", LittleFS.usedBytes() >> 10,
+                         LittleFS.totalBytes() >> 10);
+        }
+    }
 }
 
 namespace HAL {
@@ -87,7 +86,11 @@ void
 FileSystem_Init() {
     if (!findLittlefsPartition()) {
         printPartitionTable();
+        online_devices.littlefs = false;
         systemPrintln("No LittleFS partition found");
+    } else {
+        systemPrintln("LittleFS partition found");
+        online_devices.littlefs = true;
     }
 
     beginFileSystem();

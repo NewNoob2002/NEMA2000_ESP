@@ -325,7 +325,7 @@ void
 requestChangeState(SystemState_t requestedState) {
     newSystemStateRequested = true;
     requestedSystemState = requestedState;
-    log_d("Requested System State: %d", requestedSystemState);
+    systemPrintf("Requested System State: %d\n", requestedSystemState);
 }
 
 // Print the current state
