@@ -3,4 +3,4 @@ idf_component_register(SRCS
     "DataCenter.cpp"
     "ringBuffer/ringBuffer.cpp"
     INCLUDE_DIRS "."
-    REQUIRES esp_timer freertos)
+    REQUIRES esp_timer freertos log)

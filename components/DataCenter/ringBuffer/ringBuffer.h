@@ -25,13 +25,15 @@
 
 #ifdef __cplusplus
 
+#ifndef RB_USE_LOG
 #define RB_USE_LOG 0
+#endif
 
 #if RB_USE_LOG
-#include <cstdio>
-#define RB_LOG_INFO(format, ...)  printf("[RB][I] " format "\n", ##__VA_ARGS__)
-#define RB_LOG_WARN(format, ...)  printf("[RB][W] " format "\n", ##__VA_ARGS__)
-#define RB_LOG_ERROR(format, ...) printf("[RB][E] " format "\n", ##__VA_ARGS__)
+#include "DataCenterLog.h"
+#define RB_LOG_INFO(format, ...)  DataCenterLog(DATACENTER_LOG_LEVEL_INFO, "RingBuffer", format, ##__VA_ARGS__)
+#define RB_LOG_WARN(format, ...)  DataCenterLog(DATACENTER_LOG_LEVEL_WARN, "RingBuffer", format, ##__VA_ARGS__)
+#define RB_LOG_ERROR(format, ...) DataCenterLog(DATACENTER_LOG_LEVEL_ERROR, "RingBuffer", format, ##__VA_ARGS__)
 #else
 #define RB_LOG_INFO(...)
 #define RB_LOG_WARN(...)

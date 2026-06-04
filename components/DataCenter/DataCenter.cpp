@@ -22,10 +22,44 @@
  */
 #include "DataCenter.h"
 #include <algorithm>
+#include <cstdarg>
 #include <string.h>
+#include "esp_log.h"
 
 /* Configure whether to automatically clear all accounts */
 #define DC_USE_AUTO_CLOSE 0
+
+static void
+DataCenterDefaultLogCallback(DataCenterLogLevel_t level, const char* tag, const char* message) {
+    switch (level) {
+        case DATACENTER_LOG_LEVEL_INFO: ESP_LOGI(tag, "%s", message); break;
+        case DATACENTER_LOG_LEVEL_WARN: ESP_LOGW(tag, "%s", message); break;
+        case DATACENTER_LOG_LEVEL_ERROR: ESP_LOGE(tag, "%s", message); break;
+        default: ESP_LOGW(tag, "%s", message); break;
+    }
+}
+
+static DataCenterLogCallback_t dataCenterLogCallback = DataCenterDefaultLogCallback;
+
+void
+DataCenterSetLogCallback(DataCenterLogCallback_t callback) {
+    dataCenterLogCallback = callback ? callback : DataCenterDefaultLogCallback;
+}
+
+void
+DataCenterLog(DataCenterLogLevel_t level, const char* tag, const char* format, ...) {
+    if ((dataCenterLogCallback == nullptr) || (tag == nullptr) || (format == nullptr)) {
+        return;
+    }
+
+    char message[192] = {};
+    va_list args;
+    va_start(args, format);
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+
+    dataCenterLogCallback(level, tag, message);
+}
 
 /**
   * @brief  Data center constructor

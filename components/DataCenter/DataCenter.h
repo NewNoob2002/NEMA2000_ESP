@@ -25,13 +25,14 @@
 
 #include "Account.h"
 
+#ifndef DC_USE_LOG
 #define DC_USE_LOG 1
+#endif
 
 #if DC_USE_LOG
-#include <cstdio>
-#define DC_LOG_INFO(format, ...)  printf("[DATACENTER][I] " format "\n", ##__VA_ARGS__)
-#define DC_LOG_WARN(format, ...)  printf("[DATACENTER][W] " format "\n", ##__VA_ARGS__)
-#define DC_LOG_ERROR(format, ...) printf("[DATACENTER][E] " format "\n", ##__VA_ARGS__)
+#define DC_LOG_INFO(format, ...)  DataCenterLog(DATACENTER_LOG_LEVEL_INFO, "DataCenter", format, ##__VA_ARGS__)
+#define DC_LOG_WARN(format, ...)  DataCenterLog(DATACENTER_LOG_LEVEL_WARN, "DataCenter", format, ##__VA_ARGS__)
+#define DC_LOG_ERROR(format, ...) DataCenterLog(DATACENTER_LOG_LEVEL_ERROR, "DataCenter", format, ##__VA_ARGS__)
 #else
 #define DC_LOG_INFO(...)
 #define DC_LOG_WARN(...)

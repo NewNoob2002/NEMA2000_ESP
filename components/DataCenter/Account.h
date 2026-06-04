@@ -26,23 +26,23 @@
 #include <stdint.h>
 #include <string.h>
 #include <vector>
+#include "DataCenterLog.h"
 #include "esp_timer.h"
 #include "ringBuffer/ringBuffer.h"
 
+#ifndef ACCOUNT_USE_LOG
 #define ACCOUNT_USE_LOG 0
+#endif
 
 #if ACCOUNT_USE_LOG
-#include <cstdio>
-#define ACCOUNT_LOG_INFO(format, ...)  printf("[ACCOUNT][I]" format "\n", ##__VA_ARGS__)
-#define ACCOUNT_LOG_WARN(format, ...)  printf("[ACCOUNT][W]" format "\n", ##__VA_ARGS__)
-#define ACCOUNT_LOG_ERROR(format, ...) printf("[ACCOUNT][E]" format "\n", ##__VA_ARGS__)
+#define ACCOUNT_LOG_INFO(format, ...)  DataCenterLog(DATACENTER_LOG_LEVEL_INFO, "Account", format, ##__VA_ARGS__)
+#define ACCOUNT_LOG_WARN(format, ...)  DataCenterLog(DATACENTER_LOG_LEVEL_WARN, "Account", format, ##__VA_ARGS__)
+#define ACCOUNT_LOG_ERROR(format, ...) DataCenterLog(DATACENTER_LOG_LEVEL_ERROR, "Account", format, ##__VA_ARGS__)
 #else
 #define ACCOUNT_LOG_INFO(...)
 #define ACCOUNT_LOG_WARN(...)
 #define ACCOUNT_LOG_ERROR(...)
 #endif
-
-typedef void (*AccountLogCallback_t)(const char* format, ...);
 
 class DataCenter;
 
@@ -157,7 +157,6 @@ class Account {
     } priv;
 
   private:
-    AccountLogCallback_t _logCallback;
     static void TimerCallbackHandler(void* timer_args);
 };
 
