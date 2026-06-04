@@ -42,6 +42,8 @@
 #define ACCOUNT_LOG_ERROR(...)
 #endif
 
+typedef void (*AccountLogCallback_t)(const char* format, ...);
+
 class DataCenter;
 
 class Account {
@@ -155,6 +157,7 @@ class Account {
     } priv;
 
   private:
+    AccountLogCallback_t _logCallback;
     static void TimerCallbackHandler(void* timer_args);
 };
 

@@ -202,6 +202,11 @@ wifiSoftApRunning() {
     return online_devices.wifi.wifiSoftApRunning;
 }
 
+uint8_t
+wifiSoftApClientCount() {
+    return online_devices.wifi.wifiSoftApRunning ? WiFi.softAPgetStationNum() : 0;
+}
+
 bool
 wifiStationOn(const char* fileName, uint32_t lineNumber) {
     if (settings.debugWifiState) {
@@ -317,8 +322,10 @@ RTK_WIFI::eventHandler(arduino_event_id_t event, arduino_event_info_t info) {
     }
 
     switch (event) {
-        case ARDUINO_EVENT_WIFI_AP_STACONNECTED: online_devices.wifi.wifiSoftApConnected = true; break;
-        case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED: online_devices.wifi.wifiSoftApConnected = false; break;
+        case ARDUINO_EVENT_WIFI_AP_STACONNECTED:
+        case ARDUINO_EVENT_WIFI_AP_STADISCONNECTED:
+            online_devices.wifi.wifiSoftApConnected = wifiSoftApClientCount() > 0;
+            break;
         case ARDUINO_EVENT_WIFI_STA_GOT_IP:
             _staIpAddress = WiFi.localIP();
             online_devices.wifi.wifiStationOnline = true;

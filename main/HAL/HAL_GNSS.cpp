@@ -1,11 +1,8 @@
-#include "DataProc/DataProc.h"
+#include "DataProc/DataProc_Def.h"
 #include "GNSS.h"
 #include "HAL.h"
-#include "HAL_Config.h"
 #include "HardwareSerial.h"
-#include "Support.h"
 #include "Unicore_UM980.h"
-#include "mcu_settings.h"
 
 void
 userGnssNmeaCallback(const char* sentence, uint16_t length, void* userdata) {

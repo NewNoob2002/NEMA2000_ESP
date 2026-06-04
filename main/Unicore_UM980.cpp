@@ -130,6 +130,7 @@ UnicoreUM980::configure() {
         if (configureOnceTime() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
             return true;
         }
+        delay(1000);
         log(UnicoreLogLevel::Warn, UNICORE_LOG_CHILD_CLASS, "Configuration attempt %d failed, retrying...", x + 1);
 
         //To Do: reset module

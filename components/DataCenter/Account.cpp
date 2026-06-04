@@ -21,7 +21,6 @@
  * SOFTWARE.
  */
 #include "Account.h"
-#include <inttypes.h>
 #include "DataCenter.h"
 
 /**

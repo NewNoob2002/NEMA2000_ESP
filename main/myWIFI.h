@@ -26,6 +26,7 @@ IPAddress wifiSoftApGetBroadcastIpAddress();
 const char* wifiSoftApGetSsid();
 bool wifiSoftApOnline();
 bool wifiSoftApRunning();
+uint8_t wifiSoftApClientCount();
 
 bool wifiStationOn(const char* fileName, uint32_t lineNumber);
 bool wifiStationOff(const char* fileName, uint32_t lineNumber);

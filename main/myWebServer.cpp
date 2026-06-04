@@ -32,6 +32,7 @@ static const size_t firmwareBufferLength = 16 * 1024;
 static const size_t profileUploadBufferLength = 1024;
 static const size_t profileMaxFileSize = 32 * 1024;
 static const size_t profileMaxNameLength = 63;
+static const uint32_t webServerStartRetryMs = 1000;
 
 static const char* const TAG = "WebServer";
 static const char* const image_png = "image/png";
@@ -66,6 +67,7 @@ static const char* const text_plain = "text/plain";
 static httpd_handle_t webServerHandle;
 static int webServerClientSocket = -1;
 static WebServerState webServerState = WEBSERVER_STATE_OFF;
+static uint32_t webServerLastStartAttemptMs = 0;
 static uint32_t webServerLastStatusPushMs = 0;
 static bool webServerCaptivePortalComplete = false;
 
@@ -1569,6 +1571,12 @@ webServerRegisterPageHandler(const httpd_uri_t* page) {
 
 static bool
 webServerAssignResources() {
+    const uint32_t now = millis();
+    if ((webServerLastStartAttemptMs != 0U) && ((now - webServerLastStartAttemptMs) < webServerStartRetryMs)) {
+        return false;
+    }
+    webServerLastStartAttemptMs = now;
+
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = settings.httpPort ? settings.httpPort : 80;
     config.stack_size = webServerStackSize;
@@ -1603,6 +1611,7 @@ webServerAssignResources() {
     }
 
     webServerState = WEBSERVER_STATE_RUNNING;
+    webServerLastStartAttemptMs = 0;
     ESP_LOGI(TAG, "Started");
     return true;
 }
@@ -1630,6 +1639,7 @@ webServerStop() {
     }
     webServerClientSocket = -1;
     webServerCaptivePortalComplete = false;
+    webServerLastStartAttemptMs = 0;
     webServerState = WEBSERVER_STATE_OFF;
     ESP_LOGI(TAG, "Stopped");
 }
@@ -1645,7 +1655,7 @@ webServerUpdate() {
 
     if ((webServerState == WEBSERVER_STATE_WAIT_FOR_NETWORK) || (webServerState == WEBSERVER_STATE_NETWORK_CONNECTED)) {
         webServerState = WEBSERVER_STATE_NETWORK_CONNECTED;
-        webServerAssignResources();
+        (void)webServerAssignResources();
     }
 
     webServerSendLiveStatus();
@@ -1658,7 +1668,7 @@ webServerIsRunning() {
 
 bool
 webServerIsConnected() {
-    return webServerIsRunning();
+    return webServerIsRunning() && (wifiSoftApClientCount() > 0);
 }
 
 void
