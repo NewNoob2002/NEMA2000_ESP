@@ -1,6 +1,5 @@
 #include "Bluetooth.h"
 #include "HAL.h"
-#include "HAL_Config.h"
 
 #include <cmath>
 #include <cstdint>
@@ -11,8 +10,6 @@
 #include "Support.h"
 #include "Unicore_UM980.h"
 #include "esp_app_desc.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "mcu_settings.h"
 #include "semp_crc32.h"
 
