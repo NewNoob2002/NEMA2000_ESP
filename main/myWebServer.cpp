@@ -33,6 +33,7 @@ static const size_t profileUploadBufferLength = 1024;
 static const size_t profileMaxFileSize = 32 * 1024;
 static const size_t profileMaxNameLength = 63;
 static const uint32_t webServerStartRetryMs = 1000;
+static const uint32_t webServerConfigSessionGraceMs = 5000;
 
 static const char* const TAG = "WebServer";
 static const char* const image_png = "image/png";
@@ -69,6 +70,7 @@ static int webServerClientSocket = -1;
 static WebServerState webServerState = WEBSERVER_STATE_OFF;
 static uint32_t webServerLastStartAttemptMs = 0;
 static uint32_t webServerLastStatusPushMs = 0;
+static uint32_t webServerLastWsActivityMs = 0;
 static bool webServerCaptivePortalComplete = false;
 
 static const char* const webServerStateNames[] = {
@@ -1466,14 +1468,23 @@ static esp_err_t
 webServerHandlerWebSockets(httpd_req_t* req) {
     if (req->method == HTTP_GET) {
         webServerClientSocket = httpd_req_to_sockfd(req);
+        webServerLastWsActivityMs = millis();
         ESP_LOGI(TAG, "WS connected, socket=%d", webServerClientSocket);
         return ESP_OK;
     }
+
+    webServerLastWsActivityMs = millis();
 
     httpd_ws_frame_t packet = {};
     const esp_err_t status = httpd_ws_recv_frame(req, &packet, 0);
     if (status != ESP_OK) {
         return status;
+    }
+
+    if (packet.type == HTTPD_WS_TYPE_CLOSE) {
+        ESP_LOGI(TAG, "WS closed, socket=%d", webServerClientSocket);
+        webServerClientSocket = -1;
+        return ESP_OK;
     }
 
     if (packet.len == 0) {
@@ -1639,6 +1650,7 @@ webServerStop() {
     }
     webServerClientSocket = -1;
     webServerCaptivePortalComplete = false;
+    webServerLastWsActivityMs = 0;
     webServerLastStartAttemptMs = 0;
     webServerState = WEBSERVER_STATE_OFF;
     ESP_LOGI(TAG, "Stopped");
@@ -1671,6 +1683,23 @@ webServerIsConnected() {
     return webServerIsRunning() && (wifiSoftApClientCount() > 0);
 }
 
+bool
+webServerHasActiveConfigSession() {
+    if (!webServerIsRunning()) {
+        return false;
+    }
+
+    if (webServerClientSocket >= 0) {
+        return true;
+    }
+
+    if (webServerLastWsActivityMs == 0U) {
+        return false;
+    }
+
+    return (millis() - webServerLastWsActivityMs) < webServerConfigSessionGraceMs;
+}
+
 void
 webServerSendString(const char* stringToSend) {
     if ((stringToSend == nullptr) || (webServerHandle == nullptr) || (webServerClientSocket < 0)) {
@@ -1687,7 +1716,10 @@ webServerSendString(const char* stringToSend) {
         ESP_LOGW(TAG, "WS TX failed on socket %d: %s", webServerClientSocket, esp_err_to_name(status));
         webServerClientSocket = -1;
     } else if (settings.debugWebServer) {
+        webServerLastWsActivityMs = millis();
         ESP_LOGI(TAG, "WS TX: %s", stringToSend);
+    } else {
+        webServerLastWsActivityMs = millis();
     }
 }
 

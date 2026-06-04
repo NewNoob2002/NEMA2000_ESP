@@ -646,7 +646,7 @@ btReadTask(void* e) {
     }
     // Run task until a request is raised
     while (!task.bluetoothReadTaskStopRequest) {
-        if (bluetoothGetState() == BT_CONNECTED) {
+        if ((bluetoothGetState() == BT_CONNECTED) && bluetoothDataInterfaceIsEnabled()) {
             while (bluetoothRxDataAvailable() > 0) {
                 rxBytes = bluetoothRead(bluetoothRxBuffer, sizeof(bluetoothRxBuffer));
                 if (rxBytes <= 0) {

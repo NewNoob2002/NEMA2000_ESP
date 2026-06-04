@@ -12,11 +12,11 @@
 #include "NMEA2000.h"
 
 #ifndef ESP32_CAN_TX_PIN
-#define ESP32_CAN_TX_PIN GPIO_NUM_21
+#define ESP32_CAN_TX_PIN GPIO_NUM_22
 #endif
 
 #ifndef ESP32_CAN_RX_PIN
-#define ESP32_CAN_RX_PIN GPIO_NUM_22
+#define ESP32_CAN_RX_PIN GPIO_NUM_21
 #endif
 
 typedef enum {

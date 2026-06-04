@@ -7,6 +7,7 @@
 
 static BluetoothRadioType_e bluetoothRadioType = BLUETOOTH_RADIO_SPP;
 static volatile BTState_e bluetoothState = BT_OFF;
+static volatile bool bluetoothDataInterfaceEnabled = true;
 static bool bluetoothEnded = false;
 
 BTSerialInterface* bluetoothSerialSpp = nullptr;
@@ -24,8 +25,22 @@ bluetoothGetState() {
     return bluetoothState;
 }
 
+void
+bluetoothSetDataInterfaceEnabled(bool enabled) {
+    bluetoothDataInterfaceEnabled = enabled;
+}
+
+bool
+bluetoothDataInterfaceIsEnabled() {
+    return bluetoothDataInterfaceEnabled;
+}
+
 int
 bluetoothRead(uint8_t* buffer, int length) {
+    if (!bluetoothDataInterfaceEnabled) {
+        return 0;
+    }
+
     if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
         int bytesRead = 0;
 
@@ -51,6 +66,10 @@ bluetoothRead(uint8_t* buffer, int length) {
 // Determine if data is available
 int
 bluetoothRxDataAvailable() {
+    if (!bluetoothDataInterfaceEnabled) {
+        return 0;
+    }
+
     if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
         // Give incoming BLE the priority
         if (bluetoothSerialBle->available()) {
@@ -70,6 +89,10 @@ bluetoothRxDataAvailable() {
 // Write data to the Bluetooth device
 int
 bluetoothWrite(const uint8_t* buffer, int length) {
+    if (!bluetoothDataInterfaceEnabled) {
+        return 0;
+    }
+
     if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
         // Write to both interfaces
         int bleWrite = bluetoothSerialBle->write(buffer, length);
@@ -94,9 +117,18 @@ bluetoothWrite(const uint8_t* buffer, int length) {
     return 0;
 }
 
+int
+bluetoothWrite(uint8_t value) {
+    return bluetoothWrite(&value, 1);
+}
+
 // Flush Bluetooth device
 void
 bluetoothFlush() {
+    if (!bluetoothDataInterfaceEnabled) {
+        return;
+    }
+
     if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
         bluetoothSerialBle->flush();
         bluetoothSerialSpp->flush();

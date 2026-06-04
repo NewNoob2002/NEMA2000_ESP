@@ -16,6 +16,9 @@
 
 BTState_e bluetoothGetState();
 
+void bluetoothSetDataInterfaceEnabled(bool enabled);
+bool bluetoothDataInterfaceIsEnabled();
+
 int bluetoothRead(uint8_t* buffer, int length);
 
 // Determine if data is available

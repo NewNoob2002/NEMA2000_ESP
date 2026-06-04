@@ -74,6 +74,7 @@ void webServerStop();
 void webServerUpdate();
 bool webServerIsRunning();
 bool webServerIsConnected();
+bool webServerHasActiveConfigSession();
 void webServerSendString(const char* stringToSend);
 void webServerSendField(const char* fieldId, const char* value);
 void webServerSendFieldInt(const char* fieldId, int value);

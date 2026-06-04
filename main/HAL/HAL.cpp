@@ -96,6 +96,10 @@ HAL_Update(void* e) {
     wifiUpdate();
 
     webServerUpdate();
+
+#ifdef COMPILE_WEBSERVER
+    bluetoothSetDataInterfaceEnabled(!webServerHasActiveConfigSession());
+#endif
 }
 
 void
