@@ -40,6 +40,16 @@ static const char* const text_html = "text/html";
 static const char* const text_javascript = "text/javascript";
 static const char* const text_plain = "text/plain";
 
+#define CAPTIVE_ANDROID_GENERATE_204 "/generate_204"
+#define CAPTIVE_ANDROID_GEN_204 "/gen_204"
+#define CAPTIVE_APPLE_HOTSPOT_DETECT "/hotspot-detect.html"
+#define CAPTIVE_APPLE_SUCCESS "/library/test/success.html"
+#define CAPTIVE_CHROME_SUCCESS "/success.txt"
+#define CAPTIVE_PORTAL "/portal"
+#define CAPTIVE_PORTAL_COMPLETE "/portal/complete"
+#define CAPTIVE_REDIRECT "/redirect"
+#define CAPTIVE_WINDOWS_CONNECT_TEST "/connecttest.txt"
+#define CAPTIVE_WINDOWS_NCSI "/ncsi.txt"
 #define UPLOAD_FIRMWARE "/uploadFirmware"
 #define PROFILE_LIST "/profile/list"
 #define PROFILE_DOWNLOAD "/profile/download"
@@ -57,6 +67,7 @@ static httpd_handle_t webServerHandle;
 static int webServerClientSocket = -1;
 static WebServerState webServerState = WEBSERVER_STATE_OFF;
 static uint32_t webServerLastStatusPushMs = 0;
+static bool webServerCaptivePortalComplete = false;
 
 static const char* const webServerStateNames[] = {
     "WEBSERVER_STATE_OFF",
@@ -70,6 +81,9 @@ static const char* const webServerStateNames[] = {
 //----------------------------------------
 
 static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req);
+static esp_err_t webServerHandlerCaptivePortalComplete(httpd_req_t* req);
+static esp_err_t webServerHandlerCaptivePortalProbe(httpd_req_t* req);
+static esp_err_t webServerHandlerCaptivePortalWelcome(httpd_req_t* req);
 static esp_err_t webServerHandlerGetPage(httpd_req_t* req);
 static esp_err_t webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error);
 static esp_err_t webServerHandlerProfileActivate(httpd_req_t* req);
@@ -106,6 +120,18 @@ const GET_PAGE_HANDLER webServerPages[] = {
     PAGE_HANDLER(8, PROFILE_UPLOAD, HTTP_POST, text_plain, webServerHandlerProfileUpload),
     PAGE_HANDLER(9, PROFILE_ACTIVATE, HTTP_POST, text_plain, webServerHandlerProfileActivate),
     PAGE_HANDLER(10, PROFILE_DELETE, HTTP_POST, text_plain, webServerHandlerProfileDelete),
+
+    // OS captive-portal probes
+    PAGE_HANDLER(11, CAPTIVE_ANDROID_GENERATE_204, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
+    PAGE_HANDLER(12, CAPTIVE_ANDROID_GEN_204, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
+    PAGE_HANDLER(13, CAPTIVE_APPLE_HOTSPOT_DETECT, HTTP_GET, text_html, webServerHandlerCaptivePortalProbe),
+    PAGE_HANDLER(14, CAPTIVE_APPLE_SUCCESS, HTTP_GET, text_html, webServerHandlerCaptivePortalProbe),
+    PAGE_HANDLER(15, CAPTIVE_CHROME_SUCCESS, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
+    PAGE_HANDLER(16, CAPTIVE_PORTAL, HTTP_GET, text_html, webServerHandlerCaptivePortalWelcome),
+    PAGE_HANDLER(17, CAPTIVE_PORTAL_COMPLETE, HTTP_GET, text_plain, webServerHandlerCaptivePortalComplete),
+    PAGE_HANDLER(18, CAPTIVE_REDIRECT, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
+    PAGE_HANDLER(19, CAPTIVE_WINDOWS_CONNECT_TEST, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
+    PAGE_HANDLER(20, CAPTIVE_WINDOWS_NCSI, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
 };
 
 const int webServerTotalPages = sizeof(webServerPages) / sizeof(webServerPages[0]);
@@ -1059,6 +1085,85 @@ webServerHandlerGetPage(httpd_req_t* req) {
 }
 
 static esp_err_t
+webServerRedirect(httpd_req_t* req, const char* location) {
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_hdr(req, "Location", location);
+    return httpd_resp_send(req, nullptr, 0);
+}
+
+static esp_err_t
+webServerHandlerCaptivePortalWelcome(httpd_req_t* req) {
+    const char* displayName = productPropertiesTable[productType].displayName[0]
+                                  ? productPropertiesTable[productType].displayName
+                                  : productPropertiesTable[productType].name;
+
+    char page[1400] = {};
+    snprintf(page, sizeof(page),
+             "<!doctype html><html><head><meta charset=\"utf-8\">"
+             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+             "<title>%s Setup</title>"
+             "<style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6f8;color:#1a1d23}"
+             ".card{max-width:420px;margin:12vh auto;padding:28px;background:#fff;border:1px solid #e4e8ee;border-radius:16px;"
+             "box-shadow:0 8px 30px rgba(0,0,0,.08)}h1{margin:0 0 10px;font-size:24px}p{color:#5f6672;line-height:1.5}"
+             "a{display:block;text-align:center;margin-top:22px;padding:13px 18px;border-radius:10px;background:#1d4ed8;color:#fff;"
+             "font-weight:700;text-decoration:none}</style></head><body><main class=\"card\">"
+             "<h1>Welcome to %s</h1><p>This access point is used to configure the receiver. Click Go to finish portal "
+             "detection and open the main configuration page.</p><a href=\"%s\">Go</a></main></body></html>",
+             displayName, displayName, CAPTIVE_PORTAL_COMPLETE);
+
+    httpd_resp_set_type(req, text_html);
+    return httpd_resp_sendstr(req, page);
+}
+
+static esp_err_t
+webServerHandlerCaptivePortalComplete(httpd_req_t* req) {
+    webServerCaptivePortalComplete = true;
+    return webServerRedirect(req, "/");
+}
+
+static esp_err_t
+webServerHandlerCaptivePortalProbe(httpd_req_t* req) {
+    if (settings.debugWebServer) {
+        ESP_LOGI(TAG, "Captive probe %s", req->uri);
+    }
+
+    if (!webServerCaptivePortalComplete) {
+        return webServerRedirect(req, CAPTIVE_PORTAL);
+    }
+
+    if ((strcmp(req->uri, CAPTIVE_ANDROID_GENERATE_204) == 0) || (strcmp(req->uri, CAPTIVE_ANDROID_GEN_204) == 0)) {
+        httpd_resp_set_status(req, "204 No Content");
+        return httpd_resp_send(req, nullptr, 0);
+    }
+
+    if ((strcmp(req->uri, CAPTIVE_APPLE_HOTSPOT_DETECT) == 0) || (strcmp(req->uri, CAPTIVE_APPLE_SUCCESS) == 0)) {
+        httpd_resp_set_type(req, text_html);
+        return httpd_resp_sendstr(req, "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");
+    }
+
+    if (strcmp(req->uri, CAPTIVE_WINDOWS_CONNECT_TEST) == 0) {
+        httpd_resp_set_type(req, text_plain);
+        return httpd_resp_sendstr(req, "Microsoft Connect Test");
+    }
+
+    if (strcmp(req->uri, CAPTIVE_WINDOWS_NCSI) == 0) {
+        httpd_resp_set_type(req, text_plain);
+        return httpd_resp_sendstr(req, "Microsoft NCSI");
+    }
+
+    if (strcmp(req->uri, CAPTIVE_CHROME_SUCCESS) == 0) {
+        httpd_resp_set_type(req, text_plain);
+        return httpd_resp_sendstr(req, "success");
+    }
+
+    if (strcmp(req->uri, CAPTIVE_REDIRECT) == 0) {
+        return webServerRedirect(req, "/");
+    }
+
+    return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
+}
+
+static esp_err_t
 webServerHandlerProfileList(httpd_req_t* req) {
     char response[1400] = {};
     if (!webServerBuildProfileListJson(response, sizeof(response))) {
@@ -1437,9 +1542,7 @@ webServerHandleClientMessage(const char* message) {
 static esp_err_t
 webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error) {
     (void)error;
-    httpd_resp_set_status(req, "302 Found");
-    httpd_resp_set_hdr(req, "Location", "/");
-    return httpd_resp_send(req, nullptr, 0);
+    return webServerRedirect(req, webServerCaptivePortalComplete ? "/" : CAPTIVE_PORTAL);
 }
 
 //----------------------------------------
@@ -1514,6 +1617,7 @@ webServerStart() {
         wifiSoftApOn(__FILE__, __LINE__);
     }
     if (webServerState == WEBSERVER_STATE_OFF) {
+        webServerCaptivePortalComplete = false;
         webServerState = WEBSERVER_STATE_WAIT_FOR_NETWORK;
     }
 }
@@ -1525,6 +1629,7 @@ webServerStop() {
         webServerHandle = nullptr;
     }
     webServerClientSocket = -1;
+    webServerCaptivePortalComplete = false;
     webServerState = WEBSERVER_STATE_OFF;
     ESP_LOGI(TAG, "Stopped");
 }
