@@ -21,7 +21,7 @@
  * SOFTWARE.
 */
 
-/***********************************************************************//**
+/***********************************************************************/ /**
  * \file  NMEA2000_CompilerDefns.h
  *  \brief Specific compiler definition to adapt the library to your needs
  *
@@ -41,7 +41,7 @@
 #ifndef _NMEA2000_COMPILER_DEFNS_H_
 #define _NMEA2000_COMPILER_DEFNS_H_
 
-/***********************************************************************//**
+/***********************************************************************/ /**
  * \brief Deactivation of ISO Multipacket Support 
  * ISO Multipacket is an other way to send long messages instead of
  * NMEA2000 fastpacket. If you do not need ISO Multi-packet support in
@@ -54,7 +54,7 @@
  */
 // #define N2K_NO_ISO_MULTI_PACKET_SUPPORT 1    //Uncomment as needed
 
-/***********************************************************************//**
+/***********************************************************************/ /**
  * \brief Deactivation of Group Function Support
  * Group functions has been used to control different settings. Mandatory
  * default handlers sets heartbeat interval and node "name" device
@@ -66,7 +66,7 @@
  */
 // #define N2K_NO_GROUP_FUNCTION_SUPPORT 1      //Uncomment as needed
 
-/***********************************************************************//**
+/***********************************************************************/ /**
  * \brief Deactivation Heatbeat Support
  * Heartbeat is new way to other devices see that node is alive. Support for
  * this has been slowly implemented to new firmwares. Since this is new feature
