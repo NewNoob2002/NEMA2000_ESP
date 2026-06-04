@@ -26,11 +26,214 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if !defined(N2K_NO_GROUP_FUNCTION_SUPPORT)
 #include "N2kGroupFunctionDefaultHandlers.h"
 #endif
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define DebugStream           Serial // outputs debug messages to the serial console (only for Arduino)
-//#define DebugStream           (*ForwardStream) // outputs debug messages to same destination as ForwardStream
+#if defined(ESP_PLATFORM)
+#include "esp_log.h"
+static const char* const kN2kLogTag = "[NMEA2000]";
+#endif
+
+#ifndef HEX
+#define HEX 16
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#define N2K_LOG_UNUSED __attribute__((unused))
+#else
+#define N2K_LOG_UNUSED
+#endif
+
+namespace {
+
+#if defined(ESP_PLATFORM)
+void
+N2kEspIdfLogCallback(tNMEA2000::tLogLevel level, const char* message) {
+    switch (level) {
+        case tNMEA2000::log_Error: ESP_LOGE(kN2kLogTag, "%s", message); break;
+        case tNMEA2000::log_Warning: ESP_LOGW(kN2kLogTag, "%s", message); break;
+        case tNMEA2000::log_Info: ESP_LOGI(kN2kLogTag, "%s", message); break;
+        case tNMEA2000::log_Debug:
+        default: ESP_LOGD(kN2kLogTag, "%s", message); break;
+    }
+}
+#endif
+
+tNMEA2000::tLogCallback N2kLogCallback =
+#if defined(ESP_PLATFORM)
+    N2kEspIdfLogCallback;
+#else
+    0;
+#endif
+char N2kLogLine[256];
+size_t N2kLogLineLen = 0;
+
+void
+N2kLogStartLine() {
+    N2kLogLineLen = 0;
+    N2kLogLine[0] = '\0';
+}
+
+void
+N2kLogAppendRaw(const char* text) {
+    if (text == 0) {
+        text = "";
+    }
+    if (N2kLogLineLen >= sizeof(N2kLogLine) - 1) {
+        return;
+    }
+    const int written = snprintf(N2kLogLine + N2kLogLineLen, sizeof(N2kLogLine) - N2kLogLineLen, "%s", text);
+    if (written > 0) {
+        const size_t available = sizeof(N2kLogLine) - 1 - N2kLogLineLen;
+        N2kLogLineLen += (static_cast<size_t>(written) > available) ? available : static_cast<size_t>(written);
+    }
+}
+
+void
+N2kLogPrint(const char* value) {
+    N2kLogAppendRaw(value);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(char* value) {
+    N2kLogAppendRaw(value);
+}
+
+template <size_t N>
+void
+N2kLogPrint(const char (&value)[N]) {
+    N2kLogAppendRaw(value);
+}
+
+template <size_t N>
+void
+N2kLogPrint(char (&value)[N]) {
+    N2kLogAppendRaw(value);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(char value) {
+    char text[2] = {value, '\0'};
+    N2kLogAppendRaw(text);
+}
+
+void
+N2kLogPrintUnsigned(unsigned long long value, int base) {
+    char text[32];
+    if (base == HEX) {
+        snprintf(text, sizeof(text), "%llx", value);
+    } else {
+        snprintf(text, sizeof(text), "%llu", value);
+    }
+    N2kLogAppendRaw(text);
+}
+
+void
+N2kLogPrintSigned(long long value, int base) {
+    char text[32];
+    if (base == HEX) {
+        snprintf(text, sizeof(text), "%llx", static_cast<unsigned long long>(value));
+    } else {
+        snprintf(text, sizeof(text), "%lld", value);
+    }
+    N2kLogAppendRaw(text);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(unsigned char value, int base = 10) {
+    N2kLogPrintUnsigned(value, base);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(unsigned short value, int base = 10) {
+    N2kLogPrintUnsigned(value, base);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(unsigned int value, int base = 10) {
+    N2kLogPrintUnsigned(value, base);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(unsigned long value, int base = 10) {
+    N2kLogPrintUnsigned(value, base);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(unsigned long long value, int base = 10) {
+    N2kLogPrintUnsigned(value, base);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(signed char value, int base = 10) {
+    N2kLogPrintSigned(value, base);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(short value, int base = 10) {
+    N2kLogPrintSigned(value, base);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(int value, int base = 10) {
+    N2kLogPrintSigned(value, base);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(long value, int base = 10) {
+    N2kLogPrintSigned(value, base);
+}
+
+void N2K_LOG_UNUSED
+N2kLogPrint(long long value, int base = 10) {
+    N2kLogPrintSigned(value, base);
+}
+
+void
+N2kLogFlush(tNMEA2000::tLogLevel level = tNMEA2000::log_Debug) {
+    if (N2kLogCallback != 0) {
+        N2kLogCallback(level, N2kLogLine);
+    }
+    N2kLogStartLine();
+}
+
+void
+N2kLogPrintln() {
+    N2kLogFlush();
+}
+
+template <typename T>
+void
+N2kLogPrintln(const T& value) {
+    N2kLogPrint(value);
+    N2kLogFlush();
+}
+
+template <typename T>
+void
+N2kLogPrintln(const T& value, int base) {
+    N2kLogPrint(value, base);
+    N2kLogFlush();
+}
+
+void
+N2kLogPrintBuf(unsigned char len, const unsigned char* data, bool addLineFeed) {
+    if (data == 0) {
+        return;
+    }
+    for (unsigned char i = 0; i < len; i++) {
+        if (i > 0) {
+            N2kLogPrint(",");
+        }
+        N2kLogPrint(data[i], HEX);
+    }
+    if (addLineFeed) {
+        N2kLogFlush();
+    }
+}
+
+} // namespace
 
 // #define NMEA2000_FRAME_ERROR_DEBUG
 // #define NMEA2000_FRAME_IN_DEBUG
@@ -41,82 +244,87 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define NMEA2000_DEBUG
 
 #if defined(NMEA2000_FRAME_ERROR_DEBUG)
-#define N2kFrameErrDbgStart(fmt, args...)                                                                              \
-    DebugStream.print(N2kMillis());                                                                                    \
-    DebugStream.print(": ");                                                                                           \
-    DebugStream.print(fmt, ##args)
-#define N2kFrameErrDbg(fmt, args...)   DebugStream.print(fmt, ##args)
-#define N2kFrameErrDbgln(fmt, args...) DebugStream.println(fmt, ##args)
+#define N2kFrameErrDbgStart(...)                                                                                       \
+    N2kLogStartLine();                                                                                                 \
+    N2kLogPrint(N2kMillis());                                                                                          \
+    N2kLogPrint(": ");                                                                                                 \
+    N2kLogPrint(__VA_ARGS__)
+#define N2kFrameErrDbg(...)   N2kLogPrint(__VA_ARGS__)
+#define N2kFrameErrDbgln(...) N2kLogPrintln(__VA_ARGS__)
 #else
-#define N2kFrameErrDbgStart(fmt, args...)
-#define N2kFrameErrDbg(fmt, args...)
-#define N2kFrameErrDbgln(fmt, args...)
+#define N2kFrameErrDbgStart(...)
+#define N2kFrameErrDbg(...)
+#define N2kFrameErrDbgln(...)
 #endif
 
 #if defined(NMEA2000_FRAME_IN_DEBUG)
-#define N2kFrameInDbgStart(fmt, args...)                                                                               \
-    DebugStream.print(N2kMillis());                                                                                    \
-    DebugStream.print(": ");                                                                                           \
-    DebugStream.print(fmt, ##args)
-#define N2kFrameInDbg(fmt, args...)   DebugStream.print(fmt, ##args)
-#define N2kFrameInDbgln(fmt, args...) DebugStream.println(fmt, ##args)
+#define N2kFrameInDbgStart(...)                                                                                        \
+    N2kLogStartLine();                                                                                                 \
+    N2kLogPrint(N2kMillis());                                                                                          \
+    N2kLogPrint(": ");                                                                                                 \
+    N2kLogPrint(__VA_ARGS__)
+#define N2kFrameInDbg(...)   N2kLogPrint(__VA_ARGS__)
+#define N2kFrameInDbgln(...) N2kLogPrintln(__VA_ARGS__)
 #else
-#define N2kFrameInDbgStart(fmt, args...)
-#define N2kFrameInDbg(fmt, args...)
-#define N2kFrameInDbgln(fmt, args...)
+#define N2kFrameInDbgStart(...)
+#define N2kFrameInDbg(...)
+#define N2kFrameInDbgln(...)
 #endif
 
 #if defined(NMEA2000_FRAME_OUT_DEBUG)
-#define N2kFrameOutDbgStart(fmt, args...)                                                                              \
-    DebugStream.print(N2kMillis());                                                                                    \
-    DebugStream.print(": ");                                                                                           \
-    DebugStream.print(fmt, ##args)
-#define N2kFrameOutDbg(fmt, args...)   DebugStream.print(fmt, ##args)
-#define N2kFrameOutDbgln(fmt, args...) DebugStream.println(fmt, ##args)
+#define N2kFrameOutDbgStart(...)                                                                                       \
+    N2kLogStartLine();                                                                                                 \
+    N2kLogPrint(N2kMillis());                                                                                          \
+    N2kLogPrint(": ");                                                                                                 \
+    N2kLogPrint(__VA_ARGS__)
+#define N2kFrameOutDbg(...)   N2kLogPrint(__VA_ARGS__)
+#define N2kFrameOutDbgln(...) N2kLogPrintln(__VA_ARGS__)
 #else
-#define N2kFrameOutDbgStart(fmt, args...)
-#define N2kFrameOutDbg(fmt, args...)
-#define N2kFrameOutDbgln(fmt, args...)
+#define N2kFrameOutDbgStart(...)
+#define N2kFrameOutDbg(...)
+#define N2kFrameOutDbgln(...)
 #endif
 
 #if defined(NMEA2000_MSG_TX_DEBUG)
-#define N2kMsgDbgStart(fmt, args...)                                                                                   \
-    DebugStream.print(N2kMillis());                                                                                    \
-    DebugStream.print(": ");                                                                                           \
-    DebugStream.print(fmt, ##args)
-#define N2kMsgDbg(fmt, args...)   DebugStream.print(fmt, ##args)
-#define N2kMsgDbgln(fmt, args...) DebugStream.println(fmt, ##args)
+#define N2kMsgDbgStart(...)                                                                                            \
+    N2kLogStartLine();                                                                                                 \
+    N2kLogPrint(N2kMillis());                                                                                          \
+    N2kLogPrint(": ");                                                                                                 \
+    N2kLogPrint(__VA_ARGS__)
+#define N2kMsgDbg(...)   N2kLogPrint(__VA_ARGS__)
+#define N2kMsgDbgln(...) N2kLogPrintln(__VA_ARGS__)
 #else
-#define N2kMsgDbgStart(fmt, args...)
-#define N2kMsgDbg(fmt, args...)
-#define N2kMsgDbgln(fmt, args...)
+#define N2kMsgDbgStart(...)
+#define N2kMsgDbg(...)
+#define N2kMsgDbgln(...)
 #endif
 
 #if defined(NMEA2000_MSG_RX_DEBUG)
-#define N2kMsgRxDbgStart(fmt, args...)                                                                                 \
-    DebugStream.print(N2kMillis());                                                                                    \
-    DebugStream.print(": ");                                                                                           \
-    DebugStream.print(fmt, ##args)
-#define N2kMsgRxDbg(fmt, args...)   DebugStream.print(fmt, ##args)
-#define N2kMsgRxDbgln(fmt, args...) DebugStream.println(fmt, ##args)
+#define N2kMsgRxDbgStart(...)                                                                                          \
+    N2kLogStartLine();                                                                                                 \
+    N2kLogPrint(N2kMillis());                                                                                          \
+    N2kLogPrint(": ");                                                                                                 \
+    N2kLogPrint(__VA_ARGS__)
+#define N2kMsgRxDbg(...)   N2kLogPrint(__VA_ARGS__)
+#define N2kMsgRxDbgln(...) N2kLogPrintln(__VA_ARGS__)
 #else
-#define N2kMsgRxDbgStart(fmt, args...)
-#define N2kMsgRxDbg(fmt, args...)
-#define N2kMsgRxDbgln(fmt, args...)
+#define N2kMsgRxDbgStart(...)
+#define N2kMsgRxDbg(...)
+#define N2kMsgRxDbgln(...)
 #endif
 
 #if defined(NMEA2000_BUF_DEBUG)
-#define DbgPrintBuf(len, buf, addln) PrintBuf(&DebugStream, len, buf, addln)
+#define DbgPrintBuf(len, buf, addln) N2kLogPrintBuf(len, buf, addln)
 #else
 #define DbgPrintBuf(len, buf, addln)
 #endif
 
 #if defined(NMEA2000_DEBUG)
-#define N2kDbg(fmt, args...)   DebugStream.print(fmt, ##args)
-#define N2kDbgln(fmt, args...) DebugStream.println(fmt, ##args)
+#define N2kDbg(...)   N2kLogPrint(__VA_ARGS__)
+#define N2kDbgln(...) N2kLogPrintln(__VA_ARGS__)
 #else
-#define N2kDbg(fmt, args...)
-#define N2kDbgln(fmt, args...)
+#define N2kDbg(...)
+#define N2kDbgln(...)
 #endif
 
 // #define NMEA2000_MEMORY_TEST 1
@@ -126,9 +334,10 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 void
 N2kPrintFreeMemory(const char* Source) {
-    Serial.print(Source);
-    Serial.print(", free memory=");
-    Serial.println(freeMemory());
+    N2kLogStartLine();
+    N2kLogPrint(Source);
+    N2kLogPrint(", free memory=");
+    N2kLogPrintln(freeMemory());
 }
 #else
 #define N2kPrintFreeMemory(a)
@@ -1854,6 +2063,12 @@ tNMEA2000::SendMsg(const tN2kMsg& N2kMsg, int DeviceIndex) {
 void
 tNMEA2000::SetDebugMode(tDebugMode _dbMode) {
     dbMode = _dbMode;
+}
+
+//*****************************************************************************
+void
+tNMEA2000::SetLogCallback(tLogCallback callback) {
+    N2kLogCallback = callback;
 }
 
 //*****************************************************************************

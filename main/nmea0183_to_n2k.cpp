@@ -2,8 +2,11 @@
 
 #include "N2kMessages.h"
 #include "Unicore_UM980.h"
+#include "esp_log.h"
 
 namespace {
+
+const char* kTag = "[nmea0183_to_n2k]";
 
 const unsigned long kGatewayTransmitMessages[] = {
     129025L,
@@ -75,6 +78,7 @@ ConfigureGatewayNmea2000(tNMEA2000& nmea2000) {
     nmea2000.SetDeviceInformation(1, 132, 25, 2046);
     nmea2000.ExtendTransmitMessages(kGatewayTransmitMessages);
     nmea2000.SetMode(tNMEA2000::N2km_ListenAndNode, 22);
+    ESP_LOGI(kTag, "NMEA2000 gateway configured");
 }
 
 bool

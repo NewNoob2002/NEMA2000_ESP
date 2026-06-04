@@ -84,7 +84,7 @@ class UnicoreGNSSLibrary {
     bool isNmeaFixed() const;
     bool disableOutput();
 
-    bool startRxTask(uint32_t stackSize = 4096, UBaseType_t priority = 3, BaseType_t coreId = 0);
+    bool startRxTask(uint32_t stackSize = 4096, UBaseType_t priority = 3);
     void stopRxTask(uint32_t timeoutMs = 1000);
     bool isRxTaskRunning() const;
 

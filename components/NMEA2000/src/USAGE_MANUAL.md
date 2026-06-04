@@ -743,6 +743,116 @@ NMEA2000.AddGroupFunctionHandler(&myHandler);
 
 认证设备通常不能只依赖默认 unsupported 响应，需要按自身 PGN 实现合规响应。
 
+### 13.1 用 CAN 调试器配置本工程 GNSS PGN 周期
+
+本工程的 NMEA2000 网关已经为 `129025`、`129026`、`129029` 注册了 PGN `126208` Request Group Function handler。CAN 调试器可以通过发送 `126208` 配置这三个 PGN 是否发送以及发送周期。
+
+默认发送配置：
+
+| PGN | 内容 | 默认周期 | 默认 offset |
+| --- | --- | --- | --- |
+| 129025 | Lat/Lon Rapid Update | 1000 ms | 0 ms |
+| 129026 | COG/SOG Rapid Update | 1000 ms | 20 ms |
+| 129029 | GNSS Position Data | 1000 ms | 40 ms |
+
+当前代码接受：
+
+- `TransmissionInterval = 0`：关闭该 PGN。
+- `TransmissionInterval = 0xffffffff`：保持当前周期。
+- `TransmissionInterval = 0xfffffffe`：恢复默认周期和默认 offset。
+- 普通 interval：设置发送周期，单位 ms，范围 `100..60000`。
+- `TransmissionIntervalOffset`：发送 offset，单位 10 ms，最大 `6000`，也就是 60000 ms。
+- `NumberOfParameterPairs` 必须为 `0`。
+
+`126208` Request Group Function payload：
+
+```text
+Byte0      Group Function Code = 0x00
+Byte1-3    目标 PGN，小端 3 字节
+Byte4-7    TransmissionInterval，小端 uint32，单位 ms
+Byte8-9    TransmissionIntervalOffset，小端 uint16，单位 10 ms
+Byte10     NumberOfParameterPairs = 0x00
+```
+
+目标 PGN 小端编码：
+
+```text
+129025 = 01 F8 01
+129026 = 02 F8 01
+129029 = 05 F8 01
+```
+
+常用 interval 小端编码：
+
+```text
+关闭发送     0 ms        = 00 00 00 00
+500 ms                  = F4 01 00 00
+1000 ms                 = E8 03 00 00
+2000 ms                 = D0 07 00 00
+恢复默认     0xfffffffe = FE FF FF FF
+保持当前     0xffffffff = FF FF FF FF
+```
+
+因为 `126208` payload 是 11 字节，裸 CAN 调试器需要按 NMEA2000 Fast Packet 拆成 2 帧。假设：
+
+- 本设备当前 NMEA2000 源地址是 `0x16`，即代码初始地址 22。
+- CAN 调试器源地址使用 `0x50`。
+- 优先级为 3。
+- 点对点发给本设备，期望收到 ACK。
+
+则 29-bit CAN ID 为：
+
+```text
+0x0DED1650
+```
+
+计算方式：
+
+```text
+priority 3, PGN 126208, destination 0x16, source 0x50
+CAN ID = 0x0DED0000 | (destination << 8) | source
+       = 0x0DED1650
+```
+
+如果设备地址因地址声明发生变化，需要把 `0x16` 替换为设备实际 source。若用广播目标地址 `0xff`，CAN ID 变为 `0x0DEDFF50`，配置会生效但设备不会返回 ACK。
+
+设置 `129025` 为 1000 ms，offset 0 ms：
+
+```text
+ID 0x0DED1650  Data: 00 0B 00 01 F8 01 E8 03
+ID 0x0DED1650  Data: 01 00 00 00 00 00 FF FF
+```
+
+设置 `129026` 为 1000 ms，offset 20 ms：
+
+```text
+ID 0x0DED1650  Data: 00 0B 00 02 F8 01 E8 03
+ID 0x0DED1650  Data: 01 00 00 02 00 00 FF FF
+```
+
+设置 `129029` 为 2000 ms，offset 40 ms：
+
+```text
+ID 0x0DED1650  Data: 00 0B 00 05 F8 01 D0 07
+ID 0x0DED1650  Data: 01 00 00 04 00 00 FF FF
+```
+
+关闭 `129025`：
+
+```text
+ID 0x0DED1650  Data: 00 0B 00 01 F8 01 00 00
+ID 0x0DED1650  Data: 01 00 00 FF FF 00 FF FF
+```
+
+恢复 `129025` 默认配置：
+
+```text
+ID 0x0DED1650  Data: 00 0B 00 01 F8 01 FE FF
+ID 0x0DED1650  Data: 01 FF FF FF FF 00 FF FF
+```
+
+点对点请求成功后，设备会回复 `126208 Acknowledge`。若 interval 越界、offset 越界或带了参数对，ACK 中会带对应错误码，且配置不会生效。
+
 ## 14. 定时发送
 
 `N2kTimer.h` 提供 `tN2kSyncScheduler`，适合周期发送 PGN：
@@ -833,18 +943,19 @@ NMEA2000.Open();
 
 周期读取传感器，调用对应 `SetN2k...` 和 `SendMsg()`。
 
-### 16.3 NMEA0183 到 NMEA2000 网关
+### 16.3 GNSS 到 NMEA2000 网关
 
 本仓库当前实现采用该模式：
 
-1. NMEA0183 parser 从 `GNSS_NMEA` 数据源读取 RMC/GGA 等句子。
-2. 构造 `tGatewayN2kMessages`。
-3. 调用：
+1. GNSS 层负责解析接收机输出，并维护 `UnicoreUM980` 结构化状态。
+2. NMEA2000 数据处理节点从 `HAL::gUm980` 读取最新 GNSS 快照。
+3. `ReadGatewayGnssData()` 将 GNSS 状态转换为 `tGatewayGnssData`。
+4. `BuildGatewayN2kMessages()` 调用：
    - `SetN2kLatLonRapid()`
    - `SetN2kCOGSOGRapid()`
    - `SetN2kGNSS()`
-4. 通过 `tNMEA2000_esp32::SendMsg()` 发送到 CAN 总线。
-5. 定时调用 `ParseMessages()` 维持协议栈。
+5. `DP_NMEA2000.cpp` 按每个 PGN 的可配置 schedule 发送到 CAN 总线。
+6. 定时调用 `ParseMessages()` 维持协议栈，并处理 `126208` 配置请求。
 
 ## 17. 编译期开关
 

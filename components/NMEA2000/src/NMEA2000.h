@@ -728,6 +728,33 @@ public:
           } tDebugMode;
 
   /************************************************************************//**
+   * \enum    tLogLevel
+   * \brief   Log level used by the optional platform independent log callback.
+   */
+  typedef enum {
+            log_Debug,
+            log_Info,
+            log_Warning,
+            log_Error,
+          } tLogLevel;
+
+  /** \brief Platform independent log callback.
+   *
+   * ESP-IDF builds install an ESP_LOG based default callback automatically.
+   * Other platforms default to no output and can install a callback to receive
+   * the same formatted lines.
+   */
+  typedef void (*tLogCallback)(tLogLevel level, const char *message);
+
+  /************************************************************************//**
+   * \brief Set optional platform log callback.
+   *
+   * ESP-IDF builds use an ESP_LOG based default callback. Calling this function
+   * overrides the default callback. Pass nullptr to disable callback logging.
+   */
+  static void SetLogCallback(tLogCallback callback);
+
+  /************************************************************************//**
    * \struct   tConfigurationInformation
    * \brief   Structure that holds the Configuration Information of this device
    */

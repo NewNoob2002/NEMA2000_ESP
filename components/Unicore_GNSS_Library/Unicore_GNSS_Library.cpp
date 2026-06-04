@@ -287,7 +287,7 @@ espLogCallback(const UnicoreLogLevel level, const uint32_t mask, const char* mes
     (void)mask;
     (void)userdata;
 
-    static constexpr const char* kTag = "UnicoreLibrary";
+    static constexpr const char* kTag = "[UnicoreLibrary]";
     switch (level) {
         case UnicoreLogLevel::Error: ESP_LOGE(kTag, "%s", message); break;
         case UnicoreLogLevel::Warn: ESP_LOGW(kTag, "%s", message); break;
@@ -363,7 +363,7 @@ UnicoreGNSSLibrary::begin(HardwareSerial& serialPort, uint16_t rxBufferSize) {
         return false;
     }
 
-    if (!startRxTask(4096, configMAX_PRIORITIES - 5, 0)) {
+    if (!startRxTask(1024 * 5, configMAX_PRIORITIES - 6)) {
         log(UnicoreLogLevel::Error, UNICORE_LOG_TASK, "begin failed: RX task failed");
         end();
         return false;
@@ -466,7 +466,7 @@ UnicoreGNSSLibrary::disableOutput() {
 }
 
 bool
-UnicoreGNSSLibrary::startRxTask(const uint32_t stackSize, const UBaseType_t priority, const BaseType_t coreId) {
+UnicoreGNSSLibrary::startRxTask(const uint32_t stackSize, const UBaseType_t priority) {
     if (!isConnected()) {
         log(UnicoreLogLevel::Error, UNICORE_LOG_TASK, "RX task start failed: not connected");
         return false;
@@ -478,11 +478,7 @@ UnicoreGNSSLibrary::startRxTask(const uint32_t stackSize, const UBaseType_t prio
 
     _rxTaskShouldRun = true;
     BaseType_t result = pdFAIL;
-    if (coreId == tskNO_AFFINITY) {
-        result = xTaskCreate(rxTaskEntry, "unicore_rx", stackSize, this, priority, &_rxTaskHandle);
-    } else {
-        result = xTaskCreatePinnedToCore(rxTaskEntry, "unicore_rx", stackSize, this, priority, &_rxTaskHandle, coreId);
-    }
+    result = xTaskCreatePinnedToCore(rxTaskEntry, "unicore_rx", stackSize, this, priority, &_rxTaskHandle, 1);
 
     if (result != pdPASS) {
         _rxTaskHandle = nullptr;
@@ -491,8 +487,8 @@ UnicoreGNSSLibrary::startRxTask(const uint32_t stackSize, const UBaseType_t prio
         return false;
     }
 
-    log(UnicoreLogLevel::Info, UNICORE_LOG_TASK, "RX task start requested stack=%lu priority=%lu core=%ld",
-        static_cast<unsigned long>(stackSize), static_cast<unsigned long>(priority), static_cast<long>(coreId));
+    log(UnicoreLogLevel::Info, UNICORE_LOG_TASK, "RX task start requested stack=%lu priority=%lu core=1",
+        static_cast<unsigned long>(stackSize), static_cast<unsigned long>(priority));
     return true;
 }
 

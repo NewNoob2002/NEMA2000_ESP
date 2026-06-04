@@ -272,13 +272,13 @@ tNMEA2000_esp32::CAN_init() {
         return false;
     }
 
-    if (xTaskCreate(&tNMEA2000_esp32::TxTaskEntry, "n2k_twai_tx", 4096, this, tskIDLE_PRIORITY + 2, &TxTaskHandle)
+    if (xTaskCreate(&tNMEA2000_esp32::TxTaskEntry, "n2k_twai_tx", 2048, this, tskIDLE_PRIORITY + 5, &TxTaskHandle)
         != pdPASS) {
         ESP_LOGE(TAG, "Failed to create TX task");
         return false;
     }
 
-    if (xTaskCreate(&tNMEA2000_esp32::CtrlTaskEntry, "n2k_twai_ctrl", 3072, this, tskIDLE_PRIORITY + 2, &CtrlTaskHandle)
+    if (xTaskCreate(&tNMEA2000_esp32::CtrlTaskEntry, "n2k_twai_ctrl", 3072, this, tskIDLE_PRIORITY + 6, &CtrlTaskHandle)
         != pdPASS) {
         ESP_LOGE(TAG, "Failed to create CTRL task");
         return false;
