@@ -283,17 +283,6 @@ setMinCN0(const char* value) {
 }
 
 static bool
-getUseMSM7(char* value, size_t valueLength) {
-    return getBool(value, valueLength, settings.useMSM7);
-}
-
-static bool
-setUseMSM7(const char* value) {
-    settings.useMSM7 = textToBool(value);
-    return true;
-}
-
-static bool
 getBaseTypeSurveyIn(char* value, size_t valueLength) {
     return getBool(value, valueLength, !settings.fixedBase);
 }
@@ -509,7 +498,6 @@ static const WebFieldBinding webFieldBindings[] = {
     {"Profile Configuration", "profileName", getProfileName, setProfileName},
     {"GNSS Configuration", "measurementRateHz", getMeasurementRateHz, setMeasurementRateHz},
     {"GNSS Configuration", "minCN0", getMinCN0, setMinCN0},
-    {"GNSS Configuration", "useMSM7", getUseMSM7, setUseMSM7},
     {"Base Configuration", "baseTypeSurveyIn", getBaseTypeSurveyIn, setBaseTypeSurveyIn},
     {"Base Configuration", "baseTypeFixed", getBaseTypeFixed, setBaseTypeFixed},
     {"Base Configuration", "observationSeconds", getObservationSeconds, setObservationSeconds},
@@ -871,6 +859,28 @@ webServerFormatPosition(char* buffer, size_t bufferLength) {
 }
 
 static void
+webServerFormatUtcTime(char* buffer, size_t bufferLength) {
+    const UnicoreUM980* gnss = HAL::gUm980;
+    if (gnss == nullptr) {
+        snprintf(buffer, bufferLength, "GNSS offline");
+        return;
+    }
+
+    if (!gnss->isValidTime()) {
+        snprintf(buffer, bufferLength, "Waiting for GNSS");
+        return;
+    }
+
+    if (gnss->isValidDate()) {
+        snprintf(buffer, bufferLength, "%04u-%02u-%02u %02u:%02u:%02u.%03u", gnss->getYear(), gnss->getMonth(),
+                 gnss->getDay(), gnss->getHour(), gnss->getMinute(), gnss->getSecond(), gnss->getMillisecond());
+    } else {
+        snprintf(buffer, bufferLength, "%02u:%02u:%02u.%03u", gnss->getHour(), gnss->getMinute(), gnss->getSecond(),
+                 gnss->getMillisecond());
+    }
+}
+
+static void
 webServerSendLiveStatus() {
     if ((webServerHandle == nullptr) || (webServerClientSocket < 0)) {
         return;
@@ -884,14 +894,17 @@ webServerSendLiveStatus() {
 
     const UnicoreUM980* gnss = HAL::gUm980;
     char position[64] = {};
+    char utcTime[32] = {};
     webServerFormatPosition(position, sizeof(position));
+    webServerFormatUtcTime(utcTime, sizeof(utcTime));
 
-    char packet[128] = {};
+    char packet[192] = {};
     char satellitesInViewText[16] = {};
     char satellitesUsedText[16] = {};
     snprintf(satellitesInViewText, sizeof(satellitesInViewText), "%u", gnss ? gnss->getSatellitesInView() : 0U);
     snprintf(satellitesUsedText, sizeof(satellitesUsedText), "%u", gnss ? gnss->getSatellitesUsed() : 0U);
 
+    webServerAppendField(packet, sizeof(packet), "utcTime", utcTime);
     webServerAppendField(packet, sizeof(packet), "satellitesInView", satellitesInViewText);
     webServerAppendField(packet, sizeof(packet), "satellitesUsed", satellitesUsedText);
     webServerAppendField(packet, sizeof(packet), "rtkPosition", position);
@@ -1898,7 +1911,7 @@ webServerSendSettings() {
 void
 webServerSendFirmwareVersion() {
     const UnicoreUM980* gnss = HAL::gUm980;
-    char message[160] = {};
+    char message[128] = {};
     webServerAppendField(message, sizeof(message), "rtkFirmwareVersion", "v0.0");
     webServerAppendField(message, sizeof(message), "gnssFirmwareVersion",
                          (gnss && gnss->getFirmwareVersion()) ? gnss->getFirmwareVersion() : "v0.0");

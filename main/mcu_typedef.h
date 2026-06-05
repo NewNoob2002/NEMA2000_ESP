@@ -312,28 +312,13 @@ typedef struct settings_t {
     float observationPositionAccuracy = 5.0; // Default survey in pos accy of 5m
     float surveyInStartingAccuracy =
         1.0; // Wait for this horizontal positional accuracy in meters before starting survey in
-    // Use MSM7 over MSM4: on platforms where that is possible and where it requires parameter selection
-    // Needed on:
-    //   LG290P (PQTMCFGRTCM)
-    // Not needed on:
-    //   mosaic-X5 (it has MSM4 and MSM7 message groups)
-    //   ZED (it has separate messages for MSM4 vs. MSM7)
-    //   UM980 (it has separate messages for MSM4 vs. MSM7)
-    bool useMSM7 = false;
-    int rtcmMinElev = -90; // LG290P - minimum elevation for RTCM (PQTMCFGRTCM)
 
     // Battery
     bool enablePrintBatteryMessages = true;
     uint32_t shutdownNoChargeTimeoutMinutes = 0; // If > 0, shut down unit after timeout if not charging
 
-    // Beeper
-    bool enableBeeper = true; // Some platforms have an audible notification
-
     // Bluetooth
-    double accessoryTimeOffset_s = -1.0; // Apply this offset to EA NMEA data via utcAdjust
     BluetoothRadioType_e bluetoothRadioType = BLUETOOTH_RADIO_SPP;
-    bool clearBtPairings = true;              // Clear MFi Accessory SSP pairings
-    char eaProtocol[50] = "com.sparkfun.rtk"; // MFi External Accessory protocol name
     uint16_t sppRxQueueSize = 512 * 4;
     uint16_t sppTxQueueSize = 32;
 
@@ -344,23 +329,15 @@ typedef struct settings_t {
     bool debugCorrections = false;
     uint8_t enableExtCorrRadio = 254; // Will be initialized to true or false depending on model
 
-    // Display
-    bool enableResetDisplay = false;
-
-    // ESP Now
-    bool debugEspNow = false;
-    bool enableEspNow = false;
-    uint8_t espnowPeerCount = 0;
-    // uint8_t espnowPeers[ESPNOW_MAX_PEERS][6] = {0}; // Contains the MAC addresses (6 bytes) of paired units
-
     // Ethernet
+#if defined(COMPILE_ETHERNET)
     bool enablePrintEthernetDiag = false;
     bool ethernetDHCP = true;
-    // IPAddress ethernetDNS = {194, 168, 4, 100};
-    // IPAddress ethernetGateway = {192, 168, 0, 1};
-    // IPAddress ethernetIP = {192, 168, 0, 123};
-    // IPAddress ethernetSubnet = {255, 255, 255, 0};
-
+    IPAddress ethernetDNS = {194, 168, 4, 100};
+    IPAddress ethernetGateway = {192, 168, 0, 1};
+    IPAddress ethernetIP = {192, 168, 0, 123};
+    IPAddress ethernetSubnet = {255, 255, 255, 0};
+#endif
     // Firmware
     uint32_t autoFirmwareCheckMinutes = 24 * 60;
     bool debugFirmwareUpdate = false;
@@ -376,34 +353,28 @@ typedef struct settings_t {
     uint16_t serialGNSSRxFullThreshold = 50; // RX FIFO full interrupt. Max of ~128. See pinUART2Task().
     int uartReceiveBufferSize = 1024 * 2;    // This buffer is filled automatically as the UART receives characters
 
-    // Hardware
-    uint32_t defaultDoubleTapInterval_ms = 250;
-    bool enableExternalHardwareEventLogging = false; // Log when INT/TM2 pin goes low
-    uint16_t spiFrequency = 16;                      // By default, use 16MHz SPI
-
     // HTTP
     bool debugHttpClientData = false;  // Debug the HTTP Client (ZTP) data flow
     bool debugHttpClientState = false; // Debug the HTTP Client state machine
 
-    // IMU
-    bool detectedTilt = false;
-    bool testedTilt = false;
-
     // Log file
+#if defined(COMPILE_SD_CARD)
     bool alignedLogFiles = false; // If true, align log files as per #630
     bool enableLogging = true;    // If an SD card is present, log default sentences
     bool enablePrintLogFileMessages = false;
     bool enablePrintLogFileStatus = true;
     int maxLogLength_minutes = 60 * 24; // Default to 24 hours
     int maxLogTime_minutes = 60 * 24;   // Default to 24 hours
+#endif
 
+#if defined(COMPILE_MQTT)
     // MQTT
     bool debugMqttClientData = false;  // Debug the MQTT SPARTAN data flow
     bool debugMqttClientState = false; // Debug the MQTT state machine
-
+#endif
     // Multicast DNS
     bool mdnsEnable = true; // Allows locating of device from browser address 'rtk.local'
-    char mdnsHostName[50] = "rtk";
+    char mdnsHostName[16] = "rtk";
 
     // Network layer
     bool debugAppleAccessory = false; // Enable debugging of the AppleAccessory
@@ -412,38 +383,24 @@ typedef struct settings_t {
     // networkClient _timeout in ms (lib default is 3000). This limits write glitches to about 3.4s
     uint32_t networkClientWriteTimeout_ms = 250;
 
-    // NTP
-    bool debugNtp = false;
-    bool enableNTPFile = false; // Log NTP requests to file
-    uint16_t ethernetNtpPort = 123;
-    uint8_t ntpPollExponent = 6; // NTPpacket::defaultPollExponent 2^6 = 64 seconds
-    int8_t ntpPrecision = -20;   // NTPpacket::defaultPrecision 2^-20 = 0.95us
-    char ntpReferenceId[5] = {'G', 'P', 'S', 0,
-                              0}; // NTPpacket::defaultReferenceId. Ref ID is 4 chars. Add one extra for a NULL.
-    uint32_t ntpRootDelay = 0;    // NTPpacket::defaultRootDelay = 0. ntpRootDelay is defined in microseconds.
-                                  // ntpProcessOneRequest will convert it to seconds and fraction.
-    uint32_t ntpRootDispersion =
-        1000; // NTPpacket::defaultRootDispersion 1007us = 2^-16 * 66. ntpRootDispersion is defined in microseconds.
-              // ntpProcessOneRequest will convert it to seconds and fraction.
+    // // NTRIP Client
+    // bool debugNtripClientRtcm = false;
+    // bool debugNtripClientState = false;
+    // bool enableNtripClient = false;
+    // char ntripClient_CasterHost[50] = "rtk2go.com"; // It's free...
+    // uint16_t ntripClient_CasterPort = 2101;
+    // char ntripClient_CasterUser[50] =
+    //     "test@test.com"; // Some free casters require auth. User must provide their own email address to use RTK2Go
+    // char ntripClient_CasterUserPW[50] = "";
+    // char ntripClient_MountPoint[50] = "bldr_SparkFun1";
+    // char ntripClient_MountPointPW[50] = "";
+    // bool ntripClient_TransmitGGA = true;
 
-    // NTRIP Client
-    bool debugNtripClientRtcm = false;
-    bool debugNtripClientState = false;
-    bool enableNtripClient = false;
-    char ntripClient_CasterHost[50] = "rtk2go.com"; // It's free...
-    uint16_t ntripClient_CasterPort = 2101;
-    char ntripClient_CasterUser[50] =
-        "test@test.com"; // Some free casters require auth. User must provide their own email address to use RTK2Go
-    char ntripClient_CasterUserPW[50] = "";
-    char ntripClient_MountPoint[50] = "bldr_SparkFun1";
-    char ntripClient_MountPointPW[50] = "";
-    bool ntripClient_TransmitGGA = true;
-
-    // NTRIP Server
-    bool debugNtripServerRtcm = false;
-    bool debugNtripServerState = false;
-    bool enableNtripServer = false;
-    bool enableRtcmMessageChecking = false;
+    // // NTRIP Server
+    // bool debugNtripServerRtcm = false;
+    // bool debugNtripServerState = false;
+    // bool enableNtripServer = false;
+    // bool enableRtcmMessageChecking = false;
     /*
     bool ntripServer_CasterEnabled[NTRIP_SERVER_MAX] = {
         false,
@@ -557,11 +514,6 @@ typedef struct settings_t {
     // pulseEdgeType_e externalPulsePolarity = PULSE_RISING_EDGE; // Pulse rises for pulse length, then falls
     uint64_t externalPulseTimeBetweenPulse_us = 1000000; // us between pulses, max of 60s = 60 * 1000 * 1000
 
-    // Ring Buffer
-    bool enablePrintRingBufferOffsets = false;
-    int gnssHandlerBufferSize =
-        1024 * 4; // This buffer is filled from the UART receive buffer, and is then written to SD
-
     // Rover operation
     uint8_t dynamicModel = 254; // Default will be applied by checkGNSSArrayDefaults
     bool enablePrintRoverAccuracy = true;
@@ -576,11 +528,13 @@ typedef struct settings_t {
     // RTCM buffers
     bool debugRtcmBuffers = false;
 
+#if defined(COMPILE_SD_CARD)
     // SD Card
     bool enablePrintBufferOverrun = false;
     bool enablePrintSDBuffers = false;
     bool enableSD = true;
     bool forceResetOnSDFail = false; // Set to true to reset system if SD is detected but fails to start.
+#endif
 
     // Serial
     // Default to 115200bps. This interface can be a bottleneck at high fix rates but allows the SD buffer to be reduced to 6k.
@@ -592,14 +546,12 @@ typedef struct settings_t {
                                     // hardware serial reports data available.
     bool enableNmeaOnRadio = true;  // Depends on the platform and GNSS
 
-    // Setup Button
-    bool disableSetupButton = false; // By default, allow setup through the overlay button(s)
-
     // State
     bool enablePrintDuplicateStates = false;
     bool enablePrintStates = true;
     SystemState_t lastState = STATE_NOT_SET; // Start unit in last known state
 
+#if defined(COMPILE_TCP)
     // TCP Client
     bool debugTcpClient = false;
     bool enableTcpClient = false;
@@ -612,27 +564,19 @@ typedef struct settings_t {
     uint16_t tcpServerPort = 2948;  // TCP server port, 2948 is GPS Daemon: http://tcp-udp-ports.com/port-2948.htm
     bool tcpOverWiFiStation = true; // Should TCP server use Station (true) or AP (false)
     bool udpOverWiFiStation = true; // Should UDP server use Station (true) or AP (false)
+#endif
 
     // Time Zone - Default to UTC
     int8_t timeZoneHours = 0;
     int8_t timeZoneMinutes = 0;
     int8_t timeZoneSeconds = 0;
 
-    // UBX
-#ifdef COMPILE_ZED
-    uint8_t ubxConstellationsEnabled[MAX_UBX_CONSTELLATIONS] = {
-        254};                                     // Mark first record with key so defaults will be applied.
-    uint8_t ubxMessageRates[MAX_UBX_MSG] = {254}; // Mark first record with key so defaults will be applied.
-    uint8_t ubxMessageRatesBase[MAX_UBX_MSG_RTCM] =
-        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-               // rates for RTCM Base. Default to u-blox recommended rates.
-#endif         // COMPILE_ZED
-
+#if defined(COMPILE_UDP)
     // UDP Server
     bool debugUdpServer = false;
     bool enableUdpServer = false;
     uint16_t udpServerPort = 10110; // NMEA-0183 Navigational Data: https://tcp-udp-ports.com/port-10110.htm
-
+#endif
     // UM980
     bool enableImuCompensationDebug = false;
     bool enableImuDebug = false;         // Turn on to display IMU library debug messages
@@ -687,6 +631,7 @@ typedef struct settings_t {
     // Web Server
     uint16_t httpPort = 80;
 
+#if defined(COMPILE_WIFI)
     // WiFi
     bool debugWebServer = true;
     bool debugWifiState = true;
@@ -699,47 +644,9 @@ typedef struct settings_t {
         {"", ""},
     };
     uint32_t wifiConnectTimeoutMs = 10000; // Wait this long for a WiFiMulti connection
-
-    bool outputTipAltitude =
-        false; // If enabled, subtract the pole length and APC from the GNSS receiver's reported altitude
-
-    // Localized distribution
-    bool useLocalizedDistribution = false;
-    uint8_t localizedDistributionTileLevel = 5;
-    bool useAssistNow = false;
-
-    bool requestKeyUpdate = false; // Set to true to force a key provisioning attempt
-
-    bool debugLora = false;
-    bool enableLora = false;
-    float loraCoordinationFrequency = 910.000;
-    int loraSerialInteractionTimeout_s =
-        30; // Seconds without user serial that must elapse before LoRa radio goes into dedicated listening mode
-    bool loraSaveSettingsToFlash =
-        false; // Passed to LoRa (>= 3.0.1) as AT+SAVE= . When true, updated settings are saved at each AT+TRANS
-    int loraTransmitGain_dB = 10;          // Passed to LoRa as AT+PWR=
-    bool enableMultipathMitigation = true; // Multipath mitigation. UM980 specific.
-
-#ifdef COMPILE_LG290P
-    uint8_t lg290pConstellations[MAX_LG290P_CONSTELLATIONS] = {
-        254};                                                // Mark first record with key so defaults will be applied.
-    int lg290pMessageRatesNMEA[MAX_LG290P_NMEA_MSG] = {254}; // Mark first record with key so defaults will be applied.
-    int lg290pMessageRatesRTCMBase[MAX_LG290P_RTCM_MSG] =
-        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-               // rates for RTCM Base. Default to Quectel recommended rates.
-    int lg290pMessageRatesRTCMRover[MAX_LG290P_RTCM_MSG] =
-        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-               // rates for RTCM Base. Default to Quectel recommended rates.
-    int lg290pMessageRatesPQTM[MAX_LG290P_PQTM_MSG] = {254}; // Mark first record with key so defaults will be applied.
-#endif                                                       // COMPILE_LG290P
+#endif                                     // COMPILE_WIFI
 
     bool debugSettings = false;
-    bool enableNtripCaster = false; //When true, respond as a faux NTRIP Caster to incoming TCP connections
-    bool baseCasterOverride =
-        false; //When true, user has put device into 'BaseCast' mode. Change settings, but don't save to NVM.
-    bool debugCLI = false; //When true, output BLE CLI interactions over serial
-    uint16_t cliBlePrintDelay_ms =
-        50; // Time delayed between prints during a LIST command to avoid overwhelming the BLE connection
     uint32_t gnssConfigureRequest =
         0;                       // Bitfield containing the change requests for various settings on the GNSS receiver
     bool debugGnssConfig = true; // Enable to print output during gnssUpdate

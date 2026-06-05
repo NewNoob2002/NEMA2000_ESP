@@ -1,8 +1,14 @@
-#include "Arduino.h"
+#include <Arduino.h>
 #include "Support.h"
+#include "esp_app_desc.h"
 #include "mcu_settings.h"
 
 static uint32_t lastHeapReport = 0;
+
+void
+querySystemInfo() {
+    const esp_app_desc_t* app = esp_app_get_description();
+}
 
 // If debug option is on, print available heap
 void

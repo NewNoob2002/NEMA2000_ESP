@@ -72,7 +72,6 @@ function handleMessage(raw) {
     switch (key) {
       /* ── Live telemetry ── */
       case "utcTime":          TXT("utcTime", val); break;
-      case "systemUptime":     TXT("systemUptime", val); break;
       case "satellitesInView": TXT("satellitesInView", val); updateSatBar(); break;
       case "satellitesUsed":   TXT("satellitesUsed", val); updateSatBar(); break;
       case "rtkPosition":      updateFixDisplay(val); break;

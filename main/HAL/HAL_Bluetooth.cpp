@@ -20,9 +20,9 @@ extern UnicoreUM980* gUm980;
 
 namespace {
 
-constexpr uint8_t kMsgSenderApp = 0x00;
+// constexpr uint8_t kMsgSenderApp = 0x00;
 constexpr uint8_t kMsgSenderDevice = 0x01;
-constexpr uint8_t kMsgSenderPannel = 0x02;
+// constexpr uint8_t kMsgSenderPannel = 0x02;
 
 constexpr uint8_t kMsgQueryType = 0x00;
 constexpr uint8_t kMsgQueryRespType = 0x01;
@@ -228,7 +228,7 @@ handleDeviceStatusQuery(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& r
     response.payload[1] = 0x01;                                          // Position or Head
     response.payload[2] = online_devices.gnss ? 0x81 : 0x01;             // Gnss Board status
     response.payload[3] = settings.enableTiltCompensation ? 0x81 : 0x01; // IMU
-    response.payload[4] = settings.enableLora ? 0x81 : 0x00;             // Radio
+    response.payload[4] = 0x00;                                          // Radio
     response.payload[5] = 0x00;                                          // 4G/5G
     response.payload[9] = 0x81;                                          // Battery
     response.payload[10] = 0x81;                                         // WIfi
@@ -348,14 +348,14 @@ handleLogConfig(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHe
             return;
         }
         response.payload[0] = 0x01;
-        response.payload[3] = settings.enableLogging ? 0x01 : 0x00;
+        response.payload[3] = 0x00;
         response.payload[4] = 0x02;
         response.payload[31] = 0x01;
         return;
     }
 
     if (payload && (payloadLength >= 4)) {
-        settings.enableLogging = payload[3] != 0;
+        // settings.enableLogging = payload[3] != 0;
     }
     ack(response, requestHeader, 1);
 }
