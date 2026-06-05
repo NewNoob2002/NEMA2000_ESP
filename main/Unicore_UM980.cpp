@@ -1040,6 +1040,11 @@ UnicoreUM980::getModelType() const {
 }
 
 const char*
+UnicoreUM980::getModelName() const {
+    return _version.modelName;
+}
+
+const char*
 UnicoreUM980::getId() const {
     return _version.efuseID;
 }

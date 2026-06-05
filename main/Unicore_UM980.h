@@ -177,6 +177,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     const char* getFirmwareVersion() const;
     const char* getSerialNumber() const;
     uint8_t getModelType() const;
+    const char* getModelName() const;
     const char* getId() const;
 
     bool inRoverMode() const;

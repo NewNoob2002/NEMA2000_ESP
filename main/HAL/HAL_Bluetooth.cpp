@@ -211,7 +211,7 @@ handleModelQuery(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestH
     copyFixedString(response.payload + 8, 16, productPropertiesTable[RTK_S20].productPlanUID);
     copyFixedString(response.payload + 24, 8, "V1.2");
     copyFixedString(response.payload + 32, 16, app ? app->version : "");
-    copyFixedString(response.payload + 56, 8, gUm980Present && HAL::gUm980->getModelType() == 18 ? "UM980" : "Unknown");
+    copyFixedString(response.payload + 56, 8, gUm980Present ? HAL::gUm980->getModelName() : "");
     copyFixedString(response.payload + 64, 16, gUm980Present ? HAL::gUm980->getSerialNumber() : "");
     copyFixedString(response.payload + 80, 16, gUm980Present ? HAL::gUm980->getFirmwareVersion() : "");
     copyFixedString(response.payload + 96, 8, "NONE");
