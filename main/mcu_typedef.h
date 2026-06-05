@@ -299,6 +299,7 @@ typedef struct settings_t {
     // Base operation
     // CoordinateInputType coordinateInputType = COORDINATE_INPUT_TYPE_DD; // Default DD.ddddddddd
     char baseId[8] = "1234";
+    bool baseCasterOverride = false;
 
     double fixedAltitude = 1560.089; // m
     bool fixedBase = false;          // Use survey-in by default
@@ -517,6 +518,7 @@ typedef struct settings_t {
     // Rover operation
     uint8_t dynamicModel = 254; // Default will be applied by checkGNSSArrayDefaults
     bool enablePrintRoverAccuracy = true;
+    bool enableMultipathMitigation = true;
     int16_t minCN0 = 6; // Minimum satellite signal level for navigation. ZED-F9P default is 6 dBHz
     // Minimum elevation (in deg) for a GNSS satellite to be used in NAV
     // Note: we use 8-bit unsigned here, but some platforms (ZED, mosaic-X5) support negative elevation limits

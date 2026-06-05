@@ -30,6 +30,13 @@ constexpr uint8_t kMsgSetType = 0x02;
 constexpr uint8_t kMsgSetRespType = 0x03;
 constexpr uint8_t kResponseError = 0x05;
 
+constexpr uint8_t kWorkModeRover = 0x00;
+constexpr uint8_t kWorkModeBase = 0x01;
+constexpr uint8_t kBaseKnownPoint = 0x01;
+constexpr uint8_t kBaseSinglePoint = 0x02;
+constexpr uint8_t kBaseDisabled = 0x00;
+constexpr uint8_t kBaseEnabled = 0x01;
+
 constexpr size_t kBluetoothRxBufferSize = 512;
 constexpr size_t kBluetoothMaxPayload = 256;
 constexpr size_t kBluetoothTxBufferSize = sizeof(SEMP_CUSTOM_HEADER) + kBluetoothMaxPayload + sizeof(uint32_t);
@@ -99,6 +106,24 @@ writeLe32(uint8_t* dest, const uint32_t value) {
     dest[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
     dest[2] = static_cast<uint8_t>((value >> 16) & 0xFF);
     dest[3] = static_cast<uint8_t>((value >> 24) & 0xFF);
+}
+
+double
+applyHemisphere(double value, const char positiveHemisphere, const char negativeHemisphere, const char hemisphere) {
+    if ((hemisphere == positiveHemisphere) || (hemisphere == negativeHemisphere)) {
+        value = std::fabs(value);
+        if (hemisphere == negativeHemisphere) {
+            value = -value;
+        }
+    }
+    return value;
+}
+
+bool
+isValidGeodeticPosition(const double longitude, const double latitude, const double altitude) {
+    return std::isfinite(longitude) && std::isfinite(latitude) && std::isfinite(altitude) && (longitude >= -180.0)
+           && (longitude <= 180.0) && (latitude >= -90.0) && (latitude <= 90.0) && (altitude > -10000.0)
+           && (altitude < 100000.0);
 }
 
 void
@@ -293,10 +318,10 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         if (!allocateResponse(response, requestHeader, 48)) {
             return;
         }
-        const bool baseMode = HAL::gUm980 && (HAL::gUm980->getMode() == Um980Mode::Base);
-        response.payload[0] = baseMode ? 0x01 : 0x00;
-        response.payload[1] = settings.fixedBase ? 0x01 : 0x00;
-        response.payload[2] = baseMode ? 0x01 : 0x00;
+        const bool baseMode = inBaseMode();
+        response.payload[0] = baseMode ? kWorkModeBase : kWorkModeRover;
+        response.payload[1] = settings.fixedBase ? kBaseKnownPoint : kBaseSinglePoint;
+        response.payload[2] = baseMode ? kBaseEnabled : kBaseDisabled;
         std::memcpy(response.payload + 4, &settings.baseId, sizeof(settings.baseId));
         std::memcpy(response.payload + 12, &settings.fixedLong, sizeof(settings.fixedLong));
         response.payload[20] = (settings.fixedLong >= 0.0) ? 'E' : 'W';
@@ -305,18 +330,72 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         std::memcpy(response.payload + 36, &settings.fixedAltitude, sizeof(settings.fixedAltitude));
         return;
     } else if (requestHeader.messageType == kMsgSetType) {
-        bool valid = payload && (payloadLength >= 1);
-        if (valid && HAL::gUm980) {
-            uint8_t RTK_MODE_SET = payload[0];
-            uint8_t FixedBase = payload[1];
-            uint8_t BaseEnable = payload[2];
-            double lon, lat, alt;
-            std::memcpy(&lon, &payload[12], 8);
-            std::memcpy(&lat, &payload[24], 8);
-            std::memcpy(&alt, &payload[36], 8);
-            systemPrintf("RTK_MODE:%d, FixedBase:%d, BaseEnable:%d, lon:%0.6f, lat:%0.6f, alt:%0.6f", RTK_MODE_SET,
-                         FixedBase, BaseEnable, lon, lat, alt);
+        if (!payload || (payloadLength < 3)) {
+            ack(response, requestHeader, kResponseError);
+            return;
         }
+
+        const uint8_t requestedMode = payload[0];
+        const uint8_t fixedBaseMode = payload[1];
+        const uint8_t baseEnable = payload[2];
+
+        if ((requestedMode != kWorkModeRover) && (requestedMode != kWorkModeBase)) {
+            ack(response, requestHeader, kResponseError);
+            return;
+        }
+        if ((baseEnable != kBaseDisabled) && (baseEnable != kBaseEnabled)) {
+            ack(response, requestHeader, kResponseError);
+            return;
+        }
+        if ((fixedBaseMode != kBaseKnownPoint) && (fixedBaseMode != kBaseSinglePoint)) {
+            ack(response, requestHeader, kResponseError);
+            return;
+        }
+
+        if ((payloadLength >= 12) && payload[4] != 0) {
+            copyFixedString(reinterpret_cast<uint8_t*>(settings.baseId), sizeof(settings.baseId),
+                            reinterpret_cast<const char*>(payload + 4));
+        }
+
+        if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)
+            && (fixedBaseMode == kBaseKnownPoint)) {
+            if (payloadLength < 44) {
+                ack(response, requestHeader, kResponseError);
+                return;
+            }
+
+            double longitude = 0.0;
+            double latitude = 0.0;
+            double altitude = 0.0;
+            std::memcpy(&longitude, &payload[12], sizeof(longitude));
+            std::memcpy(&latitude, &payload[24], sizeof(latitude));
+            std::memcpy(&altitude, &payload[36], sizeof(altitude));
+            longitude = applyHemisphere(longitude, 'E', 'W', static_cast<char>(payload[20]));
+            latitude = applyHemisphere(latitude, 'N', 'S', static_cast<char>(payload[32]));
+
+            if (!isValidGeodeticPosition(longitude, latitude, altitude)) {
+                ack(response, requestHeader, kResponseError);
+                return;
+            }
+
+            settings.fixedBase = true;
+            settings.fixedBaseCoordinateType = COORD_TYPE_GEODETIC;
+            settings.fixedLong = longitude;
+            settings.fixedLat = latitude;
+            settings.fixedAltitude = altitude;
+        } else {
+            settings.fixedBase = false;
+        }
+
+        systemPrintf("[Bluetooth] Work mode set: mode=0x%02X fixedBase=0x%02X baseEnable=0x%02X baseId=%s\r\n",
+                     requestedMode, fixedBaseMode, baseEnable, settings.baseId);
+
+        if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)) {
+            requestChangeState(STATE_BASE_NOT_STARTED);
+        } else {
+            requestChangeState(STATE_ROVER_NOT_STARTED);
+        }
+
         ack(response, requestHeader, 1);
     }
 }
@@ -441,7 +520,7 @@ handleWifiControl(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& request
                      wifiInfo[3]);
         ack(response, requestHeader, 0x01);
         if (wifiStatus == 0x01) {
-            changeState(STATE_WEB_CONFIG_NOT_STARTED);
+            requestChangeState(STATE_WEB_CONFIG_NOT_STARTED);
         }
     }
 }

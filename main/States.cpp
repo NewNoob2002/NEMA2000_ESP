@@ -284,8 +284,6 @@ stateUpdate(UnicoreUM980* gnss) {
 
             /* WEB CONFIG STATES */
             case (STATE_WEB_CONFIG_NOT_STARTED): {
-                bluetoothEnd(); // Bluetooth must end to allow enough RAM for AP+STA (firmware check)
-
                 webServerStart(); // Start the webserver state machine for web config
                 RTK_MODE(RTK_MODE_WEB_CONFIG);
                 changeState(STATE_WEB_CONFIG_WAIT_FOR_NETWORK);
