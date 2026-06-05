@@ -2,7 +2,6 @@
 
 #ifdef COMPILE_WIFI
 
-#include <DNSServer.h>
 #include <WiFi.h>
 #include <string.h>
 #include "Support.h"
@@ -11,7 +10,6 @@ static const char* wifiSoftApSsid = "S20 Config";
 static const char* wifiSoftApPassword = "12345678";
 static const char* wifiSoftApName = "Soft AP";
 
-static DNSServer dnsServer;
 static struct settings_t* wifiPreviousSettings;
 static bool wifiSoftApSsidSet;
 static bool wifiStationSsidSet;
@@ -30,13 +28,6 @@ copyCredential(char* destination, size_t destinationLength, const char* source) 
     }
     strncpy(destination, source, destinationLength - 1);
     destination[destinationLength - 1] = 0;
-}
-
-void
-wifiUpdate() {
-    if (settings.enableCaptivePortal && online_devices.wifi.wifiSoftApRunning) {
-        dnsServer.processNextRequest();
-    }
 }
 
 bool
@@ -473,14 +464,6 @@ RTK_WIFI::softApStart() {
     online_devices.wifi.wifiSoftApRunning = true;
     online_devices.wifi.wifiSoftApOnline = true;
 
-    if (settings.enableCaptivePortal) {
-        if (!dnsServer.start(53, "*", WiFi.softAPIP())) {
-            systemPrintln("ERROR: Failed to start DNS server for captive portal");
-            softApStop();
-            return false;
-        }
-    }
-
     if (settings.debugWifiState) {
         systemPrintf("WiFi: Soft AP online, SSID: %s, IP: %s, Password: %s\r\n", _apSsid,
                      WiFi.softAPIP().toString().c_str(), wifiSoftApPassword);
@@ -491,7 +474,6 @@ RTK_WIFI::softApStart() {
 
 bool
 RTK_WIFI::softApStop() {
-    dnsServer.stop();
     const bool stopped = WiFi.softAPdisconnect(false);
     online_devices.wifi.wifiSoftApRunning = false;
     online_devices.wifi.wifiSoftApOnline = false;

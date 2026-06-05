@@ -7,6 +7,7 @@
 #ifndef COMPILE_WIFI
 #if defined(COMPILE_WEBSERVER)
 #define COMPILE_WIFI
+#define COMPILE_NETWORK
 #endif
 #endif
 

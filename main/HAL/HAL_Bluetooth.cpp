@@ -7,11 +7,11 @@
 
 #include "HardwareSerial.h"
 #include "SparkFun_Extensible_Message_Parser.h"
+#include "States.h"
 #include "Support.h"
 #include "Unicore_UM980.h"
 #include "esp_app_desc.h"
 #include "mcu_settings.h"
-#include "semp_crc32.h"
 
 namespace HAL {
 extern HardwareSerial* gnssSerial;
@@ -34,7 +34,7 @@ constexpr size_t kBluetoothRxBufferSize = 512;
 constexpr size_t kBluetoothMaxPayload = 256;
 constexpr size_t kBluetoothTxBufferSize = sizeof(SEMP_CUSTOM_HEADER) + kBluetoothMaxPayload + sizeof(uint32_t);
 constexpr uint32_t kBluetoothParserBufferSize = 1024 * 2;
-constexpr uint32_t kBluetoothReadTaskStack = 2048;
+constexpr uint32_t kBluetoothReadTaskStack = 3072;
 
 enum BluetoothParserType : uint16_t {
     BluetoothAPPType = 0,
@@ -433,13 +433,17 @@ handleWifiControl(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& request
         response.payload[3] = 10;
         response.payload[4] = 12;
         return;
+    } else if (requestHeader.messageType == kMsgSetType) {
+        uint8_t wifiStatus = payload[0];
+        char wifiInfo[4] = {};
+        std::memcpy(wifiInfo, &payload[1], 4);
+        systemPrintf("[Bluetooth] Set Wifi Info :%d, %d.%d.%d.%d\n", wifiStatus, wifiInfo[0], wifiInfo[1], wifiInfo[2],
+                     wifiInfo[3]);
+        ack(response, requestHeader, 0x01);
+        if (wifiStatus == 0x01) {
+            changeState(STATE_WEB_CONFIG_NOT_STARTED);
+        }
     }
-    uint8_t wifiStatus = payload[0];
-    char wifiInfo[4] = {};
-    std::memcpy(wifiInfo, &payload[1], 4);
-    systemPrintf("[Bluetooth] Set Wifi Info :%d, %d.%d.%d.%d", wifiStatus, wifiInfo[0], wifiInfo[1], wifiInfo[2],
-                 wifiInfo[3]);
-    ack(response, requestHeader, 0x01);
 }
 
 void
@@ -534,11 +538,11 @@ processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
     }
     response.msgInterval = requestHeader->MsgInterval;
 
-    systemPrintf("[Bluetooth]Rev 0x%02x, type 0x%02x, length: %d :", messageId, response.messageType, payloadLength);
+    // systemPrintf("[Bluetooth]Rev 0x%02x, type 0x%02x, length: %d :", messageId, response.messageType, payloadLength);
     // for (int i = 0; i < payloadLength; i++) {
     //     systemPrintf("0x%02x ", parse->buffer[sizeof(SEMP_CUSTOM_HEADER) + i]);
     // }
-    systemPrintln();
+    // systemPrintln();
 
     switch (messageId) {
         case 0x01: handleModelQuery(response, *requestHeader); break;

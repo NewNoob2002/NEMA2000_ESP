@@ -16,7 +16,6 @@ typedef uint8_t WIFI_CHANNEL_t;
 bool wifiSettingsChangedAndFree();
 bool wifiSettingsChanged(struct settings_t* newSettings);
 void wifiSettingsClone();
-void wifiUpdate();
 void wifiUpdateSettings();
 
 bool wifiSoftApOn(const char* fileName, uint32_t lineNumber);

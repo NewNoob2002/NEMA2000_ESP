@@ -94,8 +94,6 @@ HAL_Update(void* e) {
 
     bluetoothUpdate();
 
-    wifiUpdate();
-
     webServerUpdate();
 
 #ifdef COMPILE_WEBSERVER
@@ -132,17 +130,17 @@ HAL_Init() {
     stateInit();
     DMW_b("wifiUpdateSettings");
     wifiUpdateSettings();
-    if (settings.wifiConfigOverAP) {
-        DMW_b("wifiSoftApOn");
-        wifiSoftApOn(__FILE__, __LINE__);
-    } else if (wifiNetworkCount() > 0) {
-        DMW_b("wifiStationOn");
-        wifiStationOn(__FILE__, __LINE__);
-    }
-    DMW_b("webServerStart");
-    webServerStart();
-    DMW_b("webServerUpdate");
-    webServerUpdate();
+    // if (settings.wifiConfigOverAP) {
+    //     DMW_b("wifiSoftApOn");
+    //     wifiSoftApOn(__FILE__, __LINE__);
+    // } else if (wifiNetworkCount() > 0) {
+    //     DMW_b("wifiStationOn");
+    //     wifiStationOn(__FILE__, __LINE__);
+    // }
+    // DMW_b("webServerStart");
+    // webServerStart();
+    // DMW_b("webServerUpdate");
+    // webServerUpdate();
 
     showBootTimes();
 }
