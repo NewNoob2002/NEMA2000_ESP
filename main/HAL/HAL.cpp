@@ -106,7 +106,7 @@ HAL_Update(void* e) {
 void
 HAL_Init() {
     DMW_b("Serial.begin");
-    Serial.begin(115200);
+    Serial.begin(460800);
     // Initialize the power module.
     DMW_b("Power_Init");
     Power_Init();

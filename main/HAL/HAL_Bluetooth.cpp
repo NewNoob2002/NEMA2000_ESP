@@ -179,16 +179,16 @@ ack(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHeader, uint8_
     return true;
 }
 
-float
-decodeMessagePeriod(const int8_t interval) {
-    if (interval == 0) {
-        return 0.0f;
-    }
-    if (interval > 0) {
-        return 1.0f / static_cast<float>(interval);
-    }
-    return static_cast<float>(-interval);
-}
+// float
+// decodeMessagePeriod(const int8_t interval) {
+//     if (interval == 0) {
+//         return 0.0f;
+//     }
+//     if (interval > 0) {
+//         return 1.0f / static_cast<float>(interval);
+//     }
+//     return static_cast<float>(-interval);
+// }
 
 bool
 setNmeaPeriod(const char* messageName, const int8_t interval) {
@@ -243,6 +243,8 @@ handleBatteryStorageQuery(BluetoothResponse& response, const SEMP_CUSTOM_HEADER&
         return;
     }
     response.payload[0] = online_devices.bq40z50 ? 0x01 : 0x00;
+    response.payload[2] = online_devices.bq40z50 ? 0x01 : 0x00;
+    response.payload[12] = online_devices.bq40z50 ? 0x01 : 0x00;
 }
 
 void

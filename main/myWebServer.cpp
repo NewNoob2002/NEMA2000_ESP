@@ -42,14 +42,14 @@ static const char* const text_html = "text/html";
 static const char* const text_javascript = "text/javascript";
 static const char* const text_plain = "text/plain";
 
-#define UPLOAD_FIRMWARE              "/uploadFirmware"
-#define PROFILE_LIST                 "/profile/list"
-#define PROFILE_DOWNLOAD             "/profile/download"
-#define PROFILE_UPLOAD               "/profile/upload"
-#define PROFILE_ACTIVATE             "/profile/activate"
-#define PROFILE_DELETE               "/profile/delete"
-#define PROFILE_DIR                  "/littlefs/profiles"
-#define PROFILE_ACTIVE_FILE          "/littlefs/profiles/active.txt"
+#define UPLOAD_FIRMWARE     "/uploadFirmware"
+#define PROFILE_LIST        "/profile/list"
+#define PROFILE_DOWNLOAD    "/profile/download"
+#define PROFILE_UPLOAD      "/profile/upload"
+#define PROFILE_ACTIVATE    "/profile/activate"
+#define PROFILE_DELETE      "/profile/delete"
+#define PROFILE_DIR         "/littlefs/profiles"
+#define PROFILE_ACTIVE_FILE "/littlefs/profiles/active.txt"
 
 //----------------------------------------
 // Locals
@@ -775,36 +775,6 @@ webServerSendProfileList() {
     webServerSendString(packet);
 }
 
-static void
-webServerFormatUptime(char* buffer, size_t bufferLength) {
-    const uint32_t uptimeSeconds = millis() / 1000U;
-    const uint32_t days = uptimeSeconds / 86400U;
-    const uint32_t hours = (uptimeSeconds % 86400U) / 3600U;
-    const uint32_t minutes = (uptimeSeconds % 3600U) / 60U;
-    const uint32_t seconds = uptimeSeconds % 60U;
-
-    if (days > 0U) {
-        snprintf(buffer, bufferLength, "%lu d %02lu:%02lu:%02lu", static_cast<unsigned long>(days),
-                 static_cast<unsigned long>(hours), static_cast<unsigned long>(minutes),
-                 static_cast<unsigned long>(seconds));
-    } else {
-        snprintf(buffer, bufferLength, "%02lu:%02lu:%02lu", static_cast<unsigned long>(hours),
-                 static_cast<unsigned long>(minutes), static_cast<unsigned long>(seconds));
-    }
-}
-
-static void
-webServerFormatUtcTime(char* buffer, size_t bufferLength) {
-    const UnicoreUM980* gnss = HAL::gUm980;
-    if ((gnss == nullptr) || !gnss->isValidDate() || !gnss->isValidTime()) {
-        snprintf(buffer, bufferLength, "Waiting for GNSS");
-        return;
-    }
-
-    snprintf(buffer, bufferLength, "%04u-%02u-%02u %02u:%02u:%02u.%03u UTC", gnss->getYear(), gnss->getMonth(),
-             gnss->getDay(), gnss->getHour(), gnss->getMinute(), gnss->getSecond(), gnss->getMillisecond());
-}
-
 static const char*
 webServerFixText(const UnicoreUM980* gnss) {
     if (gnss == nullptr) {
@@ -856,22 +826,17 @@ webServerSendLiveStatus() {
     webServerLastStatusPushMs = now;
 
     const UnicoreUM980* gnss = HAL::gUm980;
-    char utcTime[64] = {};
-    char uptime[32] = {};
-    char position[160] = {};
-
-    webServerFormatUtcTime(utcTime, sizeof(utcTime));
-    webServerFormatUptime(uptime, sizeof(uptime));
+    char position[64] = {};
     webServerFormatPosition(position, sizeof(position));
 
-    char packet[320] = {};
+    char packet[128] = {};
     char satellitesInViewText[16] = {};
     char satellitesUsedText[16] = {};
     snprintf(satellitesInViewText, sizeof(satellitesInViewText), "%u", gnss ? gnss->getSatellitesInView() : 0U);
     snprintf(satellitesUsedText, sizeof(satellitesUsedText), "%u", gnss ? gnss->getSatellitesUsed() : 0U);
 
-    webServerAppendField(packet, sizeof(packet), "utcTime", utcTime);
-    webServerAppendField(packet, sizeof(packet), "systemUptime", uptime);
+    // webServerAppendField(packet, sizeof(packet), "utcTime", utcTime);
+    // webServerAppendField(packet, sizeof(packet), "systemUptime", uptime);
     webServerAppendField(packet, sizeof(packet), "satellitesInView", satellitesInViewText);
     webServerAppendField(packet, sizeof(packet), "satellitesUsed", satellitesUsedText);
     webServerAppendField(packet, sizeof(packet), "rtkPosition", position);
