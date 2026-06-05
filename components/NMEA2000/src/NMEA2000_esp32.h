@@ -106,14 +106,13 @@ class tNMEA2000_esp32 : public tNMEA2000 {
     static void TxTaskEntry(void* arg);
     static void CtrlTaskEntry(void* arg);
 
-    static bool IRAM_ATTR OnTxDone(twai_node_handle_t handle, const twai_tx_done_event_data_t* edata, void* user_ctx);
+    static bool OnTxDone(twai_node_handle_t handle, const twai_tx_done_event_data_t* edata, void* user_ctx);
 
-    static bool IRAM_ATTR OnRxDone(twai_node_handle_t handle, const twai_rx_done_event_data_t* edata, void* user_ctx);
+    static bool OnRxDone(twai_node_handle_t handle, const twai_rx_done_event_data_t* edata, void* user_ctx);
 
-    static bool IRAM_ATTR OnError(twai_node_handle_t handle, const twai_error_event_data_t* edata, void* user_ctx);
+    static bool OnError(twai_node_handle_t handle, const twai_error_event_data_t* edata, void* user_ctx);
 
-    static bool IRAM_ATTR OnStateChange(twai_node_handle_t handle, const twai_state_change_event_data_t* edata,
-                                        void* user_ctx);
+    static bool OnStateChange(twai_node_handle_t handle, const twai_state_change_event_data_t* edata, void* user_ctx);
 
     void TxTask();
     void CtrlTask();

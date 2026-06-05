@@ -532,11 +532,11 @@ processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
     }
     response.msgInterval = requestHeader->MsgInterval;
 
-    // systemPrintf("[Bluetooth]Rev 0x%02x, type 0x%02x, length: %d :", messageId, response.messageType, payloadLength);
+    systemPrintf("[Bluetooth]Rev 0x%02x, type 0x%02x, length: %d :", messageId, response.messageType, payloadLength);
     // for (int i = 0; i < payloadLength; i++) {
     //     systemPrintf("0x%02x ", parse->buffer[sizeof(SEMP_CUSTOM_HEADER) + i]);
     // }
-    // systemPrintln();
+    systemPrintln();
 
     switch (messageId) {
         case 0x01: handleModelQuery(response, *requestHeader); break;
@@ -677,12 +677,14 @@ void
 bluetoothInit() {
     bluetoothStart();
     if (!online_devices.bluetooth) {
+        systemPrintf("Bluetooth not enabled\r\n");
         return;
     }
 
     if (btReadTaskHandle == nullptr) {
         xTaskCreatePinnedToCore(btReadTask, "btReadTask", kBluetoothReadTaskStack, nullptr, settings.btReadTaskPriority,
                                 &btReadTaskHandle, settings.btReadTaskCore);
+        systemPrintf("Bluetooth read task created on core %d\r\n", settings.btReadTaskCore);
     }
 }
 } // namespace HAL

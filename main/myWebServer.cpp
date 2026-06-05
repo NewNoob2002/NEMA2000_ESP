@@ -27,11 +27,11 @@ extern UnicoreUM980* gUm980;
 // Constants
 //----------------------------------------
 
-static const size_t webServerStackSize = 1024 * 20;
-static const size_t firmwareBufferLength = 16 * 1024;
+static const size_t webServerStackSize = 1024 * 12;
+static const size_t firmwareBufferLength = 8 * 1024;
 static const size_t profileUploadBufferLength = 1024;
-static const size_t profileMaxFileSize = 32 * 1024;
-static const size_t profileMaxNameLength = 63;
+static const size_t profileMaxFileSize = 8 * 1024;
+static const size_t profileMaxNameLength = 31;
 static const uint32_t webServerStartRetryMs = 1000;
 static const uint32_t webServerConfigSessionGraceMs = 5000;
 
@@ -42,24 +42,14 @@ static const char* const text_html = "text/html";
 static const char* const text_javascript = "text/javascript";
 static const char* const text_plain = "text/plain";
 
-#define CAPTIVE_ANDROID_GENERATE_204 "/generate_204"
-#define CAPTIVE_ANDROID_GEN_204 "/gen_204"
-#define CAPTIVE_APPLE_HOTSPOT_DETECT "/hotspot-detect.html"
-#define CAPTIVE_APPLE_SUCCESS "/library/test/success.html"
-#define CAPTIVE_CHROME_SUCCESS "/success.txt"
-#define CAPTIVE_PORTAL "/portal"
-#define CAPTIVE_PORTAL_COMPLETE "/portal/complete"
-#define CAPTIVE_REDIRECT "/redirect"
-#define CAPTIVE_WINDOWS_CONNECT_TEST "/connecttest.txt"
-#define CAPTIVE_WINDOWS_NCSI "/ncsi.txt"
-#define UPLOAD_FIRMWARE "/uploadFirmware"
-#define PROFILE_LIST "/profile/list"
-#define PROFILE_DOWNLOAD "/profile/download"
-#define PROFILE_UPLOAD "/profile/upload"
-#define PROFILE_ACTIVATE "/profile/activate"
-#define PROFILE_DELETE "/profile/delete"
-#define PROFILE_DIR "/littlefs/profiles"
-#define PROFILE_ACTIVE_FILE "/littlefs/profiles/active.txt"
+#define UPLOAD_FIRMWARE              "/uploadFirmware"
+#define PROFILE_LIST                 "/profile/list"
+#define PROFILE_DOWNLOAD             "/profile/download"
+#define PROFILE_UPLOAD               "/profile/upload"
+#define PROFILE_ACTIVATE             "/profile/activate"
+#define PROFILE_DELETE               "/profile/delete"
+#define PROFILE_DIR                  "/littlefs/profiles"
+#define PROFILE_ACTIVE_FILE          "/littlefs/profiles/active.txt"
 
 //----------------------------------------
 // Locals
@@ -70,8 +60,8 @@ static int webServerClientSocket = -1;
 static WebServerState webServerState = WEBSERVER_STATE_OFF;
 static uint32_t webServerLastStartAttemptMs = 0;
 static uint32_t webServerLastStatusPushMs = 0;
+static uint32_t webServerLastConfigActivityMs = 0;
 static uint32_t webServerLastWsActivityMs = 0;
-static bool webServerCaptivePortalComplete = false;
 
 static const char* const webServerStateNames[] = {
     "WEBSERVER_STATE_OFF",
@@ -85,10 +75,9 @@ static const char* const webServerStateNames[] = {
 //----------------------------------------
 
 static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req);
-static esp_err_t webServerHandlerCaptivePortalComplete(httpd_req_t* req);
-static esp_err_t webServerHandlerCaptivePortalProbe(httpd_req_t* req);
-static esp_err_t webServerHandlerCaptivePortalWelcome(httpd_req_t* req);
 static esp_err_t webServerHandlerGetPage(httpd_req_t* req);
+static esp_err_t webServerHandlerHead(httpd_req_t* req);
+static esp_err_t webServerHandlerMethodNotFound(httpd_req_t* req);
 static esp_err_t webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error);
 static esp_err_t webServerHandlerProfileActivate(httpd_req_t* req);
 static esp_err_t webServerHandlerProfileDelete(httpd_req_t* req);
@@ -102,6 +91,7 @@ static bool webServerBuildSettingsCsv(char* buffer, size_t bufferLength);
 static void webServerSendProfileList();
 static void webServerSendLiveStatus();
 static void webServerHandleClientMessage(const char* message);
+static void webServerMarkConfigActivity();
 
 //----------------------------------------
 // Web page descriptions
@@ -124,18 +114,6 @@ const GET_PAGE_HANDLER webServerPages[] = {
     PAGE_HANDLER(8, PROFILE_UPLOAD, HTTP_POST, text_plain, webServerHandlerProfileUpload),
     PAGE_HANDLER(9, PROFILE_ACTIVATE, HTTP_POST, text_plain, webServerHandlerProfileActivate),
     PAGE_HANDLER(10, PROFILE_DELETE, HTTP_POST, text_plain, webServerHandlerProfileDelete),
-
-    // OS captive-portal probes
-    PAGE_HANDLER(11, CAPTIVE_ANDROID_GENERATE_204, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
-    PAGE_HANDLER(12, CAPTIVE_ANDROID_GEN_204, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
-    PAGE_HANDLER(13, CAPTIVE_APPLE_HOTSPOT_DETECT, HTTP_GET, text_html, webServerHandlerCaptivePortalProbe),
-    PAGE_HANDLER(14, CAPTIVE_APPLE_SUCCESS, HTTP_GET, text_html, webServerHandlerCaptivePortalProbe),
-    PAGE_HANDLER(15, CAPTIVE_CHROME_SUCCESS, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
-    PAGE_HANDLER(16, CAPTIVE_PORTAL, HTTP_GET, text_html, webServerHandlerCaptivePortalWelcome),
-    PAGE_HANDLER(17, CAPTIVE_PORTAL_COMPLETE, HTTP_GET, text_plain, webServerHandlerCaptivePortalComplete),
-    PAGE_HANDLER(18, CAPTIVE_REDIRECT, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
-    PAGE_HANDLER(19, CAPTIVE_WINDOWS_CONNECT_TEST, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
-    PAGE_HANDLER(20, CAPTIVE_WINDOWS_NCSI, HTTP_GET, text_plain, webServerHandlerCaptivePortalProbe),
 };
 
 const int webServerTotalPages = sizeof(webServerPages) / sizeof(webServerPages[0]);
@@ -147,6 +125,22 @@ static const httpd_uri_t webServerWebSocketPage = {.uri = "/ws",
                                                    .is_websocket = true,
                                                    .handle_ws_control_frames = true,
                                                    .supported_subprotocol = NULL};
+
+static const httpd_uri_t webServerHeadPage = {.uri = "/*",
+                                              .method = HTTP_HEAD,
+                                              .handler = webServerHandlerHead,
+                                              .user_ctx = NULL,
+                                              .is_websocket = false,
+                                              .handle_ws_control_frames = false,
+                                              .supported_subprotocol = NULL};
+
+static const httpd_uri_t webServerPostNotFoundPage = {.uri = "/*",
+                                                      .method = HTTP_POST,
+                                                      .handler = webServerHandlerMethodNotFound,
+                                                      .user_ctx = NULL,
+                                                      .is_websocket = false,
+                                                      .handle_ws_control_frames = false,
+                                                      .supported_subprotocol = NULL};
 
 //----------------------------------------
 // Web settings field API
@@ -680,13 +674,15 @@ webServerBuildProfileListJson(char* buffer, size_t bufferLength) {
     int count = 0;
 
     buffer[0] = 0;
-    snprintf(buffer, bufferLength, "{\"status\":\"%s\",\"current\":\"", online_devices.littlefs ? "ok" : "littlefs-offline");
+    snprintf(buffer, bufferLength, "{\"status\":\"%s\",\"current\":\"",
+             online_devices.littlefs ? "ok" : "littlefs-offline");
     if (!webServerAppendJsonEscaped(buffer, bufferLength, settings.profileName)) {
         return false;
     }
     strlcat(buffer, "\",\"active\":\"", bufferLength);
 
-    if (online_devices.littlefs && webServerEnsureProfileDir() && webServerReadActiveProfile(activeProfile, sizeof(activeProfile))) {
+    if (online_devices.littlefs && webServerEnsureProfileDir()
+        && webServerReadActiveProfile(activeProfile, sizeof(activeProfile))) {
         if (!webServerAppendJsonEscaped(buffer, bufferLength, activeProfile)) {
             return false;
         }
@@ -734,7 +730,8 @@ webServerSendProfileList() {
     char value[96] = {};
     int count = 0;
 
-    webServerAppendField(packet, sizeof(packet), "profileListStatus", online_devices.littlefs ? "ok" : "littlefs-offline");
+    webServerAppendField(packet, sizeof(packet), "profileListStatus",
+                         online_devices.littlefs ? "ok" : "littlefs-offline");
     webServerAppendField(packet, sizeof(packet), "profileCurrent", settings.profileName);
 
     if (!online_devices.littlefs || !webServerEnsureProfileDir()) {
@@ -1071,6 +1068,8 @@ dataIsGzipCompressed(const uint8_t* data, size_t length) {
 
 static esp_err_t
 webServerHandlerGetPage(httpd_req_t* req) {
+    webServerMarkConfigActivity();
+
     const uintptr_t index = reinterpret_cast<uintptr_t>(req->user_ctx);
     if (index >= static_cast<uintptr_t>(webServerTotalPages)) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid page index");
@@ -1089,81 +1088,16 @@ webServerHandlerGetPage(httpd_req_t* req) {
 }
 
 static esp_err_t
-webServerRedirect(httpd_req_t* req, const char* location) {
-    httpd_resp_set_status(req, "302 Found");
-    httpd_resp_set_hdr(req, "Location", location);
+webServerHandlerHead(httpd_req_t* req) {
+    webServerMarkConfigActivity();
+
+    httpd_resp_set_type(req, text_html);
     return httpd_resp_send(req, nullptr, 0);
 }
 
 static esp_err_t
-webServerHandlerCaptivePortalWelcome(httpd_req_t* req) {
-    const char* displayName = productPropertiesTable[productType].displayName[0]
-                                  ? productPropertiesTable[productType].displayName
-                                  : productPropertiesTable[productType].name;
-
-    char page[1400] = {};
-    snprintf(page, sizeof(page),
-             "<!doctype html><html><head><meta charset=\"utf-8\">"
-             "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-             "<title>%s Setup</title>"
-             "<style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f6f8;color:#1a1d23}"
-             ".card{max-width:420px;margin:12vh auto;padding:28px;background:#fff;border:1px solid #e4e8ee;border-radius:16px;"
-             "box-shadow:0 8px 30px rgba(0,0,0,.08)}h1{margin:0 0 10px;font-size:24px}p{color:#5f6672;line-height:1.5}"
-             "a{display:block;text-align:center;margin-top:22px;padding:13px 18px;border-radius:10px;background:#1d4ed8;color:#fff;"
-             "font-weight:700;text-decoration:none}</style></head><body><main class=\"card\">"
-             "<h1>Welcome to %s</h1><p>This access point is used to configure the receiver. Click Go to finish portal "
-             "detection and open the main configuration page.</p><a href=\"%s\">Go</a></main></body></html>",
-             displayName, displayName, CAPTIVE_PORTAL_COMPLETE);
-
-    httpd_resp_set_type(req, text_html);
-    return httpd_resp_sendstr(req, page);
-}
-
-static esp_err_t
-webServerHandlerCaptivePortalComplete(httpd_req_t* req) {
-    webServerCaptivePortalComplete = true;
-    return webServerRedirect(req, "/");
-}
-
-static esp_err_t
-webServerHandlerCaptivePortalProbe(httpd_req_t* req) {
-    if (settings.debugWebServer) {
-        ESP_LOGI(TAG, "Captive probe %s", req->uri);
-    }
-
-    if (!webServerCaptivePortalComplete) {
-        return webServerRedirect(req, CAPTIVE_PORTAL);
-    }
-
-    if ((strcmp(req->uri, CAPTIVE_ANDROID_GENERATE_204) == 0) || (strcmp(req->uri, CAPTIVE_ANDROID_GEN_204) == 0)) {
-        httpd_resp_set_status(req, "204 No Content");
-        return httpd_resp_send(req, nullptr, 0);
-    }
-
-    if ((strcmp(req->uri, CAPTIVE_APPLE_HOTSPOT_DETECT) == 0) || (strcmp(req->uri, CAPTIVE_APPLE_SUCCESS) == 0)) {
-        httpd_resp_set_type(req, text_html);
-        return httpd_resp_sendstr(req, "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>");
-    }
-
-    if (strcmp(req->uri, CAPTIVE_WINDOWS_CONNECT_TEST) == 0) {
-        httpd_resp_set_type(req, text_plain);
-        return httpd_resp_sendstr(req, "Microsoft Connect Test");
-    }
-
-    if (strcmp(req->uri, CAPTIVE_WINDOWS_NCSI) == 0) {
-        httpd_resp_set_type(req, text_plain);
-        return httpd_resp_sendstr(req, "Microsoft NCSI");
-    }
-
-    if (strcmp(req->uri, CAPTIVE_CHROME_SUCCESS) == 0) {
-        httpd_resp_set_type(req, text_plain);
-        return httpd_resp_sendstr(req, "success");
-    }
-
-    if (strcmp(req->uri, CAPTIVE_REDIRECT) == 0) {
-        return webServerRedirect(req, "/");
-    }
-
+webServerHandlerMethodNotFound(httpd_req_t* req) {
+    webServerMarkConfigActivity();
     return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
 }
 
@@ -1198,7 +1132,8 @@ webServerHandlerProfileDelete(httpd_req_t* req) {
     char path[96] = {};
     char activeProfile[profileMaxNameLength + 1] = {};
 
-    if (!webServerGetProfileNameFromQuery(req, name, sizeof(name)) || !webServerBuildProfilePath(name, path, sizeof(path))) {
+    if (!webServerGetProfileNameFromQuery(req, name, sizeof(name))
+        || !webServerBuildProfilePath(name, path, sizeof(path))) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid profile name");
     }
     if (!online_devices.littlefs || !LittleFS.exists(path)) {
@@ -1224,7 +1159,8 @@ webServerHandlerProfileDownload(httpd_req_t* req) {
     if (!online_devices.littlefs) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "LittleFS is not mounted");
     }
-    if (!webServerGetProfileNameFromQuery(req, name, sizeof(name)) || !webServerBuildProfilePath(name, path, sizeof(path))) {
+    if (!webServerGetProfileNameFromQuery(req, name, sizeof(name))
+        || !webServerBuildProfilePath(name, path, sizeof(path))) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid profile name");
     }
 
@@ -1467,12 +1403,14 @@ webServerHandlerFirmwareUpload(httpd_req_t* req) {
 static esp_err_t
 webServerHandlerWebSockets(httpd_req_t* req) {
     if (req->method == HTTP_GET) {
+        webServerMarkConfigActivity();
         webServerClientSocket = httpd_req_to_sockfd(req);
         webServerLastWsActivityMs = millis();
         ESP_LOGI(TAG, "WS connected, socket=%d", webServerClientSocket);
         return ESP_OK;
     }
 
+    webServerMarkConfigActivity();
     webServerLastWsActivityMs = millis();
 
     httpd_ws_frame_t packet = {};
@@ -1555,7 +1493,8 @@ webServerHandleClientMessage(const char* message) {
 static esp_err_t
 webServerHandlerPageNotFound(httpd_req_t* req, httpd_err_code_t error) {
     (void)error;
-    return webServerRedirect(req, webServerCaptivePortalComplete ? "/" : CAPTIVE_PORTAL);
+    webServerMarkConfigActivity();
+    return httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Not found");
 }
 
 //----------------------------------------
@@ -1594,6 +1533,7 @@ webServerAssignResources() {
     config.max_uri_handlers = webServerTotalPages + 4;
     config.max_open_sockets = 5;
     config.lru_purge_enable = true;
+    config.uri_match_fn = httpd_uri_match_wildcard;
 
     if (settings.debugWebServer) {
         webServerHttpdDisplayConfig(&config);
@@ -1611,10 +1551,12 @@ webServerAssignResources() {
     }
 
     bool success = webServerRegisterErrorHandler(HTTPD_404_NOT_FOUND, webServerHandlerPageNotFound)
+                   && webServerRegisterPageHandler(&webServerHeadPage)
                    && webServerRegisterPageHandler(&webServerWebSocketPage);
     for (int index = 0; success && (index < webServerTotalPages); index++) {
         success = webServerRegisterPageHandler(&webServerPages[index]._page);
     }
+    success = success && webServerRegisterPageHandler(&webServerPostNotFoundPage);
 
     if (!success) {
         webServerStop();
@@ -1637,7 +1579,6 @@ webServerStart() {
         wifiSoftApOn(__FILE__, __LINE__);
     }
     if (webServerState == WEBSERVER_STATE_OFF) {
-        webServerCaptivePortalComplete = false;
         webServerState = WEBSERVER_STATE_WAIT_FOR_NETWORK;
     }
 }
@@ -1649,7 +1590,7 @@ webServerStop() {
         webServerHandle = nullptr;
     }
     webServerClientSocket = -1;
-    webServerCaptivePortalComplete = false;
+    webServerLastConfigActivityMs = 0;
     webServerLastWsActivityMs = 0;
     webServerLastStartAttemptMs = 0;
     webServerState = WEBSERVER_STATE_OFF;
@@ -1694,10 +1635,23 @@ webServerHasActiveConfigSession() {
     }
 
     if (webServerLastWsActivityMs == 0U) {
-        return false;
+        if (webServerLastConfigActivityMs == 0U) {
+            return false;
+        }
+        return (millis() - webServerLastConfigActivityMs) < webServerConfigSessionGraceMs;
     }
 
-    return (millis() - webServerLastWsActivityMs) < webServerConfigSessionGraceMs;
+    if ((millis() - webServerLastWsActivityMs) < webServerConfigSessionGraceMs) {
+        return true;
+    }
+
+    return (webServerLastConfigActivityMs != 0U)
+           && ((millis() - webServerLastConfigActivityMs) < webServerConfigSessionGraceMs);
+}
+
+static void
+webServerMarkConfigActivity() {
+    webServerLastConfigActivityMs = millis();
 }
 
 void

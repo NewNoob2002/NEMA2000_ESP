@@ -433,7 +433,7 @@ tNMEA2000_esp32::CtrlTask() {
 
 // ----------------------------------------------------------------------------
 
-bool IRAM_ATTR
+bool
 tNMEA2000_esp32::OnTxDone(twai_node_handle_t handle, const twai_tx_done_event_data_t* edata, void* user_ctx) {
     (void)handle;
     tNMEA2000_esp32* self = static_cast<tNMEA2000_esp32*>(user_ctx);
@@ -454,7 +454,7 @@ tNMEA2000_esp32::OnTxDone(twai_node_handle_t handle, const twai_tx_done_event_da
 
 // ----------------------------------------------------------------------------
 
-bool IRAM_ATTR
+bool
 tNMEA2000_esp32::OnRxDone(twai_node_handle_t handle, const twai_rx_done_event_data_t* edata, void* user_ctx) {
     (void)edata;
     tNMEA2000_esp32* self = static_cast<tNMEA2000_esp32*>(user_ctx);
@@ -491,7 +491,7 @@ tNMEA2000_esp32::OnRxDone(twai_node_handle_t handle, const twai_rx_done_event_da
 
 // ----------------------------------------------------------------------------
 
-bool IRAM_ATTR
+bool
 tNMEA2000_esp32::OnError(twai_node_handle_t handle, const twai_error_event_data_t* edata, void* user_ctx) {
     (void)handle;
     tNMEA2000_esp32* self = static_cast<tNMEA2000_esp32*>(user_ctx);
@@ -521,7 +521,7 @@ tNMEA2000_esp32::OnError(twai_node_handle_t handle, const twai_error_event_data_
 
 // ----------------------------------------------------------------------------
 
-bool IRAM_ATTR
+bool
 tNMEA2000_esp32::OnStateChange(twai_node_handle_t handle, const twai_state_change_event_data_t* edata, void* user_ctx) {
     (void)handle;
     tNMEA2000_esp32* self = static_cast<tNMEA2000_esp32*>(user_ctx);

@@ -92,7 +92,8 @@ HAL_Update(void* e) {
 
     gnssUpdate();
 
-    // bluetoothUpdate();
+    bluetoothUpdate();
+
     wifiUpdate();
 
     webServerUpdate();
@@ -124,8 +125,8 @@ HAL_Init() {
     DMW_b("gnssInit");
     gnssInit();
 
-    // DMW_b("bluetoothInit");
-    // bluetoothInit();
+    DMW_b("bluetoothInit");
+    bluetoothInit();
 
     DMW_b("stateInit");
     stateInit();

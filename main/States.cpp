@@ -1,5 +1,4 @@
 #include "States.h"
-#include "Arduino.h"
 #include "GNSS.h"
 #include "Support.h"
 #include "Unicore_UM980.h"
@@ -214,9 +213,9 @@ stateUpdate(UnicoreUM980* gnss) {
                 const char* accUnits =
                     getHpaUnits(settings.surveyInStartingAccuracy, accuracy, sizeof(accuracy), 2, false);
 
-                // systemPrintf("Waiting for Horz Accuracy < %s (%s): %s%s%s%s, SIV: %d\r\n", accuracy, accUnits, temp,
-                //              (accUnits != units) ? " (" : "", (accUnits != units) ? units : "",
-                //              (accUnits != units) ? ")" : "", siv);
+                systemPrintf("Waiting for Horz Accuracy < %s (%s): %s%s%s%s, SIV: %d\r\n", accuracy, accUnits, temp,
+                             (accUnits != units) ? " (" : "", (accUnits != units) ? units : "",
+                             (accUnits != units) ? ")" : "", siv);
 
                 // On the mosaic-X5, the HPA is undefined while the GNSS is determining its fixed position
                 // We need to skip the HPA check...
@@ -312,7 +311,7 @@ stateUpdate(UnicoreUM980* gnss) {
             case (STATE_SHUTDOWN): break;
             case (STATE_NOT_SET): {
                 gnssConfigure(GNSS_CONFIG_ONCE);
-                changeState(STATE_BASE_NOT_STARTED);
+                changeState(STATE_ROVER_NOT_STARTED);
             } break;
         }
     }
