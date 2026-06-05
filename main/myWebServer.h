@@ -84,5 +84,6 @@ void webServerSendSettings();
 void webServerSendFirmwareVersion();
 void webServerVerifyTables();
 
+void webServerSetState(WebServerState newState);
 void webServerHttpdDisplayConfig(struct httpd_config* config);
 #endif // COMPILE_WEBSERVER

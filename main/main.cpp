@@ -2,10 +2,10 @@
  * NMEA0183 GNSS to NMEA2000 gateway for ESP32.
  */
 
+#include <cstdio>
+#include <cstdlib>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <cstdlib>
-#include <cstdio>
 #include "App/App.h"
 #include "HAL/HAL.h"
 #include "esp_heap_caps.h"
@@ -24,19 +24,13 @@ constexpr configSTACK_DEPTH_TYPE kStackWarnWords = 768;
 const char*
 taskStateText(const eTaskState state) {
     switch (state) {
-    case eRunning:
-        return "running";
-    case eReady:
-        return "ready";
-    case eBlocked:
-        return "blocked";
-    case eSuspended:
-        return "suspended";
-    case eDeleted:
-        return "deleted";
-    case eInvalid:
-    default:
-        return "invalid";
+        case eRunning: return "running";
+        case eReady: return "ready";
+        case eBlocked: return "blocked";
+        case eSuspended: return "suspended";
+        case eDeleted: return "deleted";
+        case eInvalid:
+        default: return "invalid";
     }
 }
 
@@ -85,8 +79,8 @@ logTaskDetails() {
                      static_cast<unsigned>(taskStatus[index].xTaskNumber), runtime, percentX100 / 100ULL,
                      percentX100 % 100ULL);
         } else {
-            ESP_LOGI(kTaskMonitorTag, "%-16s %-9s %2u %4s %10u %7u %10llu %3llu.%02llu%%",
-                     taskStatus[index].pcTaskName, taskStateText(taskStatus[index].eCurrentState),
+            ESP_LOGI(kTaskMonitorTag, "%-16s %-9s %2u %4s %10u %7u %10llu %3llu.%02llu%%", taskStatus[index].pcTaskName,
+                     taskStateText(taskStatus[index].eCurrentState),
                      static_cast<unsigned>(taskStatus[index].uxCurrentPriority), coreText,
                      static_cast<unsigned>(taskStatus[index].usStackHighWaterMark),
                      static_cast<unsigned>(taskStatus[index].xTaskNumber), runtime, percentX100 / 100ULL,
@@ -100,8 +94,8 @@ logTaskDetails() {
                      static_cast<unsigned>(taskStatus[index].usStackHighWaterMark),
                      static_cast<unsigned>(taskStatus[index].xTaskNumber));
         } else {
-            ESP_LOGI(kTaskMonitorTag, "%-16s %-9s %2u %4s %10u %7u runtime-disabled",
-                     taskStatus[index].pcTaskName, taskStateText(taskStatus[index].eCurrentState),
+            ESP_LOGI(kTaskMonitorTag, "%-16s %-9s %2u %4s %10u %7u runtime-disabled", taskStatus[index].pcTaskName,
+                     taskStateText(taskStatus[index].eCurrentState),
                      static_cast<unsigned>(taskStatus[index].uxCurrentPriority), coreText,
                      static_cast<unsigned>(taskStatus[index].usStackHighWaterMark),
                      static_cast<unsigned>(taskStatus[index].xTaskNumber));
@@ -159,7 +153,7 @@ extern "C" void
 app_main(void) {
     HAL::HAL_Init();
     App_Init();
-    startTaskMonitor();
+    // startTaskMonitor();
 
     while (true) {
         HAL::HAL_Update(nullptr);

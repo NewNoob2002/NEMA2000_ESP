@@ -3,6 +3,7 @@
 #include "HAL_Config.h"
 #include "States.h"
 #include "mcu_settings.h"
+#include "myNetwork.h"
 #include "myWIFI.h"
 #include "myWebServer.h"
 // Display boot times
@@ -94,6 +95,8 @@ HAL_Update(void* e) {
 
     bluetoothUpdate();
 
+    networkUpdate();
+
     webServerUpdate();
 
 #ifdef COMPILE_WEBSERVER
@@ -130,17 +133,8 @@ HAL_Init() {
     stateInit();
     DMW_b("wifiUpdateSettings");
     wifiUpdateSettings();
-    // if (settings.wifiConfigOverAP) {
-    //     DMW_b("wifiSoftApOn");
-    //     wifiSoftApOn(__FILE__, __LINE__);
-    // } else if (wifiNetworkCount() > 0) {
-    //     DMW_b("wifiStationOn");
-    //     wifiStationOn(__FILE__, __LINE__);
-    // }
-    // DMW_b("webServerStart");
-    // webServerStart();
-    // DMW_b("webServerUpdate");
-    // webServerUpdate();
+    DMW_b("networkBegin");
+    networkBegin();
 
     showBootTimes();
 }

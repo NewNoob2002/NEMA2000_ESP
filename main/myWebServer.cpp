@@ -3,7 +3,6 @@
 #ifdef COMPILE_WEBSERVER
 
 #include <Arduino.h>
-#include <ESPmDNS.h>
 #include <LittleFS.h>
 #include <Update.h>
 #include <ctype.h>
@@ -17,6 +16,7 @@
 #include "Unicore_UM980.h"
 #include "form.h"
 #include "mcu_settings.h"
+#include "myNetwork.h"
 #include "myWIFI.h"
 
 namespace HAL {
@@ -27,7 +27,7 @@ extern UnicoreUM980* gUm980;
 // Constants
 //----------------------------------------
 
-static const size_t webServerStackSize = 1024 * 12;
+static const size_t webServerStackSize = 1024 * 20;
 static const size_t firmwareBufferLength = 8 * 1024;
 static const size_t profileUploadBufferLength = 1024;
 static const size_t profileMaxFileSize = 8 * 1024;
@@ -63,7 +63,7 @@ static uint32_t webServerLastStatusPushMs = 0;
 static uint32_t webServerLastConfigActivityMs = 0;
 static uint32_t webServerLastWsActivityMs = 0;
 
-static const char* const webServerStateNames[] = {
+static const char* webServerStateNames[] = {
     "WEBSERVER_STATE_OFF",
     "WEBSERVER_STATE_WAIT_FOR_NETWORK",
     "WEBSERVER_STATE_NETWORK_CONNECTED",
@@ -75,6 +75,7 @@ static const char* const webServerStateNames[] = {
 //----------------------------------------
 
 static esp_err_t webServerHandlerFirmwareUpload(httpd_req_t* req);
+static esp_err_t webServerHandlerCaptivePortalProbe(httpd_req_t* req);
 static esp_err_t webServerHandlerGetPage(httpd_req_t* req);
 static esp_err_t webServerHandlerHead(httpd_req_t* req);
 static esp_err_t webServerHandlerMethodNotFound(httpd_req_t* req);
@@ -91,6 +92,7 @@ static bool webServerBuildSettingsCsv(char* buffer, size_t bufferLength);
 static void webServerSendProfileList();
 static void webServerSendLiveStatus();
 static void webServerHandleClientMessage(const char* message);
+static void webServerClearClientSession();
 static void webServerMarkConfigActivity();
 
 //----------------------------------------
@@ -141,6 +143,61 @@ static const httpd_uri_t webServerPostNotFoundPage = {.uri = "/*",
                                                       .is_websocket = false,
                                                       .handle_ws_control_frames = false,
                                                       .supported_subprotocol = NULL};
+
+static const httpd_uri_t webServerCaptivePortalProbePages[] = {
+    {.uri = "/connecttest.txt",
+     .method = static_cast<httpd_method_t>(HTTP_ANY),
+     .handler = webServerHandlerCaptivePortalProbe,
+     .user_ctx = NULL,
+     .is_websocket = false,
+     .handle_ws_control_frames = false,
+     .supported_subprotocol = NULL},
+    {.uri = "/generate_204",
+     .method = static_cast<httpd_method_t>(HTTP_ANY),
+     .handler = webServerHandlerCaptivePortalProbe,
+     .user_ctx = NULL,
+     .is_websocket = false,
+     .handle_ws_control_frames = false,
+     .supported_subprotocol = NULL},
+    {.uri = "/gen_204",
+     .method = static_cast<httpd_method_t>(HTTP_ANY),
+     .handler = webServerHandlerCaptivePortalProbe,
+     .user_ctx = NULL,
+     .is_websocket = false,
+     .handle_ws_control_frames = false,
+     .supported_subprotocol = NULL},
+    {.uri = "/hotspot-detect.html",
+     .method = static_cast<httpd_method_t>(HTTP_ANY),
+     .handler = webServerHandlerCaptivePortalProbe,
+     .user_ctx = NULL,
+     .is_websocket = false,
+     .handle_ws_control_frames = false,
+     .supported_subprotocol = NULL},
+    {.uri = "/library/test/success.html",
+     .method = static_cast<httpd_method_t>(HTTP_ANY),
+     .handler = webServerHandlerCaptivePortalProbe,
+     .user_ctx = NULL,
+     .is_websocket = false,
+     .handle_ws_control_frames = false,
+     .supported_subprotocol = NULL},
+    {.uri = "/ncsi.txt",
+     .method = static_cast<httpd_method_t>(HTTP_ANY),
+     .handler = webServerHandlerCaptivePortalProbe,
+     .user_ctx = NULL,
+     .is_websocket = false,
+     .handle_ws_control_frames = false,
+     .supported_subprotocol = NULL},
+    {.uri = "/fwlink",
+     .method = static_cast<httpd_method_t>(HTTP_ANY),
+     .handler = webServerHandlerCaptivePortalProbe,
+     .user_ctx = NULL,
+     .is_websocket = false,
+     .handle_ws_control_frames = false,
+     .supported_subprotocol = NULL},
+};
+
+static const int webServerCaptivePortalProbePageCount =
+    sizeof(webServerCaptivePortalProbePages) / sizeof(webServerCaptivePortalProbePages[0]);
 
 //----------------------------------------
 // Web settings field API
@@ -820,7 +877,7 @@ webServerSendLiveStatus() {
     }
 
     const uint32_t now = millis();
-    if ((webServerLastStatusPushMs != 0U) && ((now - webServerLastStatusPushMs) < 1000U)) {
+    if ((webServerLastStatusPushMs != 0U) && ((now - webServerLastStatusPushMs) < 5000U)) {
         return;
     }
     webServerLastStatusPushMs = now;
@@ -835,8 +892,6 @@ webServerSendLiveStatus() {
     snprintf(satellitesInViewText, sizeof(satellitesInViewText), "%u", gnss ? gnss->getSatellitesInView() : 0U);
     snprintf(satellitesUsedText, sizeof(satellitesUsedText), "%u", gnss ? gnss->getSatellitesUsed() : 0U);
 
-    // webServerAppendField(packet, sizeof(packet), "utcTime", utcTime);
-    // webServerAppendField(packet, sizeof(packet), "systemUptime", uptime);
     webServerAppendField(packet, sizeof(packet), "satellitesInView", satellitesInViewText);
     webServerAppendField(packet, sizeof(packet), "satellitesUsed", satellitesUsedText);
     webServerAppendField(packet, sizeof(packet), "rtkPosition", position);
@@ -1050,6 +1105,19 @@ webServerHandlerGetPage(httpd_req_t* req) {
         httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
     }
     return httpd_resp_send(req, reinterpret_cast<const char*>(page->_data), page->_length);
+}
+
+static esp_err_t
+webServerHandlerCaptivePortalProbe(httpd_req_t* req) {
+    httpd_resp_set_type(req, text_plain);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_status(req, "404 Not Found");
+
+    if (req->method == HTTP_HEAD) {
+        return httpd_resp_send(req, nullptr, 0);
+    }
+
+    return httpd_resp_sendstr(req, "Not found");
 }
 
 static esp_err_t
@@ -1371,7 +1439,7 @@ webServerHandlerWebSockets(httpd_req_t* req) {
         webServerMarkConfigActivity();
         webServerClientSocket = httpd_req_to_sockfd(req);
         webServerLastWsActivityMs = millis();
-        ESP_LOGI(TAG, "WS connected, socket=%d", webServerClientSocket);
+        ESP_LOGW(TAG, "WS connected, socket=%d", webServerClientSocket);
         return ESP_OK;
     }
 
@@ -1385,7 +1453,7 @@ webServerHandlerWebSockets(httpd_req_t* req) {
     }
 
     if (packet.type == HTTPD_WS_TYPE_CLOSE) {
-        ESP_LOGI(TAG, "WS closed, socket=%d", webServerClientSocket);
+        ESP_LOGW(TAG, "WS closed, socket=%d", webServerClientSocket);
         webServerClientSocket = -1;
         return ESP_OK;
     }
@@ -1495,7 +1563,7 @@ webServerAssignResources() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.server_port = settings.httpPort ? settings.httpPort : 80;
     config.stack_size = webServerStackSize;
-    config.max_uri_handlers = webServerTotalPages + 4;
+    config.max_uri_handlers = webServerTotalPages + webServerCaptivePortalProbePageCount + 4;
     config.max_open_sockets = 5;
     config.lru_purge_enable = true;
     config.uri_match_fn = httpd_uri_match_wildcard;
@@ -1505,19 +1573,18 @@ webServerAssignResources() {
         ESP_LOGI(TAG, "Starting on port: %d", config.server_port);
     }
 
-    if (MDNS.begin(&settings.mdnsHostName[0]) && settings.mdnsEnable) {
-        MDNS.addService("http", "tcp", config.server_port);
-    }
-
     esp_err_t status = httpd_start(&webServerHandle, &config);
     if (status != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start: %s", esp_err_to_name(status));
         return false;
     }
 
-    bool success = webServerRegisterErrorHandler(HTTPD_404_NOT_FOUND, webServerHandlerPageNotFound)
-                   && webServerRegisterPageHandler(&webServerHeadPage)
-                   && webServerRegisterPageHandler(&webServerWebSocketPage);
+    bool success = webServerRegisterErrorHandler(HTTPD_404_NOT_FOUND, webServerHandlerPageNotFound);
+    for (int index = 0; success && (index < webServerCaptivePortalProbePageCount); index++) {
+        success = webServerRegisterPageHandler(&webServerCaptivePortalProbePages[index]);
+    }
+    success = success && webServerRegisterPageHandler(&webServerHeadPage)
+              && webServerRegisterPageHandler(&webServerWebSocketPage);
     for (int index = 0; success && (index < webServerTotalPages); index++) {
         success = webServerRegisterPageHandler(&webServerPages[index]._page);
     }
@@ -1535,16 +1602,93 @@ webServerAssignResources() {
 }
 
 //----------------------------------------
+// Get the webconfig state name
+//----------------------------------------
+const char*
+webServerGetStateName(uint8_t state, char* string) {
+    if (state < WEBSERVER_STATE_MAX) {
+        return webServerStateNames[state];
+    }
+    sprintf(string, "Web Server: Unknown state (%d)", state);
+    return string;
+}
+
+//----------------------------------------
+// Set the next webconfig state
+//----------------------------------------
+void
+webServerSetState(WebServerState newState) {
+    char string1[40];
+    char string2[40];
+    const char* arrow = nullptr;
+    const char* asterisk = nullptr;
+    const char* initialState = nullptr;
+    const char* endingState = nullptr;
+
+    // Display the state transition
+    if (settings.debugWebServer) {
+        arrow = "";
+        asterisk = "";
+        initialState = "";
+        if (newState == webServerState) {
+            asterisk = "*";
+        } else {
+            initialState = webServerGetStateName(webServerState, string1);
+            arrow = " --> ";
+        }
+    }
+
+    // Set the new state
+    webServerState = newState;
+    if (settings.debugWebServer) {
+        // Display the new firmware update state
+        endingState = webServerGetStateName(newState, string2);
+        if (!online_devices.rtc) {
+            systemPrintf("%s%s%s%s\r\n", asterisk, initialState, arrow, endingState);
+        } else {
+            // Timestamp the state change
+            systemPrintf("%s%s%s%s, %s\r\n", asterisk, initialState, arrow, endingState, getTimeStamp());
+        }
+    }
+
+    // Validate the state
+    if (newState >= WEBSERVER_STATE_MAX) {
+        reportFatalError("Web Server: Invalid web config state");
+    }
+}
+
+//----------------------------------------
 // State machine
 //----------------------------------------
-
 void
 webServerStart() {
-    if (!wifiSoftApRunning()) {
-        wifiSoftApOn(__FILE__, __LINE__);
-    }
-    if (webServerState == WEBSERVER_STATE_OFF) {
-        webServerState = WEBSERVER_STATE_WAIT_FOR_NETWORK;
+    // Display the heap state
+    reportHeapNow(settings.debugWebServer);
+
+    if (webServerState != WEBSERVER_STATE_OFF) {
+        if (settings.debugWebServer) {
+            systemPrintln("Web Server: Already running!");
+        }
+    } else {
+        if (settings.debugWebServer) {
+            systemPrintln("Web Server: Starting");
+        }
+        do {
+            // Start the network
+            if (networkInterfaceHasInternet(NETWORK_ETHERNET)) {
+                networkConsumerAdd(NETCONSUMER_WEB_CONFIG, NETWORK_ANY, __FILE__, __LINE__);
+                break;
+            }
+
+            if ((settings.wifiConfigOverAP == false) || networkInterfaceHasInternet(NETWORK_WIFI_STATION)) {
+                networkConsumerAdd(NETCONSUMER_WEB_CONFIG, NETWORK_ANY, __FILE__, __LINE__);
+            }
+
+            if (settings.wifiConfigOverAP) {
+                networkSoftApConsumerAdd(NETCONSUMER_WEB_CONFIG, __FILE__, __LINE__);
+            }
+        } while (0);
+        webServerSetState(WEBSERVER_STATE_WAIT_FOR_NETWORK);
     }
 }
 
@@ -1554,29 +1698,87 @@ webServerStop() {
         httpd_stop(webServerHandle);
         webServerHandle = nullptr;
     }
-    webServerClientSocket = -1;
-    webServerLastConfigActivityMs = 0;
-    webServerLastWsActivityMs = 0;
+    webServerClearClientSession();
+    networkUserRemove(NETCONSUMER_WEB_CONFIG, __FILE__, __LINE__);
+    networkConsumerRemove(NETCONSUMER_WEB_CONFIG, NETWORK_ANY, __FILE__, __LINE__);
+    networkSoftApConsumerRemove(NETCONSUMER_WEB_CONFIG, __FILE__, __LINE__);
     webServerLastStartAttemptMs = 0;
     webServerState = WEBSERVER_STATE_OFF;
     ESP_LOGI(TAG, "Stopped");
 }
 
+//----------------------------------------
+// State machine to handle the starting/stopping of the web server
+//----------------------------------------
 void
 webServerUpdate() {
-    if (!wifiSoftApRunning()) {
-        if (webServerState == WEBSERVER_STATE_RUNNING) {
+    bool connected;
+
+    // Determine if the network is connected
+    connected = networkConsumerIsConnected(NETCONSUMER_WEB_CONFIG);
+
+    // Walk the state machine
+    switch (webServerState) {
+        default:
+            systemPrintf("ERROR: Unknown Web Server state (%d)\r\n", webServerState);
+
+            // Stop the machine
             webServerStop();
-        }
-        return;
+            break;
+
+        case WEBSERVER_STATE_OFF:
+            // Wait until webServerStart() is called
+            break;
+
+        // Wait for connection to the network
+        case WEBSERVER_STATE_WAIT_FOR_NETWORK:
+            // Wait until the network is connected to the internet or has WiFi AP
+            if (connected || wifiSoftApRunning()) {
+                if (settings.debugWebServer) {
+                    systemPrintln("Web Server connected to network");
+                }
+
+                networkUserAdd(NETCONSUMER_WEB_CONFIG, __FILE__, __LINE__);
+                webServerSetState(WEBSERVER_STATE_NETWORK_CONNECTED);
+            }
+            break;
+
+        // Start the web server
+        case WEBSERVER_STATE_NETWORK_CONNECTED: {
+            // Determine if the network has failed
+            if (connected == false && wifiSoftApRunning() == false) {
+                networkUserRemove(NETCONSUMER_WEB_CONFIG, __FILE__, __LINE__);
+                webServerSetState(WEBSERVER_STATE_WAIT_FOR_NETWORK);
+            }
+
+            // Attempt to start the web server
+            else if (webServerAssignResources() == true) {
+                webServerSetState(WEBSERVER_STATE_RUNNING);
+            }
+        } break;
+
+        // Allow web services
+        case WEBSERVER_STATE_RUNNING:
+            // Determine if the network has failed
+            if (connected == false && wifiSoftApRunning() == false) {
+                if (webServerHandle != nullptr) {
+                    httpd_stop(webServerHandle);
+                    webServerHandle = nullptr;
+                }
+                webServerClearClientSession();
+                webServerSetState(WEBSERVER_STATE_WAIT_FOR_NETWORK);
+            }
+            webServerSendLiveStatus();
+            // This state is exited when webServerStop() is called
+
+            break;
     }
 
-    if ((webServerState == WEBSERVER_STATE_WAIT_FOR_NETWORK) || (webServerState == WEBSERVER_STATE_NETWORK_CONNECTED)) {
-        webServerState = WEBSERVER_STATE_NETWORK_CONNECTED;
-        (void)webServerAssignResources();
-    }
-
-    webServerSendLiveStatus();
+    // Display an alive message
+    // if (PERIODIC_DISPLAY(PD_WEB_SERVER_STATE)) {
+    //     systemPrintf("Web Server state: %s\r\n", webServerStateNames[webServerState]);
+    //     PERIODIC_CLEAR(PD_WEB_SERVER_STATE);
+    // }
 }
 
 bool
@@ -1592,6 +1794,11 @@ webServerIsConnected() {
 bool
 webServerHasActiveConfigSession() {
     if (!webServerIsRunning()) {
+        return false;
+    }
+
+    if (wifiSoftApClientCount() == 0) {
+        webServerClearClientSession();
         return false;
     }
 
@@ -1612,6 +1819,13 @@ webServerHasActiveConfigSession() {
 
     return (webServerLastConfigActivityMs != 0U)
            && ((millis() - webServerLastConfigActivityMs) < webServerConfigSessionGraceMs);
+}
+
+static void
+webServerClearClientSession() {
+    webServerClientSocket = -1;
+    webServerLastConfigActivityMs = 0;
+    webServerLastWsActivityMs = 0;
 }
 
 static void
@@ -1636,7 +1850,7 @@ webServerSendString(const char* stringToSend) {
         webServerClientSocket = -1;
     } else if (settings.debugWebServer) {
         webServerLastWsActivityMs = millis();
-        ESP_LOGI(TAG, "WS TX: %s", stringToSend);
+        //ESP_LOGI(TAG, "WS TX: %s", stringToSend);
     } else {
         webServerLastWsActivityMs = millis();
     }

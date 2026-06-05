@@ -407,7 +407,7 @@ typedef struct settings_t {
 
     // Network layer
     bool debugAppleAccessory = false; // Enable debugging of the AppleAccessory
-    bool debugNetworkLayer = false;   // Enable debugging of the network layer
+    bool debugNetworkLayer = true;    // Enable debugging of the network layer
     bool printNetworkStatus = true;   // Print network status (delays, failovers, IP address)
     // networkClient _timeout in ms (lib default is 3000). This limits write glitches to about 3.4s
     uint32_t networkClientWriteTimeout_ms = 250;
