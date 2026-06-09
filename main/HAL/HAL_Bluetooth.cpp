@@ -181,16 +181,22 @@ sendResponse(const BluetoothResponse& response) {
     }
 
     const size_t frameLength = sizeof(SEMP_CUSTOM_HEADER) + response.payloadLength;
+    const size_t totalLength = frameLength + sizeof(uint32_t);
     const uint32_t crc = computeBluetoothCrc(messageTxBuffer, frameLength);
     writeLe32(messageTxBuffer + frameLength, crc);
-    bluetoothWrite(messageTxBuffer, frameLength + sizeof(uint32_t));
-#if 0
-    systemPrintf("Send Res: ");
-    for (int i = 0; i < sizeof(SEMP_CUSTOM_HEADER) + response.payloadLength + 4; i++) {
+    const int bytesWritten = bluetoothWrite(messageTxBuffer, totalLength);
+#if 1
+    systemPrintf("[Bluetooth] Send Res (%d/%u): ", bytesWritten, static_cast<unsigned int>(totalLength));
+    for (size_t i = 0; i < totalLength; i++) {
         systemPrintf("0x%02x ", messageTxBuffer[i]);
     }
     systemPrintln();
 #endif
+    if (bytesWritten != static_cast<int>(totalLength)) {
+        systemPrintf("[Bluetooth] Response write incomplete: id=0x%04x wrote=%d expected=%u\r\n", response.messageId,
+                     bytesWritten, static_cast<unsigned int>(totalLength));
+        return false;
+    }
     return true;
 }
 
@@ -318,7 +324,9 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         if (!allocateResponse(response, requestHeader, 48)) {
             return;
         }
-        const bool baseMode = inBaseMode();
+        const SystemState_t reportedState = getSystemStateForReporting();
+        const bool baseMode =
+            (reportedState >= STATE_BASE_CASTER_NOT_STARTED) && (reportedState <= STATE_BASE_FIXED_TRANSMITTING);
         response.payload[0] = baseMode ? kWorkModeBase : kWorkModeRover;
         response.payload[1] = settings.fixedBase ? kBaseKnownPoint : kBaseSinglePoint;
         response.payload[2] = baseMode ? kBaseEnabled : kBaseDisabled;
@@ -357,8 +365,7 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
                             reinterpret_cast<const char*>(payload + 4));
         }
 
-        if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)
-            && (fixedBaseMode == kBaseKnownPoint)) {
+        if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled) && (fixedBaseMode == kBaseKnownPoint)) {
             if (payloadLength < 44) {
                 ack(response, requestHeader, kResponseError);
                 return;
@@ -617,11 +624,8 @@ processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
     }
     response.msgInterval = requestHeader->MsgInterval;
 
-    // systemPrintf("[Bluetooth]Rev 0x%02x, type 0x%02x, length: %d :", messageId, response.messageType, payloadLength);
-    // for (int i = 0; i < payloadLength; i++) {
-    //     systemPrintf("0x%02x ", parse->buffer[sizeof(SEMP_CUSTOM_HEADER) + i]);
-    // }
-    // systemPrintln();
+    systemPrintf("[Bluetooth] Rev 0x%02x, reqType 0x%02x, resType 0x%02x, length: %d :", messageId,
+                 requestHeader->messageType, response.messageType, payloadLength);
 
     switch (messageId) {
         case 0x01: handleModelQuery(response, *requestHeader); break;

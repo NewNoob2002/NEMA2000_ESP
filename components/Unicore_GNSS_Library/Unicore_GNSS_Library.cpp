@@ -441,6 +441,8 @@ UnicoreGNSSLibrary::isOnline() {
             ret = true;
             break;
         }
+        log(UnicoreLogLevel::Error, UNICORE_LOG_TASK, "isOnline failed: Device not responding to MODE command, try %d",
+            x);
         delay(100 * (x + 1));
     }
     return ret;

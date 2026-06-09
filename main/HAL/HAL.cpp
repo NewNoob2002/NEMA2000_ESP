@@ -1,6 +1,5 @@
 #include "HAL.h"
 #include "Bluetooth.h"
-#include "HAL_Config.h"
 #include "States.h"
 #include "mcu_settings.h"
 #include "myNetwork.h"

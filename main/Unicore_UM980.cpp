@@ -320,7 +320,7 @@ UnicoreUM980::fixedBaseStart() {
         return (true);
     }
 
-    bool result = false;
+    bool result = true;
 
     if (settings.fixedBaseCoordinateType == COORD_TYPE_ECEF) {
         result &= setBaseModeECEF(settings.fixedEcefX, settings.fixedEcefY, settings.fixedEcefZ);

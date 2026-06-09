@@ -111,16 +111,7 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
 
 void
 gnssUpdate(UnicoreUM980* gnss) {
-    if (!online_devices.gnss) {
-        if (settings.debugGnssConfig == true) {
-            systemPrintln("GNSS not online, skipping update");
-        }
-        return;
-    }
-    if (!gnss) {
-        if (settings.debugGnssConfig == true) {
-            systemPrintln("GNSS instance not available, skipping update");
-        }
+    if (!online_devices.gnss || !gnss) {
         return;
     }
 

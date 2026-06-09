@@ -6,5 +6,5 @@
     ],
     "idf.currentSetup": "/home/gtc/esp/esp-idf",
     "idf.flashType": "UART",
-    "idf.port": "/dev/ttyACM0"
+    "idf.port": "/dev/ttyUSB0"
 }

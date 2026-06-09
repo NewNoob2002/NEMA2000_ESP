@@ -284,6 +284,7 @@ stateUpdate(UnicoreUM980* gnss) {
 
             /* WEB CONFIG STATES */
             case (STATE_WEB_CONFIG_NOT_STARTED): {
+                bluetoothEnd();   // Release Bluetooth memory before starting WiFi/WebServer resources.
                 webServerStart(); // Start the webserver state machine for web config
                 RTK_MODE(RTK_MODE_WEB_CONFIG);
                 changeState(STATE_WEB_CONFIG_WAIT_FOR_NETWORK);
@@ -325,9 +326,14 @@ stateUpdate(UnicoreUM980* gnss) {
 // Requests are handled at the start of stateUpdate()
 void
 requestChangeState(SystemState_t requestedState) {
-    newSystemStateRequested = true;
     requestedSystemState = requestedState;
+    newSystemStateRequested = true;
     systemPrintf("Requested System State: %d\n", requestedSystemState);
+}
+
+SystemState_t
+getSystemStateForReporting() {
+    return newSystemStateRequested ? requestedSystemState : systemState;
 }
 
 // Print the current state
