@@ -259,9 +259,9 @@ handleDeviceStatusQuery(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& r
     response.payload[1] = 0x01;                                          // Position or Head
     response.payload[2] = online_devices.gnss ? 0x81 : 0x01;             // Gnss Board status
     response.payload[3] = settings.enableTiltCompensation ? 0x81 : 0x01; // IMU
-    response.payload[4] = 0x00;                                          // Radio
+    response.payload[4] = 0x81;                                          // Radio
     response.payload[5] = 0x00;                                          // 4G/5G
-    response.payload[9] = 0x81;                                          // Battery
+    response.payload[9] = 0x00;                                          // Battery
     response.payload[10] = 0x81;                                         // WIfi
     response.payload[11] = 0x81;                                         // Bluetooth
     response.payload[12] = 0x00;                                         // Display
