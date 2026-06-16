@@ -218,7 +218,7 @@ bluetoothStart(bool onlineCheck) {
         }
 #else
         systemPrintf("Error: Bluetooth BLE mode is not supported in BR/EDR only controller mode. Please check your "
-                     "Bluetooth settings and hardware configuration.\r\n");
+                     "Bluetooth settings and hardware configuration.");
 #endif // CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY
     } else if (settings.bluetoothRadioType == BLUETOOTH_RADIO_SPP) {
         if (bluetoothSerialSpp == nullptr) {
@@ -234,7 +234,7 @@ bluetoothStart(bool onlineCheck) {
         }
 #else
         systemPrintf("Error: Bluetooth BLE mode is not supported in BR/EDR only controller mode. Please check your "
-                     "Bluetooth settings and hardware configuration.\r\n");
+                     "Bluetooth settings and hardware configuration.");
         return;
 #endif // CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY
     }

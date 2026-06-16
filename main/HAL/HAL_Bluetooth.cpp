@@ -151,7 +151,7 @@ struct BluetoothResponse {
 bool
 allocateResponse(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHeader, const uint16_t payloadLength) {
     if (payloadLength > kBluetoothMaxPayload) {
-        systemPrintf("Bluetooth response too large: %u\r\n", payloadLength);
+        systemPrintf("Bluetooth response too large: %u", payloadLength);
         return false;
     }
 
@@ -186,14 +186,11 @@ sendResponse(const BluetoothResponse& response) {
     writeLe32(messageTxBuffer + frameLength, crc);
     const int bytesWritten = bluetoothWrite(messageTxBuffer, totalLength);
 #if 1
-    systemPrintf("[Bluetooth] Send Res (%d/%u): ", bytesWritten, static_cast<unsigned int>(totalLength));
-    for (size_t i = 0; i < totalLength; i++) {
-        systemPrintf("0x%02x ", messageTxBuffer[i]);
-    }
-    systemPrintln();
+    systemPrintf("[Bluetooth] 0x%04x Send Res (%d/%u): ", response.messageId, bytesWritten,
+                 static_cast<unsigned int>(totalLength));
 #endif
     if (bytesWritten != static_cast<int>(totalLength)) {
-        systemPrintf("[Bluetooth] Response write incomplete: id=0x%04x wrote=%d expected=%u\r\n", response.messageId,
+        systemPrintf("[Bluetooth] Response write incomplete: id=0x%04x wrote=%d expected=%u", response.messageId,
                      bytesWritten, static_cast<unsigned int>(totalLength));
         return false;
     }
@@ -394,7 +391,7 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
             settings.fixedBase = false;
         }
 
-        systemPrintf("[Bluetooth] Work mode set: mode=0x%02X fixedBase=0x%02X baseEnable=0x%02X baseId=%s\r\n",
+        systemPrintf("[Bluetooth] Work mode set: mode=0x%02X fixedBase=0x%02X baseEnable=0x%02X baseId=%s",
                      requestedMode, fixedBaseMode, baseEnable, settings.baseId);
 
         if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)) {
@@ -523,7 +520,7 @@ handleWifiControl(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& request
         uint8_t wifiStatus = payload[0];
         char wifiInfo[4] = {};
         std::memcpy(wifiInfo, &payload[1], 4);
-        systemPrintf("[Bluetooth] Set Wifi Info :%d, %d.%d.%d.%d\n", wifiStatus, wifiInfo[0], wifiInfo[1], wifiInfo[2],
+        systemPrintf("[Bluetooth] Set Wifi Info :%d, %d.%d.%d.%d", wifiStatus, wifiInfo[0], wifiInfo[1], wifiInfo[2],
                      wifiInfo[3]);
         ack(response, requestHeader, 0x01);
         if (wifiStatus == 0x01) {
@@ -602,7 +599,7 @@ void
 processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
     const auto* requestHeader = reinterpret_cast<const SEMP_CUSTOM_HEADER*>(parse->buffer);
     if (!requestHasPayload(parse, *requestHeader)) {
-        systemPrintf("Bluetooth APP frame too short: %u\r\n", parse->length);
+        systemPrintf("Bluetooth APP frame too short: %u", parse->length);
         return;
     }
 
@@ -678,7 +675,7 @@ processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
         case 0x34: ack(response, *requestHeader, 0x01); break;
         case 0x36: ack(response, *requestHeader, 0x01); break;
         default:
-            systemPrintf("Unknown Bluetooth message: id=0x%02x type=0x%02x\r\n", messageId, requestHeader->messageType);
+            systemPrintf("Unknown Bluetooth message: id=0x%02x type=0x%02x", messageId, requestHeader->messageType);
             ack(response, *requestHeader, 1);
             break;
     }
@@ -694,8 +691,9 @@ processRtcmMessage(SEMP_PARSE_STATE* parse) {
 
     if (HAL::gnssSerial) {
         HAL::gnssSerial->write(parse->buffer, parse->length);
+        // systemPrintf("Sent RTCM%u(%d)", sempRtcmGetMessageNumber(parse), parse->length);
     } else {
-        systemPrintf("Dropped RTCM%u: GNSS serial not ready\r\n", sempRtcmGetMessageNumber(parse));
+        systemPrintf("Dropped RTCM%u: GNSS serial not ready", sempRtcmGetMessageNumber(parse));
     }
 }
 
@@ -716,7 +714,7 @@ btReadTask(void* e) {
         sempBeginParser(kBluetoothParserTable, kBluetoothParserCount, kBluetoothParserNames, kBluetoothParserNameCount,
                         0, kBluetoothParserBufferSize, btDataProcess, "BluetoothDebug", parserDebugPrintf);
     if (!btParser) {
-        systemPrintf("Failed to initialize the Bluetooth parser\r\n");
+        systemPrintf("Failed to initialize the Bluetooth parser");
         btReadTaskHandle = nullptr;
         vTaskDelete(nullptr);
         return;
@@ -766,14 +764,14 @@ void
 bluetoothInit() {
     bluetoothStart();
     if (!online_devices.bluetooth) {
-        systemPrintf("Bluetooth not enabled\r\n");
+        systemPrintf("Bluetooth not enabled");
         return;
     }
 
     if (btReadTaskHandle == nullptr) {
         xTaskCreatePinnedToCore(btReadTask, "btReadTask", kBluetoothReadTaskStack, nullptr, settings.btReadTaskPriority,
                                 &btReadTaskHandle, settings.btReadTaskCore);
-        systemPrintf("Bluetooth read task created on core %d\r\n", settings.btReadTaskCore);
+        systemPrintf("Bluetooth read task created on core %d", settings.btReadTaskCore);
     }
 }
 } // namespace HAL

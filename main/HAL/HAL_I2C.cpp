@@ -31,12 +31,12 @@ class EspIdfI2CBus : public HAL::I2CBus {
         esp_err_t ret = i2c_new_master_bus(&bus_cfg, &bus_handle_);
         if (ret != ESP_OK) {
             online_devices.i2c = false;
-            systemPrintf("ERROR: I2C bus initialization failed: 0x%X\r\n", ret);
+            systemPrintf("ERROR: I2C bus initialization failed: 0x%X", ret);
             return false;
         }
 
         online_devices.i2c = true;
-        systemPrintf("I2C bus initialized\r\n");
+        systemPrintf("I2C bus initialized");
         return true;
     }
 
@@ -54,7 +54,7 @@ class EspIdfI2CBus : public HAL::I2CBus {
     write(uint8_t address, const uint8_t* data, size_t length) override {
         i2c_master_dev_handle_t device_handle = device_handles_[address];
         if (device_handle == nullptr) {
-            systemPrintf("ERROR: I2C device 0x%02X not initialized\r\n", address);
+            systemPrintf("ERROR: I2C device 0x%02X not initialized", address);
             return false;
         }
         return i2c_master_transmit(device_handle, data, length, I2C_TIMEOUT_MS) == ESP_OK;
@@ -65,7 +65,7 @@ class EspIdfI2CBus : public HAL::I2CBus {
               size_t readLength) override {
         i2c_master_dev_handle_t device_handle = device_handles_[address];
         if (device_handle == nullptr) {
-            systemPrintf("ERROR: I2C device 0x%02X not initialized\r\n", address);
+            systemPrintf("ERROR: I2C device 0x%02X not initialized", address);
             return false;
         }
 
@@ -93,7 +93,7 @@ class EspIdfI2CBus : public HAL::I2CBus {
 
         esp_err_t ret = i2c_master_bus_add_device(bus_handle_, &device_cfg, &device_handles_[address]);
         if (ret != ESP_OK) {
-            systemPrintf("ERROR: I2C device 0x%02X initialization failed: 0x%X\r\n", address, ret);
+            systemPrintf("ERROR: I2C device 0x%02X initialization failed: 0x%X", address, ret);
             return false;
         }
         return true;
@@ -130,7 +130,7 @@ I2C_Scan(void (*callback)(const uint8_t* address)) {
             if (callback) {
                 callback(&i);
             } else {
-                systemPrintf("Found device address: %02x\n", i);
+                systemPrintf("Found device address: %02x", i);
             }
             nDevice++;
         }

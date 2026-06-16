@@ -35,7 +35,7 @@ showBootTimes() {
         systemPrintln();
         systemPrintln("Time when calling:");
         for (uint8_t index = 0; index < entryCount; index++) {
-            systemPrintf("%8lu mSec: %s\r\n", static_cast<unsigned long>(bootTime[index]),
+            systemPrintf("%8lu mSec: %s", static_cast<unsigned long>(bootTime[index]),
                          bootTimeString[index] ? bootTimeString[index] : "");
         }
         systemPrintln();
@@ -68,11 +68,11 @@ showBootTimes() {
         systemPrintln("Delta times:");
         for (int index = static_cast<int>(entryCount) - 1; index >= 0; index--) {
             const uint8_t sortedIndex = sortOrder[index];
-            systemPrintf("%8lu mSec: %s\r\n", static_cast<unsigned long>(deltaTime[sortedIndex]),
+            systemPrintf("%8lu mSec: %s", static_cast<unsigned long>(deltaTime[sortedIndex]),
                          bootTimeString[sortedIndex] ? bootTimeString[sortedIndex] : "");
         }
-        systemPrintln("--------");
-        systemPrintf("%8lu mSec: Total boot time\r\n", static_cast<unsigned long>(totalBootTime));
+        systemPrintln("-----------------------------------------");
+        systemPrintf("%8lu mSec: Total boot time", static_cast<unsigned long>(totalBootTime));
         systemPrintln();
     }
 }

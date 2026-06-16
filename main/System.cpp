@@ -17,17 +17,16 @@ reportHeapNow(bool alwaysPrint) {
         lastHeapReport = millis();
 
         if (online_devices.psram == true) {
-            systemPrintf("[%ld] FreeHeap: %ld / HeapLowestPoint: %ld / LargestBlock: %ld / "
-                         "Used PSRAM: %ld\r\n",
-                         lastHeapReport, heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                         xPortGetMinimumEverFreeHeapSize(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
+            systemPrintf("FreeHeap: %ld / HeapLowestPoint: %ld / LargestBlock: %ld / "
+                         "Used PSRAM: %ld",
+                         heap_caps_get_free_size(MALLOC_CAP_INTERNAL), xPortGetMinimumEverFreeHeapSize(),
+                         heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
                          heap_caps_get_total_size(MALLOC_CAP_SPIRAM) - heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
         } else {
-            systemPrintf("[%ld] TotalHeap: %ld, FreeHeap: %ld / HeapLowestPoint: %ld / "
-                         "LargestBlock: %ld\r\n",
-                         lastHeapReport, heap_caps_get_total_size(MALLOC_CAP_INTERNAL),
-                         heap_caps_get_free_size(MALLOC_CAP_INTERNAL), xPortGetMinimumEverFreeHeapSize(),
-                         heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+            systemPrintf("TotalHeap: %ld, FreeHeap: %ld / HeapLowestPoint: %ld / "
+                         "LargestBlock: %ld",
+                         heap_caps_get_total_size(MALLOC_CAP_INTERNAL), heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                         xPortGetMinimumEverFreeHeapSize(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
         }
     }
 }

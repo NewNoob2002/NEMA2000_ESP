@@ -14,7 +14,7 @@ class UnicoreUM980;
 void gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980);
 void gnssUpdate(UnicoreUM980* pUm980);
 #endif // __cplusplus
-void gnssConfigure(uint32_t configureBit);
+void gnssConfigure(uint32_t configureBit, const char* fileName, uint32_t lineNumber);
 
 // Given a bit to configure, clear that bit from the overall bitfield
 void gnssConfigureClear(uint32_t configureBit);

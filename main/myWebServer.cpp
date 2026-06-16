@@ -1657,10 +1657,10 @@ webServerSetState(WebServerState newState) {
         // Display the new firmware update state
         endingState = webServerGetStateName(newState, string2);
         if (!online_devices.rtc) {
-            systemPrintf("%s%s%s%s\r\n", asterisk, initialState, arrow, endingState);
+            systemPrintf("%s%s%s%s", asterisk, initialState, arrow, endingState);
         } else {
             // Timestamp the state change
-            systemPrintf("%s%s%s%s, %s\r\n", asterisk, initialState, arrow, endingState, getTimeStamp());
+            systemPrintf("%s%s%s%s, %s", asterisk, initialState, arrow, endingState, getTimeStamp());
         }
     }
 
@@ -1733,7 +1733,7 @@ webServerUpdate() {
     // Walk the state machine
     switch (webServerState) {
         default:
-            systemPrintf("ERROR: Unknown Web Server state (%d)\r\n", webServerState);
+            systemPrintf("ERROR: Unknown Web Server state (%d)", webServerState);
 
             // Stop the machine
             webServerStop();

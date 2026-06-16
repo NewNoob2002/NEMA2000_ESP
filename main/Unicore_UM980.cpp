@@ -223,10 +223,10 @@ UnicoreUM980::configureRover() {
             // Assume we are changing from Base to Rover, request any additional config changes
             // Sets the dynamic model (Survey/UAV/Automotive) and puts the device into Rover mode
             log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Changing GNSS model from Base to Rover...");
-            gnssConfigure(GNSS_CONFIG_MODEL);
+            gnssConfigure(GNSS_CONFIG_MODEL, __FILE__, __LINE__);
 
             // Request a change to Rover RTCM
-            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER);
+            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER, __FILE__, __LINE__);
         } else {
             // No change needed, but we may want to update the message rates just in case
             log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "GNSS model no change needed. Current: %d   ",
@@ -264,11 +264,12 @@ UnicoreUM980::configureBase() {
     // needed to allow a freshly started device to settle in regular GNSS
     // reception mode before issuing a surveyInStart().
     // gnss->setModel(settings.dynamicModel) sets the model
-    // gnssConfigure(GNSS_CONFIG_MODEL);
+    // setModel(settings.dynamicModel);
+    gnssConfigure(GNSS_CONFIG_MODEL, __FILE__, __LINE__);
 
     // Request a change to Base RTCM. gnss->setMessagesRTCMBase() sets the
     // messages
-    gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE);
+    gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE, __FILE__, __LINE__);
 
     return (true);
 }
@@ -409,9 +410,9 @@ UnicoreUM980::setMessagesNMEA() {
         um980MessagesEnabled_RTCM_Base = false;
         // Request reconfigure of RTCM
         if (inBaseMode()) { // If the current system state is Base
-            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE);
+            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE, __FILE__, __LINE__);
         } else {
-            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER);
+            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER, __FILE__, __LINE__);
         }
     }
 

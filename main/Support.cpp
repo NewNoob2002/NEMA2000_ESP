@@ -44,7 +44,8 @@ systemRead() {
 void
 systemWrite(const uint8_t* buffer, uint16_t length) {
     // printf("%.*s", length, buffer);
-    Serial.write(buffer, length);
+    // Serial.write(buffer, length);
+    ESP_LOGI("[systemLog]", "%.*s", length, buffer);
 }
 
 /**
@@ -75,7 +76,7 @@ systemPrint(const char* string) {
 void
 systemPrintln(const char* value) {
     systemPrint(value);
-    systemPrintln();
+    // systemPrintln();
 }
 
 /**
@@ -499,7 +500,7 @@ getTimeStamp() {
 void
 rtkFree(void* data, const char* text) {
     if (settings.debugMalloc) {
-        systemPrintf("%p: Freeing %s\r\n", data, text);
+        systemPrintf("%p: Freeing %s", data, text);
     }
     free(data);
 }
@@ -521,10 +522,10 @@ rtkMalloc(size_t sizeInBytes, const char* text) {
     // Display the allocation
     if (data) {
         if (settings.debugMalloc) {
-            systemPrintf("%p, %s %d bytes allocated: %s\r\n", data, area, sizeInBytes, text);
+            systemPrintf("%p, %s %d bytes allocated: %s", data, area, sizeInBytes, text);
         }
     } else {
-        systemPrintf("Error: Failed to allocate %d bytes from %s: %s\r\n", sizeInBytes, area, text);
+        systemPrintf("Error: Failed to allocate %d bytes from %s: %s", sizeInBytes, area, text);
     }
 
     // If you are trying to trace "CORRUPT HEAP Bad tail" issues, add the tail address here:
@@ -540,7 +541,7 @@ rtkMalloc(size_t sizeInBytes, const char* text) {
         uint32_t alignedSize = (sizeInBytes + 3) & (~3);
         // Look for address == badTail - alignedSize (ignore the canary)
         if (ptr2address.address == badTail - alignedSize) {
-            systemPrintf("rtkMalloc: tail 0x%08x length 0x%04X (%ld) allocated to %s\r\n", badTail, sizeInBytes,
+            systemPrintf("rtkMalloc: tail 0x%08x length 0x%04X (%ld) allocated to %s", badTail, sizeInBytes,
                          sizeInBytes, text);
         }
     }
@@ -558,8 +559,8 @@ rtkMalloc(size_t sizeInBytes, const char* text) {
         uint32_t alignedSize = (sizeInBytes + 3) & (~3);
         // Look for badHead == address + alignedSize + two 4-byte canaries:
         if (badHead == ptr2address.address + alignedSize + 8) {
-            systemPrintf("rtkMalloc: head 0x%08x length 0x%04X (%ld) allocated to %s\r\n", ptr2address.address,
-                         sizeInBytes, sizeInBytes, text);
+            systemPrintf("rtkMalloc: head 0x%08x length 0x%04X (%ld) allocated to %s", ptr2address.address, sizeInBytes,
+                         sizeInBytes, text);
         }
     }
 

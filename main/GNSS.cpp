@@ -94,6 +94,7 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
                                UNICORE_LOG_COMMAND | UNICORE_LOG_TX | UNICORE_LOG_DATA | UNICORE_LOG_CHILD_CLASS);
     pUm980->init();
     pUm980->powerOn();
+    delay(2000); // Wait for the GNSS to power up
     if (pUm980->begin(*pGnssSerial)) {
         if (pUm980->requestVersion(2000) == Unicore_RESULT_RESPONSE_COMMAND_OK) {
             online_devices.gnss = true;
@@ -136,7 +137,7 @@ gnssUpdate(UnicoreUM980* gnss) {
         if (gnssConfigureRequested(GNSS_CONFIG_ONCE)) {
             if (gnss->configure() == true) {
                 gnssConfigureClear(GNSS_CONFIG_ONCE);
-                gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
@@ -145,36 +146,36 @@ gnssUpdate(UnicoreUM980* gnss) {
         if (gnssConfigureRequested(GNSS_CONFIG_MODEL)) {
             if (gnss->setModel(settings.dynamicModel) == true) {
                 gnssConfigureClear(GNSS_CONFIG_MODEL);
-                gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_ROVER)) {
             gnss->configureRover();
             gnssConfigureClear(GNSS_CONFIG_ROVER);
-            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA); // Request update to NMEA
-            gnssConfigure(GNSS_CONFIG_SAVE);              // Request receiver commit this change to NVM
+            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA, __FILE__, __LINE__); // Request update to NMEA
+            gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_BASE)) {
             if (gnss->configureBase()) {
                 gnssConfigureClear(GNSS_CONFIG_BASE);
-                // gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA);
-                gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA, __FILE__, __LINE__);
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_BASE_SURVEY)) {
             if (gnss->surveyInStart()) {
                 gnssConfigureClear(GNSS_CONFIG_BASE_SURVEY);
-                gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_BASE_FIXED)) {
             if (gnss->fixedBaseStart()) {
                 gnssConfigureClear(GNSS_CONFIG_BASE_FIXED);
-                gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
@@ -182,7 +183,7 @@ gnssUpdate(UnicoreUM980* gnss) {
             if (gnss->setPortBaudrate(UnicorePort::Current, settings.dataPortBaud)
                 == Unicore_RESULT_RESPONSE_COMMAND_OK) {
                 gnssConfigureClear(GNSS_CONFIG_BAUD_RATE_DATA);
-                gnssConfigure(GNSS_CONFIG_SAVE);
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
@@ -190,7 +191,7 @@ gnssUpdate(UnicoreUM980* gnss) {
             if (gnss->setPortBaudrate(UnicorePort::Com2, settings.radioPortBaud)
                 == Unicore_RESULT_RESPONSE_COMMAND_OK) {
                 gnssConfigureClear(GNSS_CONFIG_BAUD_RATE_RADIO);
-                gnssConfigure(GNSS_CONFIG_SAVE);
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
@@ -198,29 +199,29 @@ gnssUpdate(UnicoreUM980* gnss) {
             const double rateSeconds = static_cast<double>(settings.measurementRateMs) / MILLISECONDS_IN_A_SECOND;
             if (gnss->setRate(rateSeconds) == Unicore_RESULT_RESPONSE_COMMAND_OK) {
                 gnssConfigureClear(GNSS_CONFIG_FIX_RATE);
-                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA);
-                gnssConfigure(GNSS_CONFIG_SAVE);
+                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA, __FILE__, __LINE__);
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_CONSTELLATION)) {
             if (gnss->setConstellations() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
                 gnssConfigureClear(GNSS_CONFIG_CONSTELLATION);
-                gnssConfigure(GNSS_CONFIG_SAVE);
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_ELEVATION)) {
             if (gnss->setElevation(settings.minElev) == Unicore_RESULT_RESPONSE_COMMAND_OK) {
                 gnssConfigureClear(GNSS_CONFIG_ELEVATION);
-                gnssConfigure(GNSS_CONFIG_SAVE);
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_CN0)) {
             if (gnss->setMinCno(settings.minCN0) == Unicore_RESULT_RESPONSE_COMMAND_OK) {
                 gnssConfigureClear(GNSS_CONFIG_CN0);
-                gnssConfigure(GNSS_CONFIG_SAVE);
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
@@ -228,28 +229,27 @@ gnssUpdate(UnicoreUM980* gnss) {
             if (gnss->setMultipathMitigation(settings.enableMultipathMitigation)
                 == Unicore_RESULT_RESPONSE_COMMAND_OK) {
                 gnssConfigureClear(GNSS_CONFIG_MULTIPATH);
-                gnssConfigure(GNSS_CONFIG_SAVE);
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_MESSAGE_RATE_NMEA)) {
             if (gnss->setMessagesNMEA() == true) {
                 gnssConfigureClear(GNSS_CONFIG_MESSAGE_RATE_NMEA);
-                gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
                 // setLoggingType();                // Update Standard, PPP, or custom for icon selection
             }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER)) {
             if (settings.debugGnssConfig == true && gnss->gnssInRoverMode() == false) {
-                systemPrintf(
-                    "Warning: Change to RTCM Rover rates requested but not in Rover mode, current mode :%d.\r\n",
-                    gnss->getDynamicModel());
+                systemPrintf("Warning: Change to RTCM Rover rates requested but not in Rover mode, current mode :%d.",
+                             gnss->getDynamicModel());
             }
 
             if (gnss->setMessagesRTCMRover() == true) {
                 gnssConfigureClear(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER);
-                gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
                 // setLoggingType();                // Update Standard, PPP, or custom for icon selection
             }
         }
@@ -257,15 +257,14 @@ gnssUpdate(UnicoreUM980* gnss) {
         if (gnssConfigureRequested(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE)) {
             if (settings.debugGnssConfig == true) {
                 if (gnss->gnssInBaseFixedMode() == false && gnss->gnssInBaseSurveyInMode() == false) {
-                    systemPrintf(
-                        "Warning: Change to RTCM Base rates requested but not in Base mode, current mode :%d.\r\n",
-                        gnss->getDynamicModel());
+                    systemPrintf("Warning: Change to RTCM Base rates requested but not in Base mode, current mode :%d.",
+                                 gnss->getDynamicModel());
                 }
             }
 
             if (gnss->setMessagesRTCMBase() == true) {
                 gnssConfigureClear(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE);
-                gnssConfigure(GNSS_CONFIG_SAVE); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
                 // setLoggingType();                // Update Standard, PPP, or custom for icon selection
             }
         }
@@ -333,20 +332,20 @@ gnssUpdate(UnicoreUM980* gnss) {
 
         gnssConfigureInProgress = false; // Clear the 'semaphore'
     } else {
-        systemPrintf("GNSS configuration in progress, skipping update\r\n");
+        systemPrintf("GNSS configuration in progress, skipping update");
     }
 }
 
 // Given a bit to configure, set that bit in the overall bitfield
 void
-gnssConfigure(uint32_t configureBit) {
+gnssConfigure(uint32_t configureBit, const char* fileName, uint32_t lineNumber) {
     if (!gnssConfigBitValid(configureBit)) {
         if (settings.debugGnssConfig) {
-            systemPrintf("GNSS Config Set rejected: invalid bit %lu\r\n", static_cast<unsigned long>(configureBit));
+            systemPrintf("GNSS Config Set rejected: invalid bit %lu", static_cast<unsigned long>(configureBit));
         }
         return;
     }
-
+    systemPrintf("GNSS Config Set: %s in %s:%d", gnssConfigName(configureBit), fileName, lineNumber);
     uint32_t mask = (1UL << configureBit);
     settings.gnssConfigureRequest |= mask; // Set the bit
 }
@@ -356,7 +355,7 @@ void
 gnssConfigureClear(uint32_t configureBit) {
     if (!gnssConfigBitValid(configureBit)) {
         if (settings.debugGnssConfig) {
-            systemPrintf("GNSS Config Clear rejected: invalid bit %lu\r\n", static_cast<unsigned long>(configureBit));
+            systemPrintf("GNSS Config Clear rejected: invalid bit %lu", static_cast<unsigned long>(configureBit));
         }
         return;
     }
@@ -364,7 +363,7 @@ gnssConfigureClear(uint32_t configureBit) {
     uint32_t mask = (1UL << configureBit);
 
     if (settings.debugGnssConfig && (settings.gnssConfigureRequest & mask)) {
-        systemPrintf("GNSS Config Clear: %s\r\n", gnssConfigName(configureBit));
+        systemPrintf("GNSS Config Clear: %s", gnssConfigName(configureBit));
     }
 
     settings.gnssConfigureRequest &= ~mask; // Clear the bit
@@ -375,7 +374,7 @@ bool
 gnssConfigureRequested(uint32_t configureBit) {
     if (!gnssConfigBitValid(configureBit)) {
         if (settings.debugGnssConfig) {
-            systemPrintf("GNSS Config Request rejected: invalid bit %lu\r\n", static_cast<unsigned long>(configureBit));
+            systemPrintf("GNSS Config Request rejected: invalid bit %lu", static_cast<unsigned long>(configureBit));
         }
         return false;
     }
@@ -383,7 +382,7 @@ gnssConfigureRequested(uint32_t configureBit) {
     uint32_t mask = (1UL << configureBit);
 
     if (settings.debugGnssConfig && (settings.gnssConfigureRequest & mask)) {
-        systemPrintf("GNSS Config Request: %s\r\n", gnssConfigName(configureBit));
+        systemPrintf("GNSS Config Request: %s", gnssConfigName(configureBit));
     }
 
     return (settings.gnssConfigureRequest & mask);

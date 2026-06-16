@@ -68,13 +68,13 @@ stateUpdate(UnicoreUM980* gnss) {
 
         switch (systemState) {
             default: {
-                systemPrintf("Unknown state: %d\r\n", systemState);
+                systemPrintf("Unknown state: %d", systemState);
             } break;
             /* ROVER STATES */
             case (STATE_ROVER_NOT_STARTED): {
                 RTK_MODE(RTK_MODE_ROVER);
 
-                gnssConfigure(GNSS_CONFIG_ROVER);
+                gnssConfigure(GNSS_CONFIG_ROVER, __FILE__, __LINE__);
 
                 if (gnssReady == false) {
                     changeState(STATE_ROVER_NO_FIX);
@@ -185,7 +185,7 @@ stateUpdate(UnicoreUM980* gnss) {
                 if (!online_devices.gnss) {
                     return;
                 }
-                gnssConfigure(GNSS_CONFIG_BASE);
+                gnssConfigure(GNSS_CONFIG_BASE, __FILE__, __LINE__);
                 changeState(STATE_BASE_CONFIG_WAIT);
             } break;
             case (STATE_BASE_CONFIG_WAIT): {
@@ -196,7 +196,7 @@ stateUpdate(UnicoreUM980* gnss) {
                         changeState(STATE_BASE_TEMP_SETTLE);
                         RTK_MODE(RTK_MODE_BASE_SURVEY_IN); // Now allow NTRIP Client to start
                     } else {
-                        gnssConfigure(GNSS_CONFIG_BASE_FIXED); // Request start of fixed base
+                        gnssConfigure(GNSS_CONFIG_BASE_FIXED, __FILE__, __LINE__); // Request start of fixed base
                         changeState(STATE_BASE_FIXED_NOT_STARTED);
                         RTK_MODE(RTK_MODE_BASE_FIXED); // Now allow NTRIP Server to start
                     }
@@ -215,14 +215,15 @@ stateUpdate(UnicoreUM980* gnss) {
                 const char* accUnits =
                     getHpaUnits(settings.surveyInStartingAccuracy, accuracy, sizeof(accuracy), 2, false);
 
-                systemPrintf("Waiting for Horz Accuracy < %s (%s): %s%s%s%s, SIV: %d\r\n", accuracy, accUnits, temp,
+                systemPrintf("Waiting for Horz Accuracy < %s (%s): %s%s%s%s, SIV: %d", accuracy, accUnits, temp,
                              (accUnits != units) ? " (" : "", (accUnits != units) ? units : "",
                              (accUnits != units) ? ")" : "", siv);
 
                 // On the mosaic-X5, the HPA is undefined while the GNSS is determining its fixed position
                 // We need to skip the HPA check...
                 if (hpa > 0.0 && hpa < settings.surveyInStartingAccuracy) {
-                    gnssConfigure(GNSS_CONFIG_BASE_SURVEY); // Request reconfigure to base survey in mode
+                    gnssConfigure(GNSS_CONFIG_BASE_SURVEY, __FILE__,
+                                  __LINE__); // Request reconfigure to base survey in mode
 
                     changeState(STATE_BASE_TEMP_SURVEY_STARTED);
                 }
@@ -235,7 +236,7 @@ stateUpdate(UnicoreUM980* gnss) {
 
                 if (gnss->isSurveyInComplete() == true) // Survey in complete
                 {
-                    systemPrintf("Observation Time: %d\r\n", observationTime);
+                    systemPrintf("Observation Time: %d", observationTime);
                     systemPrintln("Base survey complete! RTCM now broadcasting.");
 
                     // baseStatusLedOn(); // Indicate survey complete
@@ -248,10 +249,10 @@ stateUpdate(UnicoreUM980* gnss) {
                 } else {
                     char temp[20];
                     const char* units = getHpaUnits(meanAccuracy, temp, sizeof(temp), 3, true);
-                    systemPrintf("Time elapsed: %d Accuracy (%s): %s SIV: %d\r\n", observationTime, units, temp, siv);
+                    systemPrintf("Time elapsed: %d Accuracy (%s): %s SIV: %d", observationTime, units, temp, siv);
 
                     if (observationTime > 60UL * 15UL) {
-                        systemPrintf("Survey-In took more than %d minutes. Returning to rover mode.\r\n",
+                        systemPrintf("Survey-In took more than %d minutes. Returning to rover mode.",
                                      60UL * 15UL / 60UL);
 
                         if (gnss->surveyInReset() == false) {
@@ -314,7 +315,7 @@ stateUpdate(UnicoreUM980* gnss) {
 #endif
             case (STATE_SHUTDOWN): break;
             case (STATE_NOT_SET): {
-                gnssConfigure(GNSS_CONFIG_ONCE);
+                gnssConfigure(GNSS_CONFIG_ONCE, __FILE__, __LINE__);
                 changeState(STATE_ROVER_NOT_STARTED);
             } break;
         }
@@ -328,7 +329,7 @@ void
 requestChangeState(SystemState_t requestedState) {
     requestedSystemState = requestedState;
     newSystemStateRequested = true;
-    systemPrintf("Requested System State: %d\n", requestedSystemState);
+    systemPrintf("Requested System State: %d", requestedSystemState);
 }
 
 SystemState_t
@@ -406,10 +407,10 @@ changeState(SystemState_t newState) {
         endingState = getState(newState);
 
         if (!online_devices.rtc) {
-            systemPrintf("[State] %s%s%s%s\r\n", asterisk, initialState, arrow, endingState);
+            systemPrintf("[State] %s%s%s%s", asterisk, initialState, arrow, endingState);
         } else {
             // Timestamp the state change
-            systemPrintf("[State] %s%s%s%s, %s\r\n", asterisk, initialState, arrow, endingState, getTimeStamp());
+            systemPrintf("[State] %s%s%s%s, %s", asterisk, initialState, arrow, endingState, getTimeStamp());
         }
     }
 }
