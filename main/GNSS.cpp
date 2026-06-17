@@ -74,13 +74,13 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
     }
 
     if (pGnssSerial == nullptr) {
+        ESP_LOGI(TAG, "GNSS UART initialized on RX: %d, TX: %d at %d baud", GNSS_RX_PIN, GNSS_TX_PIN,
+                 settings.dataPortBaud);
         pGnssSerial = new HardwareSerial(1);
         pGnssSerial->setRxBufferSize(settings.uartReceiveBufferSize);
         pGnssSerial->setTimeout(settings.serialTimeoutGNSS);
         pGnssSerial->setRxFIFOFull(settings.serialGNSSRxFullThreshold);
         pGnssSerial->begin(settings.dataPortBaud, SERIAL_8N1, GNSS_RX_PIN, GNSS_TX_PIN);
-        ESP_LOGI(TAG, "GNSS UART initialized on RX: %d, TX: %d at %d baud", GNSS_RX_PIN, GNSS_TX_PIN,
-                 settings.dataPortBaud);
     }
     if (settings.printTaskStartStop) {
         systemPrintln("Task pinGnssUartTask stopped");
@@ -109,6 +109,9 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
         ESP_LOGE(TAG, "Failed to initialize GNSS, deleting instance");
         delete pUm980;
         pUm980 = nullptr;
+    }
+    if (settings.printTaskStartStop) {
+        systemPrintln("Unicore GNSS library initialization stop");
     }
     // Nothing to do here since the GNSS library is initialized lazily
 }

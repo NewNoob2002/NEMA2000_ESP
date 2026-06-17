@@ -18,13 +18,13 @@ reportHeapNow(bool alwaysPrint) {
 
         if (online_devices.psram == true) {
             systemPrintf("FreeHeap: %ld / HeapLowestPoint: %ld / LargestBlock: %ld / "
-                         "Used PSRAM: %ld",
+                         "Used PSRAM: %ld\n",
                          heap_caps_get_free_size(MALLOC_CAP_INTERNAL), xPortGetMinimumEverFreeHeapSize(),
                          heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
                          heap_caps_get_total_size(MALLOC_CAP_SPIRAM) - heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
         } else {
             systemPrintf("TotalHeap: %ld, FreeHeap: %ld / HeapLowestPoint: %ld / "
-                         "LargestBlock: %ld",
+                         "LargestBlock: %ld\n",
                          heap_caps_get_total_size(MALLOC_CAP_INTERNAL), heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
                          xPortGetMinimumEverFreeHeapSize(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
         }

@@ -257,7 +257,7 @@ sendResponse(const BluetoothResponse& response) {
     writeLe32(messageTxBuffer + frameLength, crc);
     const int bytesWritten = bluetoothWrite(messageTxBuffer, totalLength);
 #if 1
-    ESP_LOGI(TAG, "Send Res %s(0x%04X) (%d/%u): ", response.msgName, response.messageId, bytesWritten,
+    ESP_LOGI(TAG, "=====>> Send Res %s(0x%04X) (%d/%u): ", response.msgName, response.messageId, bytesWritten,
              static_cast<unsigned int>(totalLength));
 #endif
     if (bytesWritten != static_cast<int>(totalLength)) {
@@ -707,7 +707,7 @@ processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
     }
     response.msgInterval = requestHeader->MsgInterval;
 
-    ESP_LOGI(TAG, "Recv %s(0x%04X), reqType 0x%02X, resType 0x%02X, length: %u :", response.msgName, messageId,
+    ESP_LOGI(TAG, "<<===== Recv %s(0x%04X), reqType 0x%02X, resType 0x%02X, length: %u :", response.msgName, messageId,
              requestHeader->messageType, response.messageType, payloadLength);
 
     switch (messageId) {

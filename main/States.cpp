@@ -215,10 +215,9 @@ stateUpdate(UnicoreUM980* gnss) {
                 const char* accUnits =
                     getHpaUnits(settings.surveyInStartingAccuracy, accuracy, sizeof(accuracy), 2, false);
 
-                systemPrintf("Waiting for Horz Accuracy < %s (%s): %s%s%s%s, SIV: %d", accuracy, accUnits, temp,
+                systemPrintf("Waiting for Horz Accuracy < %s (%s): %s%s%s%s, SIV: %d\n", accuracy, accUnits, temp,
                              (accUnits != units) ? " (" : "", (accUnits != units) ? units : "",
                              (accUnits != units) ? ")" : "", siv);
-
                 // On the mosaic-X5, the HPA is undefined while the GNSS is determining its fixed position
                 // We need to skip the HPA check...
                 if (hpa > 0.0 && hpa < settings.surveyInStartingAccuracy) {
@@ -236,7 +235,7 @@ stateUpdate(UnicoreUM980* gnss) {
 
                 if (gnss->isSurveyInComplete() == true) // Survey in complete
                 {
-                    systemPrintf("Observation Time: %d", observationTime);
+                    systemPrintf("Observation Time: %d\n", observationTime);
                     systemPrintln("Base survey complete! RTCM now broadcasting.");
 
                     // baseStatusLedOn(); // Indicate survey complete
@@ -249,10 +248,10 @@ stateUpdate(UnicoreUM980* gnss) {
                 } else {
                     char temp[20];
                     const char* units = getHpaUnits(meanAccuracy, temp, sizeof(temp), 3, true);
-                    systemPrintf("Time elapsed: %d Accuracy (%s): %s SIV: %d", observationTime, units, temp, siv);
+                    systemPrintf("Time elapsed: %d Accuracy (%s): %s SIV: %d\n", observationTime, units, temp, siv);
 
                     if (observationTime > 60UL * 15UL) {
-                        systemPrintf("Survey-In took more than %d minutes. Returning to rover mode.",
+                        systemPrintf("Survey-In took more than %d minutes. Returning to rover mode.\n",
                                      60UL * 15UL / 60UL);
 
                         if (gnss->surveyInReset() == false) {
@@ -406,10 +405,10 @@ changeState(SystemState_t newState) {
         endingState = getState(newState);
 
         if (!online_devices.rtc) {
-            systemPrintf("[State] %s%s%s%s", asterisk, initialState, arrow, endingState);
+            systemPrintf("[State] %s%s%s%s\n", asterisk, initialState, arrow, endingState);
         } else {
             // Timestamp the state change
-            systemPrintf("[State] %s%s%s%s, %s", asterisk, initialState, arrow, endingState, getTimeStamp());
+            systemPrintf("[State] %s%s%s%s, %s\n", asterisk, initialState, arrow, endingState, getTimeStamp());
         }
     }
 }

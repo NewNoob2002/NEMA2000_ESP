@@ -470,7 +470,7 @@ typedef struct settings_t {
     uint8_t measurementScale = MEASUREMENT_UNITS_METERS;
     bool printBootTimes = false; // Print times and deltas during boot
     bool printPartitionTable = false;
-    bool printTaskStartStop = false;
+    bool printTaskStartStop = true;
     uint16_t psramMallocLevel =
         40; // By default, push as much as possible to PSRAM. Needed to do secure WiFi (MQTT) + BT + PPL
     uint32_t rebootMinutes = 0; // Disabled, reboots after uptime reaches this number of minutes
@@ -587,13 +587,13 @@ typedef struct settings_t {
     uint8_t um980Constellations[MAX_UM980_CONSTELLATIONS] = {
         254};                                                // Mark first record with key so defaults will be applied.
     float um980MessageRatesNMEA[MAX_UM980_NMEA_MSG] = {254}; // Mark first record with key so defaults will be applied.
-    float um980MessageRatesRTCMBase[MAX_UM980_RTCM_MSG] =
-        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-               // rates for RTCM Base. Default to Unicore recommended rates.
-    float um980MessageRatesRTCMRover[MAX_UM980_RTCM_MSG] =
-        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-               // rates for RTCM Base. Default to Unicore recommended rates.
-#endif         // COMPILE_UM980
+    float um980MessageRatesRTCMBase[MAX_UM980_RTCM_MSG] = {
+        254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+              // rates for RTCM Base. Default to Unicore recommended rates.
+    float um980MessageRatesRTCMRover[MAX_UM980_RTCM_MSG] = {
+        254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+              // rates for RTCM Base. Default to Unicore recommended rates.
+#endif        // COMPILE_UM980
 
     // mosaic
 #ifdef COMPILE_MOSAICX5

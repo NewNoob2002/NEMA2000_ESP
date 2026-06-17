@@ -1,10 +1,11 @@
-#include <cstdint>
+#include "CompileConfig.h"
+
+#ifdef COMPILE_I2C
+
 #include "HAL.h"
 #include "HAL_Config.h"
 #include "Support.h"
 #include "driver/i2c_master.h"
-#include "driver/i2c_types.h"
-#include "esp_err.h"
 #include "mcu_settings.h"
 
 namespace {
@@ -144,3 +145,5 @@ I2C_GetBus() {
 }
 
 } // namespace HAL
+
+#endif

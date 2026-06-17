@@ -5,6 +5,7 @@
 namespace HAL {
 void
 Power_Init() {
+#ifdef POWER_ON_PIN
     gpio_config_t io_conf = {};
     io_conf.mode = GPIO_MODE_OUTPUT;
     io_conf.pin_bit_mask = (1ULL << POWER_ON_PIN);
@@ -14,12 +15,15 @@ Power_Init() {
     //disable pull-up mode
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     gpio_config(&io_conf);
-    // TODO: Initialize the power module.
+// TODO: Initialize the power module.
+#endif
 }
 
 void
 Power_OnCheck() {
-    // TODO: Check the power module status.
+// TODO: Check the power module status.
+#ifdef POWER_ON_PIN
     gpio_set_level(POWER_ON_PIN, 1);
+#endif
 }
 } // namespace HAL

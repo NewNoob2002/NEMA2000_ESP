@@ -75,7 +75,7 @@ beginFileSystem() {
             systemPrintln("Error: LittleFS not online");
         } else {
             systemPrintln("LittleFS Started");
-            systemPrintf("LittleFS used  / total bytes: %d KB / %d KB", LittleFS.usedBytes() >> 10,
+            systemPrintf("LittleFS used  / total bytes: %d KB / %d KB\n", LittleFS.usedBytes() >> 10,
                          LittleFS.totalBytes() >> 10);
         }
     }

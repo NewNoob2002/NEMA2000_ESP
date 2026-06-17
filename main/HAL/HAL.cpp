@@ -35,7 +35,7 @@ showBootTimes() {
         systemPrintln();
         systemPrintln("Time when calling:");
         for (uint8_t index = 0; index < entryCount; index++) {
-            systemPrintf("%8lu mSec: %s", static_cast<unsigned long>(bootTime[index]),
+            systemPrintf("%8lu mSec: %s\n", static_cast<unsigned long>(bootTime[index]),
                          bootTimeString[index] ? bootTimeString[index] : "");
         }
         systemPrintln();
@@ -68,7 +68,7 @@ showBootTimes() {
         systemPrintln("Delta times:");
         for (int index = static_cast<int>(entryCount) - 1; index >= 0; index--) {
             const uint8_t sortedIndex = sortOrder[index];
-            systemPrintf("%8lu mSec: %s", static_cast<unsigned long>(deltaTime[sortedIndex]),
+            systemPrintf("%8lu mSec: %s\n", static_cast<unsigned long>(deltaTime[sortedIndex]),
                          bootTimeString[sortedIndex] ? bootTimeString[sortedIndex] : "");
         }
         systemPrintln("-----------------------------------------");
@@ -106,7 +106,7 @@ HAL_Update(void* e) {
 void
 HAL_Init() {
     DMW_b("Serial.begin");
-    Serial.begin(460800);
+    Serial.begin(115200);
     // Initialize the power module.
     // DMW_b("Power_Init");
     // Power_Init();
