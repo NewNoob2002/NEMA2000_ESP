@@ -9,6 +9,7 @@
 //----------------------------------------
 // Constants
 //----------------------------------------
+#define TAG "[GNSS] "
 
 static const char* gnssConfigDisplayNames[] = {
     "ONCE",
@@ -78,6 +79,8 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
         pGnssSerial->setTimeout(settings.serialTimeoutGNSS);
         pGnssSerial->setRxFIFOFull(settings.serialGNSSRxFullThreshold);
         pGnssSerial->begin(settings.dataPortBaud, SERIAL_8N1, GNSS_RX_PIN, GNSS_TX_PIN);
+        ESP_LOGI(TAG, "GNSS UART initialized on RX: %d, TX: %d at %d baud", GNSS_RX_PIN, GNSS_TX_PIN,
+                 settings.dataPortBaud);
     }
     if (settings.printTaskStartStop) {
         systemPrintln("Task pinGnssUartTask stopped");
@@ -100,12 +103,12 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
             online_devices.gnss = true;
             pUm980->isOnline(true);
         } else {
-            systemPrintln("Failed to get GNSS version");
+            ESP_LOGE(TAG, "Failed to get GNSS version");
         }
-    }
-
-    if (settings.printTaskStartStop) {
-        systemPrintln("Unicore GNSS library initialization stopped");
+    } else {
+        ESP_LOGE(TAG, "Failed to initialize GNSS, deleting instance");
+        delete pUm980;
+        pUm980 = nullptr;
     }
     // Nothing to do here since the GNSS library is initialized lazily
 }
@@ -243,8 +246,8 @@ gnssUpdate(UnicoreUM980* gnss) {
 
         if (gnssConfigureRequested(GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER)) {
             if (settings.debugGnssConfig == true && gnss->gnssInRoverMode() == false) {
-                systemPrintf("Warning: Change to RTCM Rover rates requested but not in Rover mode, current mode :%d.",
-                             gnss->getDynamicModel());
+                ESP_LOGW(TAG, "Warning: Change to RTCM Rover rates requested but not in Rover mode, current mode :%d.",
+                         gnss->getDynamicModel());
             }
 
             if (gnss->setMessagesRTCMRover() == true) {
@@ -257,8 +260,9 @@ gnssUpdate(UnicoreUM980* gnss) {
         if (gnssConfigureRequested(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE)) {
             if (settings.debugGnssConfig == true) {
                 if (gnss->gnssInBaseFixedMode() == false && gnss->gnssInBaseSurveyInMode() == false) {
-                    systemPrintf("Warning: Change to RTCM Base rates requested but not in Base mode, current mode :%d.",
-                                 gnss->getDynamicModel());
+                    ESP_LOGW(TAG,
+                             "Warning: Change to RTCM Base rates requested but not in Base mode, current mode :%d.",
+                             gnss->getDynamicModel());
                 }
             }
 
@@ -309,14 +313,14 @@ gnssUpdate(UnicoreUM980* gnss) {
         if (settings.gnssConfigureRequest != 0) {
             if (settings.debugGnssConfig && (millis() - lastGnssConfigReportTime > 2000)) {
                 lastGnssConfigReportTime = millis();
-                systemPrint("Remaining gnssConfigureRequest: ");
+                ESP_LOGI(TAG, "Remaining gnssConfigureRequest: ");
 
                 for (int x = 0; x < GNSS_CONFIG_MAX; x++) {
                     if (settings.gnssConfigureRequest & (1UL << x)) {
-                        systemPrintf("%s ", gnssConfigName(x));
+                        ESP_LOGI(TAG, "%s ", gnssConfigName(x));
                     }
                 }
-                systemPrintln();
+                ESP_LOGI(TAG, "");
             }
 
             // On Facet FP mosaic-X5:
@@ -332,7 +336,7 @@ gnssUpdate(UnicoreUM980* gnss) {
 
         gnssConfigureInProgress = false; // Clear the 'semaphore'
     } else {
-        systemPrintf("GNSS configuration in progress, skipping update");
+        ESP_LOGW(TAG, "GNSS configuration in progress, skipping update");
     }
 }
 
@@ -341,11 +345,11 @@ void
 gnssConfigure(uint32_t configureBit, const char* fileName, uint32_t lineNumber) {
     if (!gnssConfigBitValid(configureBit)) {
         if (settings.debugGnssConfig) {
-            systemPrintf("GNSS Config Set rejected: invalid bit %lu", static_cast<unsigned long>(configureBit));
+            ESP_LOGW(TAG, "GNSS Config Set rejected: invalid bit %lu", static_cast<unsigned long>(configureBit));
         }
         return;
     }
-    systemPrintf("GNSS Config Set: %s in %s:%d", gnssConfigName(configureBit), fileName, lineNumber);
+    ESP_LOGI(TAG, "GNSS Config Set: %s in %s:%d", gnssConfigName(configureBit), fileName, lineNumber);
     uint32_t mask = (1UL << configureBit);
     settings.gnssConfigureRequest |= mask; // Set the bit
 }
@@ -355,7 +359,7 @@ void
 gnssConfigureClear(uint32_t configureBit) {
     if (!gnssConfigBitValid(configureBit)) {
         if (settings.debugGnssConfig) {
-            systemPrintf("GNSS Config Clear rejected: invalid bit %lu", static_cast<unsigned long>(configureBit));
+            ESP_LOGW(TAG, "GNSS Config Clear rejected: invalid bit %lu", static_cast<unsigned long>(configureBit));
         }
         return;
     }
@@ -363,7 +367,7 @@ gnssConfigureClear(uint32_t configureBit) {
     uint32_t mask = (1UL << configureBit);
 
     if (settings.debugGnssConfig && (settings.gnssConfigureRequest & mask)) {
-        systemPrintf("GNSS Config Clear: %s", gnssConfigName(configureBit));
+        ESP_LOGI(TAG, "GNSS Config Clear: %s", gnssConfigName(configureBit));
     }
 
     settings.gnssConfigureRequest &= ~mask; // Clear the bit
@@ -374,7 +378,7 @@ bool
 gnssConfigureRequested(uint32_t configureBit) {
     if (!gnssConfigBitValid(configureBit)) {
         if (settings.debugGnssConfig) {
-            systemPrintf("GNSS Config Request rejected: invalid bit %lu", static_cast<unsigned long>(configureBit));
+            ESP_LOGW(TAG, "GNSS Config Request rejected: invalid bit %lu", static_cast<unsigned long>(configureBit));
         }
         return false;
     }
@@ -382,7 +386,7 @@ gnssConfigureRequested(uint32_t configureBit) {
     uint32_t mask = (1UL << configureBit);
 
     if (settings.debugGnssConfig && (settings.gnssConfigureRequest & mask)) {
-        systemPrintf("GNSS Config Request: %s", gnssConfigName(configureBit));
+        ESP_LOGI(TAG, "GNSS Config Request: %s", gnssConfigName(configureBit));
     }
 
     return (settings.gnssConfigureRequest & mask);

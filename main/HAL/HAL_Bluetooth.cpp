@@ -20,6 +20,7 @@ extern UnicoreUM980* gUm980;
 
 namespace {
 
+#define TAG "[HAL_Bluetooth] "
 // constexpr uint8_t kMsgSenderApp = 0x00;
 constexpr uint8_t kMsgSenderDevice = 0x01;
 // constexpr uint8_t kMsgSenderPannel = 0x02;
@@ -43,14 +44,73 @@ constexpr size_t kBluetoothTxBufferSize = sizeof(SEMP_CUSTOM_HEADER) + kBluetoot
 constexpr uint32_t kBluetoothParserBufferSize = 1024 * 2;
 constexpr uint32_t kBluetoothReadTaskStack = 3072;
 
-enum BluetoothParserType : uint16_t {
-    BluetoothAPPType = 0,
-    BluetoothRTCMType = 1,
+enum BluetoothMessageId : uint16_t {
+    kMsgIdModelQuery = 0x0001,
+    kMsgIdDeviceStatusQuery = 0x0002,
+    kMsgIdBatteryStorageQuery = 0x0003,
+    kMsgIdGPGGAGnssMessageSet = 0x0004,
+    kMsgIdSATSINFOAMessageSet = 0x0005,
+    kMsgIdSatelliteTrackingSet = 0x0006,
+    kMsgIdWorkModeConfig = 0x0007,
+    kMsgIdCOMConfig = 0x000D,
+    kMsgIdRadioConfig = 0x0014,
+    kMsgIdLogConfig = 0x0015,
+    kMsgIdGPGSTGnssMessageSet = 0x0021,
+    kMsgIdGPRMCGnssMessageSet = 0x0022,
+    kMsgIdGPGSAGnssMessageSet = 0x0023,
+    kMsgIdImuAntennaHeightSet = 0x0024,
+    kMsgIdImuDataQuery = 0x0025,
+    kMsgIdTiltCompensationConfig = 0x0026,
+    kMsgIdPhoneNetworkConfig = 0x0027,
+    kMsgIdWifiControl = 0x0028,
+    kMsgIdBASEINFOPacket = 0x0029,
+    kMsgIdRegister = 0x0030,
+    kMsgIdShutdown = 0x0031,
+    kMsgIdLogAntennaHeightConfig = 0x0032,
+    kMsgIdPPPConfig = 0x0033,
+    kMsgIdExternalRadioConfig = 0x0034,
+};
+
+struct BluetoothMessageName {
+    uint16_t id;
+    const char* name;
+};
+
+constexpr BluetoothMessageName kMessageNames[] = {
+    {kMsgIdModelQuery, "ModelQuery"},
+    {kMsgIdDeviceStatusQuery, "DeviceStatusQuery"},
+    {kMsgIdBatteryStorageQuery, "BatteryStorageQuery"},
+    {kMsgIdGPGGAGnssMessageSet, "GPGGAGnssMessageSet"},
+    {kMsgIdSATSINFOAMessageSet, "SATSINFOAMessageSet"},
+    {kMsgIdSatelliteTrackingSet, "SatelliteTrackingSet"},
+    {kMsgIdWorkModeConfig, "WorkModeConfig"},
+    {kMsgIdCOMConfig, "COMConfig"},
+    {kMsgIdRadioConfig, "RadioConfig"},
+    {kMsgIdLogConfig, "LogConfig"},
+    {kMsgIdGPGSTGnssMessageSet, "GPGSTGnssMessageSet"},
+    {kMsgIdGPRMCGnssMessageSet, "GPRMCGnssMessageSet"},
+    {kMsgIdGPGSAGnssMessageSet, "GPGSAGnssMessageSet"},
+    {kMsgIdImuAntennaHeightSet, "ImuAntennaHeightSet"},
+    {kMsgIdImuDataQuery, "ImuDataQuery"},
+    {kMsgIdTiltCompensationConfig, "TiltCompensationConfig"},
+    {kMsgIdPhoneNetworkConfig, "PhoneNetworkConfig"},
+    {kMsgIdWifiControl, "WifiControl"},
+    {kMsgIdBASEINFOPacket, "BASEINFOPacket"},
+    {kMsgIdRegister, "Register"},
+    {kMsgIdShutdown, "Shutdown"},
+    {kMsgIdLogAntennaHeightConfig, "LogAntennaHeightConfig"},
+    {kMsgIdPPPConfig, "PPPConfig"},
+    {kMsgIdExternalRadioConfig, "ExternalRadioConfig"},
 };
 
 const SEMP_PARSE_ROUTINE kBluetoothParserTable[] = {
     sempCustomPreamble,
     sempRtcmPreamble,
+};
+
+enum BluetoothParserIndex : uint16_t {
+    kBluetoothParserCustom = 0,
+    kBluetoothParserRtcm = 1,
 };
 
 const char* const kBluetoothParserNames[] = {
@@ -83,6 +143,16 @@ parserDebugPrintf(const char* format, ...) {
 uint16_t
 getMessageId(const SEMP_CUSTOM_HEADER& header) {
     return static_cast<uint16_t>(header.messageId_L) | (static_cast<uint16_t>(header.messageId_H) << 8);
+}
+
+const char*
+bluetoothMessageName(const uint16_t messageId) {
+    for (const BluetoothMessageName& message : kMessageNames) {
+        if (message.id == messageId) {
+            return message.name;
+        }
+    }
+    return "Unknown";
 }
 
 void
@@ -145,6 +215,7 @@ struct BluetoothResponse {
     uint8_t msgInterval = 0;
     uint8_t* payload = nullptr;
     uint16_t payloadLength = 0;
+    char* msgName = nullptr;
     bool allocated = false;
 };
 
@@ -186,12 +257,12 @@ sendResponse(const BluetoothResponse& response) {
     writeLe32(messageTxBuffer + frameLength, crc);
     const int bytesWritten = bluetoothWrite(messageTxBuffer, totalLength);
 #if 1
-    systemPrintf("[Bluetooth] 0x%04x Send Res (%d/%u): ", response.messageId, bytesWritten,
-                 static_cast<unsigned int>(totalLength));
+    ESP_LOGI(TAG, "Send Res %s(0x%04X) (%d/%u): ", response.msgName, response.messageId, bytesWritten,
+             static_cast<unsigned int>(totalLength));
 #endif
     if (bytesWritten != static_cast<int>(totalLength)) {
-        systemPrintf("[Bluetooth] Response write incomplete: id=0x%04x wrote=%d expected=%u", response.messageId,
-                     bytesWritten, static_cast<unsigned int>(totalLength));
+        ESP_LOGW(TAG, "Response write incomplete: %s(0x%04X) wrote=%d expected=%u", response.msgName,
+                 response.messageId, bytesWritten, static_cast<unsigned int>(totalLength));
         return false;
     }
     return true;
@@ -334,74 +405,73 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         response.payload[32] = (settings.fixedLat >= 0.0) ? 'N' : 'S';
         std::memcpy(response.payload + 36, &settings.fixedAltitude, sizeof(settings.fixedAltitude));
         return;
-    } else if (requestHeader.messageType == kMsgSetType) {
-        if (!payload || (payloadLength < 3)) {
-            ack(response, requestHeader, kResponseError);
-            return;
-        }
-
-        const uint8_t requestedMode = payload[0];
-        const uint8_t fixedBaseMode = payload[1];
-        const uint8_t baseEnable = payload[2];
-
-        if ((requestedMode != kWorkModeRover) && (requestedMode != kWorkModeBase)) {
-            ack(response, requestHeader, kResponseError);
-            return;
-        }
-        if ((baseEnable != kBaseDisabled) && (baseEnable != kBaseEnabled)) {
-            ack(response, requestHeader, kResponseError);
-            return;
-        }
-        if ((fixedBaseMode != kBaseKnownPoint) && (fixedBaseMode != kBaseSinglePoint)) {
-            ack(response, requestHeader, kResponseError);
-            return;
-        }
-
-        if ((payloadLength >= 12) && payload[4] != 0) {
-            copyFixedString(reinterpret_cast<uint8_t*>(settings.baseId), sizeof(settings.baseId),
-                            reinterpret_cast<const char*>(payload + 4));
-        }
-
-        if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled) && (fixedBaseMode == kBaseKnownPoint)) {
-            if (payloadLength < 44) {
-                ack(response, requestHeader, kResponseError);
-                return;
-            }
-
-            double longitude = 0.0;
-            double latitude = 0.0;
-            double altitude = 0.0;
-            std::memcpy(&longitude, &payload[12], sizeof(longitude));
-            std::memcpy(&latitude, &payload[24], sizeof(latitude));
-            std::memcpy(&altitude, &payload[36], sizeof(altitude));
-            longitude = applyHemisphere(longitude, 'E', 'W', static_cast<char>(payload[20]));
-            latitude = applyHemisphere(latitude, 'N', 'S', static_cast<char>(payload[32]));
-
-            if (!isValidGeodeticPosition(longitude, latitude, altitude)) {
-                ack(response, requestHeader, kResponseError);
-                return;
-            }
-
-            settings.fixedBase = true;
-            settings.fixedBaseCoordinateType = COORD_TYPE_GEODETIC;
-            settings.fixedLong = longitude;
-            settings.fixedLat = latitude;
-            settings.fixedAltitude = altitude;
-        } else {
-            settings.fixedBase = false;
-        }
-
-        systemPrintf("[Bluetooth] Work mode set: mode=0x%02X fixedBase=0x%02X baseEnable=0x%02X baseId=%s",
-                     requestedMode, fixedBaseMode, baseEnable, settings.baseId);
-
-        if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)) {
-            requestChangeState(STATE_BASE_NOT_STARTED);
-        } else {
-            requestChangeState(STATE_ROVER_NOT_STARTED);
-        }
-
-        ack(response, requestHeader, 1);
     }
+    if (!payload || (payloadLength < 3)) {
+        ack(response, requestHeader, kResponseError);
+        return;
+    }
+
+    const uint8_t requestedMode = payload[0];
+    const uint8_t fixedBaseMode = payload[1];
+    const uint8_t baseEnable = payload[2];
+
+    if ((requestedMode != kWorkModeRover) && (requestedMode != kWorkModeBase)) {
+        ack(response, requestHeader, kResponseError);
+        return;
+    }
+    if ((baseEnable != kBaseDisabled) && (baseEnable != kBaseEnabled)) {
+        ack(response, requestHeader, kResponseError);
+        return;
+    }
+    if ((fixedBaseMode != kBaseKnownPoint) && (fixedBaseMode != kBaseSinglePoint)) {
+        ack(response, requestHeader, kResponseError);
+        return;
+    }
+
+    if ((payloadLength >= 12) && payload[4] != 0) {
+        copyFixedString(reinterpret_cast<uint8_t*>(settings.baseId), sizeof(settings.baseId),
+                        reinterpret_cast<const char*>(payload + 4));
+    }
+
+    if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled) && (fixedBaseMode == kBaseKnownPoint)) {
+        if (payloadLength < 44) {
+            ack(response, requestHeader, kResponseError);
+            return;
+        }
+
+        double longitude = 0.0;
+        double latitude = 0.0;
+        double altitude = 0.0;
+        std::memcpy(&longitude, &payload[12], sizeof(longitude));
+        std::memcpy(&latitude, &payload[24], sizeof(latitude));
+        std::memcpy(&altitude, &payload[36], sizeof(altitude));
+        longitude = applyHemisphere(longitude, 'E', 'W', static_cast<char>(payload[20]));
+        latitude = applyHemisphere(latitude, 'N', 'S', static_cast<char>(payload[32]));
+
+        if (!isValidGeodeticPosition(longitude, latitude, altitude)) {
+            ack(response, requestHeader, kResponseError);
+            return;
+        }
+
+        settings.fixedBase = true;
+        settings.fixedBaseCoordinateType = COORD_TYPE_GEODETIC;
+        settings.fixedLong = longitude;
+        settings.fixedLat = latitude;
+        settings.fixedAltitude = altitude;
+    } else {
+        settings.fixedBase = false;
+    }
+
+    systemPrintf("[Bluetooth] Work mode set: mode=0x%02X fixedBase=0x%02X baseEnable=0x%02X baseId=%s", requestedMode,
+                 fixedBaseMode, baseEnable, settings.baseId);
+
+    if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)) {
+        requestChangeState(STATE_BASE_NOT_STARTED);
+    } else {
+        requestChangeState(STATE_ROVER_NOT_STARTED);
+    }
+
+    ack(response, requestHeader, 1);
 }
 
 void
@@ -418,6 +488,20 @@ void
 handleRadioConfig(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHeader) {
     if (requestHeader.messageType == kMsgQueryType) {
         allocateResponse(response, requestHeader, 28);
+        response.payload[0] = 0x01; //radio number
+        response.payload[1] = 0x01; //radio status 0x00:disabled, 0x01:enabled
+        response.payload[2] = 0x01; //radio work mode 0x00:transmit, 0x01:receive
+        response.payload[3] = 0x01; //radio channel
+
+        std::memcpy(response.payload + 4, "460.05", sizeof(float));
+        std::memcpy(response.payload + 8, "460.05", sizeof(float));
+
+        response.payload[12] = 0x01; //radio power 0x00:low, 0x01:high
+        response.payload[13] =
+            0x01; //radio protocol 0x01-TRIMTALK，0x02-TRIMMK3，0x04-TT450S，0x05-TRANSEOT，0x09-SOUTH，0x0a-HUACE，0x0d-SATEL，0xf0-CCS
+        response.payload[14] = 0x02; //radio airrate 0x02- 9600 and 0x04- 19200
+
+        response.payload[17] = 0x03; //radio data format 0x03-RTCM23，0x04-RTCM30，0x05-RTCM32，0x06-CMR。
         return;
     }
     ack(response, requestHeader, 1);
@@ -604,6 +688,7 @@ processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
     }
 
     const uint16_t messageId = getMessageId(*requestHeader);
+    const char* messageName = bluetoothMessageName(messageId);
     const uint16_t payloadLength = requestHeader->messageLength;
     const uint8_t* payload = parse->buffer + sizeof(SEMP_CUSTOM_HEADER);
     if (payloadLength == 0) {
@@ -612,6 +697,7 @@ processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
 
     BluetoothResponse response;
     response.messageId = messageId;
+    response.msgName = const_cast<char*>(messageName);
     if (requestHeader->messageType == kMsgQueryType) {
         response.messageType = kMsgQueryRespType;
     } else if (requestHeader->messageType == kMsgSetType) {
@@ -621,61 +707,70 @@ processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
     }
     response.msgInterval = requestHeader->MsgInterval;
 
-    systemPrintf("[Bluetooth] Rev 0x%02x, reqType 0x%02x, resType 0x%02x, length: %d :", messageId,
-                 requestHeader->messageType, response.messageType, payloadLength);
+    ESP_LOGI(TAG, "Recv %s(0x%04X), reqType 0x%02X, resType 0x%02X, length: %u :", response.msgName, messageId,
+             requestHeader->messageType, response.messageType, payloadLength);
 
     switch (messageId) {
-        case 0x01: handleModelQuery(response, *requestHeader); break;
-        case 0x02: handleDeviceStatusQuery(response, *requestHeader); break;
-        case 0x03: handleBatteryStorageQuery(response, *requestHeader); break;
-        case 0x04: {
+        case kMsgIdModelQuery: handleModelQuery(response, *requestHeader); break;
+        case kMsgIdDeviceStatusQuery: handleDeviceStatusQuery(response, *requestHeader); break;
+        case kMsgIdBatteryStorageQuery: handleBatteryStorageQuery(response, *requestHeader); break;
+        case kMsgIdGPGGAGnssMessageSet: {
             response.messageType = kMsgSetRespType;
             handleGnssMessageToggle(response, *requestHeader, "GPGGA");
         } break;
-        case 0x05: {
+        case kMsgIdSATSINFOAMessageSet: {
             response.messageType = kMsgSetRespType;
             handleGnssMessageToggle(response, *requestHeader, "GPGSV");
         } break;
-        case 0x06: handleSatelliteTracking(response, *requestHeader, payload, payloadLength); break;
-        case 0x07: handleWorkMode(response, *requestHeader, payload, payloadLength); break;
-        case 0x0D: handleComConfig(response, *requestHeader, payload, payloadLength); break;
-        case 0x14: handleRadioConfig(response, *requestHeader); break;
-        case 0x15: handleLogConfig(response, *requestHeader, payload, payloadLength); break;
-        case 0x21: {
+        case kMsgIdSatelliteTrackingSet:
+            handleSatelliteTracking(response, *requestHeader, payload, payloadLength);
+            break;
+        case kMsgIdWorkModeConfig: handleWorkMode(response, *requestHeader, payload, payloadLength); break;
+        case kMsgIdCOMConfig: handleComConfig(response, *requestHeader, payload, payloadLength); break;
+        case kMsgIdRadioConfig: handleRadioConfig(response, *requestHeader); break;
+        case kMsgIdLogConfig: handleLogConfig(response, *requestHeader, payload, payloadLength); break;
+        case kMsgIdGPGSTGnssMessageSet: {
             response.messageType = kMsgSetRespType;
             handleGnssMessageToggle(response, *requestHeader, "GPGST");
         } break;
-        case 0x22: {
+        case kMsgIdGPRMCGnssMessageSet: {
             response.messageType = kMsgSetRespType;
             handleGnssMessageToggle(response, *requestHeader, "GPRMC");
         } break;
-        case 0x23: {
+        case kMsgIdGPGSAGnssMessageSet: {
             response.messageType = kMsgSetRespType;
             handleGnssMessageToggle(response, *requestHeader, "GPGSA");
         } break;
-        case 0x24: handleImuAntennaHeight(response, *requestHeader, payload, payloadLength); break;
-        case 0x25: {
+        case kMsgIdImuAntennaHeightSet: handleImuAntennaHeight(response, *requestHeader, payload, payloadLength); break;
+        case kMsgIdImuDataQuery: {
             response.messageType = kMsgSetRespType;
             handleImuData(response, *requestHeader, payload, payloadLength);
         } break;
-        case 0x26: handleTiltCompensation(response, *requestHeader, payload, payloadLength); break;
-        case 0x27: handlePhoneNetworkConfig(response, *requestHeader, payload, payloadLength); break;
-        case 0x28: handleWifiControl(response, *requestHeader, payload, payloadLength); break;
-        case 0x29: {
+        case kMsgIdTiltCompensationConfig:
+            handleTiltCompensation(response, *requestHeader, payload, payloadLength);
+            break;
+        case kMsgIdPhoneNetworkConfig:
+            handlePhoneNetworkConfig(response, *requestHeader, payload, payloadLength);
+            break;
+        case kMsgIdWifiControl: handleWifiControl(response, *requestHeader, payload, payloadLength); break;
+        case kMsgIdBASEINFOPacket: {
             response.messageType = kMsgSetRespType;
             handleBASEINFOPacket(response, *requestHeader, payload, payloadLength);
         } break;
-        case 0x30: handleRegister(response, *requestHeader); break;
-        case 0x31: handleShutdown(response, *requestHeader, payload, payloadLength); break;
-        case 0x32: handleLogAntennaHeight(response, *requestHeader, payload, payloadLength); break;
-        case 0x33: {
+        case kMsgIdRegister: handleRegister(response, *requestHeader); break;
+        case kMsgIdShutdown: handleShutdown(response, *requestHeader, payload, payloadLength); break;
+        case kMsgIdLogAntennaHeightConfig:
+            handleLogAntennaHeight(response, *requestHeader, payload, payloadLength);
+            break;
+        case kMsgIdPPPConfig: {
             response.messageType = kMsgSetRespType;
             handlePppControl(response, *requestHeader, payload, payloadLength);
         } break;
-        case 0x34: ack(response, *requestHeader, 0x01); break;
+        case kMsgIdExternalRadioConfig: ack(response, *requestHeader, 0x01); break;
         case 0x36: ack(response, *requestHeader, 0x01); break;
         default:
-            systemPrintf("Unknown Bluetooth message: id=0x%02x type=0x%02x", messageId, requestHeader->messageType);
+            ESP_LOGW(TAG, "Unknown message: %s(0x%04X) type=0x%02X", messageName, messageId,
+                     requestHeader->messageType);
             ack(response, *requestHeader, 1);
             break;
     }
@@ -690,18 +785,21 @@ processRtcmMessage(SEMP_PARSE_STATE* parse) {
     }
 
     if (HAL::gnssSerial) {
-        HAL::gnssSerial->write(parse->buffer, parse->length);
-        // systemPrintf("Sent RTCM%u(%d)", sempRtcmGetMessageNumber(parse), parse->length);
+        size_t bytesWritten = HAL::gnssSerial->write(parse->buffer, parse->length);
+        if (bytesWritten != parse->length) {
+            ESP_LOGE(TAG, "Failed to write RTCM%u to GNSS serial: wrote %d of %u", sempRtcmGetMessageNumber(parse),
+                     bytesWritten, parse->length);
+        }
     } else {
-        systemPrintf("Dropped RTCM%u: GNSS serial not ready", sempRtcmGetMessageNumber(parse));
+        ESP_LOGW(TAG, "Dropped RTCM%u: GNSS serial not ready", sempRtcmGetMessageNumber(parse));
     }
 }
 
 void
 btDataProcess(SEMP_PARSE_STATE* parse, uint16_t type) {
-    if (type == BluetoothRTCMType) {
+    if (type == kBluetoothParserRtcm) {
         processRtcmMessage(parse);
-    } else if (type == BluetoothAPPType) {
+    } else if (type == kBluetoothParserCustom) {
         processBluetoothAppMessage(parse);
     }
 }
@@ -764,14 +862,14 @@ void
 bluetoothInit() {
     bluetoothStart();
     if (!online_devices.bluetooth) {
-        systemPrintf("Bluetooth not enabled");
+        ESP_LOGE(TAG, "Bluetooth not enabled");
         return;
     }
 
     if (btReadTaskHandle == nullptr) {
         xTaskCreatePinnedToCore(btReadTask, "btReadTask", kBluetoothReadTaskStack, nullptr, settings.btReadTaskPriority,
                                 &btReadTaskHandle, settings.btReadTaskCore);
-        systemPrintf("Bluetooth read task created on core %d", settings.btReadTaskCore);
+        ESP_LOGI(TAG, "Bluetooth read task created on core %d", settings.btReadTaskCore);
     }
 }
 } // namespace HAL

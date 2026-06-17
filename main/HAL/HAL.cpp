@@ -108,10 +108,10 @@ HAL_Init() {
     DMW_b("Serial.begin");
     Serial.begin(460800);
     // Initialize the power module.
-    DMW_b("Power_Init");
-    Power_Init();
-    DMW_b("Power_OnCheck");
-    Power_OnCheck();
+    // DMW_b("Power_Init");
+    // Power_Init();
+    // DMW_b("Power_OnCheck");
+    // Power_OnCheck();
     // Initialize the i2c modules after the switched peripherals are powered.
 #ifdef COMPILE_I2C
     DMW_b("I2C_Init");

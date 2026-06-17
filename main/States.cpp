@@ -400,9 +400,8 @@ changeState(SystemState_t newState) {
             arrow = " --> ";
         }
     }
-
-    // Set the new state
-    systemState = newState;
+    lastSystemState = systemState; // Save the previous state for reference
+    systemState = newState;        // Set the new state
     if (settings.enablePrintStates) {
         endingState = getState(newState);
 

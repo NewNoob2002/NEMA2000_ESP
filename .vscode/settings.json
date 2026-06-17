@@ -1,10 +1,9 @@
 {
-    "clangd.path": "/home/gtc/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
     "clangd.arguments": [
         "--compile-commands-dir=${workspaceFolder}/build",
-        "--query-driver=/home/gtc/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-*"
+        "--query-driver=C:\\Espressif\\tools\\xtensa-esp-elf\\esp-14.2.0_20260121\\xtensa-esp-elf\\bin\\xtensa-esp32-elf-*"
     ],
-    "idf.currentSetup": "/home/gtc/esp/esp-idf",
+    "idf.currentSetup": "C:\\esp\\v5.5.4\\esp-idf",
     "idf.flashType": "UART",
-    "idf.port": "/dev/ttyACM1"
+    "idf.portWin": "COM6",
 }

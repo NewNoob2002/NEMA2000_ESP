@@ -1,18 +1,37 @@
 CompileFlags:
   CompilationDatabase: build
+  Add:
+    - --target=xtensa-esp-elf
+    - -isystem
+    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include
+    - -isystem
+    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/xtensa-esp-elf/include
+    - -isystem
+    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/xtensa-esp-elf/sys-include
+    - -isystem
+    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/xtensa-esp-elf/include/c++/14.2.0
+    - -isystem
+    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/xtensa-esp-elf/include/c++/14.2.0/xtensa-esp-elf
   Remove:
     - --target=*
     - -mlongcalls
     - -fno-shrink-wrap
     - -fstrict-volatile-bitfields
     - -fno-tree-switch-conversion
+    - -fno-jump-tables
+    - -fdiagnostics-color=*
+    - -fmacro-prefix-map=*
+    - -gdwarf-*
+    - "@*"
+Index:
+  Background: Build
 ---
 If:
   PathMatch: .*\.(c|h)$
 CompileFlags:
-  Compiler: /home/gtc/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc
+  Compiler: C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc.exe
 ---
 If:
   PathMatch: .*\.(cpp|hpp|hh|hxx)$
 CompileFlags:
-  Compiler: /home/gtc/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-g++
+  Compiler: C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/bin/xtensa-esp32-elf-g++.exe

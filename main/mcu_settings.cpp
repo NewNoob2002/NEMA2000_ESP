@@ -2,7 +2,7 @@
 #include "mcu_typedef.h"
 
 productProperties_t productPropertiesTable[] = {
-    {RTK_S20, BRAND_SINGULARXYZ, "S20", "", "s20", true, "s20", "20260429", STATE_ROVER_NOT_STARTED},
+    {RTK_S20, BRAND_SINGULARXYZ, "S20", "", "s20", true, "s20", "20260617", STATE_ROVER_NOT_STARTED},
 };
 
 const int productPropertiesEntries = sizeof(productPropertiesTable) / sizeof(productPropertiesTable[0]);

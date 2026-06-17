@@ -24,6 +24,8 @@ gnssInit() {
     gnssBegin(gnssSerial, gUm980);
     if (gUm980) {
         gUm980->setUserNmeaCallback(userGnssNmeaCallback);
+    } else {
+        ESP_LOGE("[HAL_GNSS]", "Failed to initialize GNSS: Unicore UM980 instance not created");
     }
 }
 

@@ -35,7 +35,7 @@ tN2kTxSchedule txSchedules[] = {
     {129026L, kNmea2000DefaultGnssSendPeriodMs, 20, kNmea2000DefaultGnssSendPeriodMs, 20, 0, true},
     {129029L, kNmea2000DefaultGnssSendPeriodMs, 40, kNmea2000DefaultGnssSendPeriodMs, 40, 0, true},
 };
-bool nmea2000Ready = false;
+static bool nmea2000Ready = false;
 uint32_t n2kSent = 0;
 uint32_t n2kFailed = 0;
 
@@ -123,7 +123,6 @@ sendN2kMessage(const tN2kMsg& message) {
 void
 sendDueGnssMessages(uint32_t now) {
     if (HAL::gUm980 == nullptr) {
-        ESP_LOGE(kTag, "GNSS not initialized");
         return;
     }
 
@@ -190,5 +189,9 @@ DATA_PROC_INIT_DEF(NMEA2000) {
     ESP_LOGI(kTag, "NMEA data processor initialized");
     nmea2000.ClearCANStatus();
     nmea2000Ready = nmea2000.Open();
-    ESP_LOGI(kTag, "NMEA2000 gateway opened");
+    if (nmea2000Ready) {
+        ESP_LOGI(kTag, "NMEA2000 gateway opened");
+    } else {
+        ESP_LOGE(kTag, "Failed to open NMEA2000 gateway");
+    }
 }
