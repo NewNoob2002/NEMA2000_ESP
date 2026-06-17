@@ -443,32 +443,88 @@ function resetToFactoryDefaults() {
   TXT("factoryDefaultsMsg", "Factory reset requested.");
 }
 
+function isFirmwareBinFile(file) {
+  return file?.name?.toLowerCase().endsWith(".bin");
+}
+
+function formatFirmwareKb(bytes) {
+  return `${Math.round(Math.max(bytes || 0, 0) / 1024)} KB`;
+}
+
+function updateFirmwareUploadProgress(loaded, total) {
+  const safeTotal = Math.max(total || 0, 0);
+  const safeLoaded = Math.min(Math.max(loaded || 0, 0), safeTotal);
+  const percent = safeTotal > 0 ? Math.round((safeLoaded / safeTotal) * 100) : 0;
+  const progress = $("firmwareUploadProgressBar");
+  if (progress) progress.value = percent;
+  TXT("firmwareUploadProgressText", `${percent}% / 100%, ${formatFirmwareKb(safeLoaded)} / ${formatFirmwareKb(safeTotal)}`);
+}
+
+function firmwareFileSelected() {
+  const input = $("submitFirmwareFile");
+  const button = $("btnFirmwareUpload");
+  if (button) button.disabled = true;
+  updateFirmwareUploadProgress(0, 0);
+  if (!input?.files?.length) {
+    TXT("firmwareUploadMsg", "Select a firmware .bin file.");
+    return;
+  }
+
+  const file = input.files[0];
+  if (!isFirmwareBinFile(file)) {
+    TXT("firmwareUploadMsg", "Only .bin files are accepted.");
+    input.value = "";
+    updateFirmwareUploadProgress(0, 0);
+    return;
+  }
+
+  TXT("firmwareUploadMsg", `Selected ${file.name} (${formatBytes(file.size)}).`);
+  updateFirmwareUploadProgress(0, file.size);
+  if (button) button.disabled = false;
+}
+
 function firmwareUploadWait() {
   const input = $("submitFirmwareFile");
   if (!input?.files?.length) return;
   const file = input.files[0];
-  if (!file.name.endsWith(".bin")) {
+  const button = $("btnFirmwareUpload");
+  if (!isFirmwareBinFile(file)) {
     TXT("firmwareUploadMsg", "Only .bin files are accepted.");
+    input.value = "";
+    if (button) button.disabled = true;
+    return;
+  }
+  if (!window.confirm(`Upload ${file.name} and restart the RTK device?`)) {
+    TXT("firmwareUploadMsg", "Upload cancelled.");
+    updateFirmwareUploadProgress(0, file.size);
+    if (button) button.disabled = false;
     return;
   }
   const form = new FormData();
   form.append("binfile", file);
   const xhr = new XMLHttpRequest();
   xhr.open("POST", "/uploadFirmware");
+  if (button) button.disabled = true;
   xhr.upload.onprogress = (ev) => {
-    if (ev.lengthComputable) $("firmwareUploadProgressBar").value = Math.round((ev.loaded / ev.total) * 100);
+    if (ev.lengthComputable) updateFirmwareUploadProgress(ev.loaded, file.size);
   };
   xhr.onload = () => {
     if (xhr.status >= 200 && xhr.status < 300) {
+      updateFirmwareUploadProgress(file.size, file.size);
       HIDE("mainApp");
       SHOW("firmwareUploadComplete");
     } else {
       TXT("firmwareUploadMsg", xhr.responseText || "Upload failed.");
+      if (button) button.disabled = false;
     }
   };
-  xhr.onerror = () => TXT("firmwareUploadMsg", "Upload network error.");
+  xhr.onerror = () => {
+    TXT("firmwareUploadMsg", "Upload network error.");
+    if (button) button.disabled = false;
+  };
   xhr.send(form);
-  TXT("firmwareUploadMsg", "Uploading…");
+  updateFirmwareUploadProgress(0, file.size);
+  TXT("firmwareUploadMsg", "Uploading...");
 }
 
 /* ── Init ─────────────────────────────────── */

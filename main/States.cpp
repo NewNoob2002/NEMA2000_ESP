@@ -68,7 +68,7 @@ stateUpdate(UnicoreUM980* gnss) {
 
         switch (systemState) {
             default: {
-                systemPrintf("Unknown state: %d", systemState);
+                systemPrintf("Unknown state: %d\n", systemState);
             } break;
             /* ROVER STATES */
             case (STATE_ROVER_NOT_STARTED): {
@@ -328,7 +328,7 @@ void
 requestChangeState(SystemState_t requestedState) {
     requestedSystemState = requestedState;
     newSystemStateRequested = true;
-    systemPrintf("Requested System State: %d", requestedSystemState);
+    systemPrintf("Requested System State: %d\n", requestedSystemState);
 }
 
 SystemState_t

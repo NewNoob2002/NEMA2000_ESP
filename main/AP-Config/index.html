@@ -213,10 +213,14 @@
                     <div class="field">
                         <label>Firmware Upgrade</label>
                         <div class="fw-row">
-                            <label class="btn btn-primary file-btn">
-                                Select .bin File <input type="file" id="submitFirmwareFile" onchange="firmwareUploadWait()" hidden>
+                            <label class="btn btn-file file-btn">
+                                Select .bin File <input type="file" id="submitFirmwareFile" accept=".bin" onchange="firmwareFileSelected()" hidden>
                             </label>
-                            <progress id="firmwareUploadProgressBar" value="0" max="100"></progress>
+                            <button type="button" id="btnFirmwareUpload" class="btn btn-accent" onclick="firmwareUploadWait()" disabled>Upload Firmware</button>
+                            <div class="fw-progress">
+                                <progress id="firmwareUploadProgressBar" value="0" max="100"></progress>
+                                <span id="firmwareUploadProgressText">0% / 100%, 0 KB / 0 KB</span>
+                            </div>
                         </div>
                         <p class="hint" id="firmwareUploadMsg"></p>
                     </div>

@@ -1,28 +1,28 @@
 /* ── Design tokens ─────────────────────────── */
 :root {
   color-scheme: light dark;
-  --bg:           #f5f6f8;
+  --bg:           #f7f8fa;
   --surface:      #ffffff;
-  --surface-alt:  #f8f9fb;
-  --border:       #e4e8ee;
-  --border-light: #eef1f5;
-  --text:         #1a1d23;
-  --text-secondary: #5f6672;
-  --text-muted:   #929aa6;
-  --primary:      #1d4ed8;
-  --primary-dim:  #dbe4ff;
-  --accent:       #334155;
+  --surface-alt:  #f3f5f8;
+  --border:       #dfe4ea;
+  --border-light: #edf0f4;
+  --text:         #111827;
+  --text-secondary: #4b5563;
+  --text-muted:   #7b8491;
+  --primary:      #2454d6;
+  --primary-dim:  #e8eefc;
+  --accent:       #111827;
   --success:      #0f8140;
   --success-dim:  #dcfce7;
   --warning:      #b45309;
   --warning-dim:  #fef3c7;
   --danger:       #c71d1d;
   --danger-dim:   #fee2e2;
-  --radius:       10px;
+  --radius:       8px;
   --radius-sm:    6px;
-  --shadow-sm:    0 1px 3px rgba(0,0,0,.04);
-  --shadow:       0 4px 16px rgba(0,0,0,.06);
-  --shadow-lg:    0 8px 30px rgba(0,0,0,.08);
+  --shadow-sm:    0 1px 2px rgba(15,23,42,.04);
+  --shadow:       0 8px 24px rgba(15,23,42,.07);
+  --shadow-lg:    0 18px 48px rgba(15,23,42,.14);
   --font:         -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono:         "SF Mono", "Fira Code", "Cascadia Code", monospace;
 }
@@ -40,9 +40,9 @@ body {
 
 /* ── App container ────────────────────────── */
 .app {
-  max-width: 800px;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 16px 16px 32px;
+  padding: 24px 20px 40px;
 }
 
 /* ── Top bar ──────────────────────────────── */
@@ -50,11 +50,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 18px;
+  padding: 14px 18px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   margin-bottom: 16px;
 }
 .topbar-brand { display: flex; align-items: center; gap: 12px; }
@@ -83,22 +83,23 @@ body {
 /* ── Dashboard grid ───────────────────────── */
 .dash {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: minmax(300px, 1.55fr) repeat(3, minmax(150px, 1fr));
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 .dash-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px 16px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow .2s;
+  padding: 16px;
+  box-shadow: none;
+  min-width: 0;
+  transition: border-color .15s, box-shadow .15s;
 }
-.dash-card:hover { box-shadow: var(--shadow); }
+.dash-card:hover { border-color: #cfd6df; box-shadow: var(--shadow-sm); }
 
-.dash-icon  { font-size: 20px; margin-bottom: 4px; }
-.dash-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+.dash-icon  { display: none; }
+.dash-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0; margin-bottom: 6px; }
 .dash-value { font-size: 15px; font-weight: 600; color: var(--text); word-break: break-word; }
 .dash-big   { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1.1; }
 .dash-dim   { font-size: 16px; font-weight: 400; color: var(--text-muted); }
@@ -108,15 +109,14 @@ body {
   font-size: 12px;
   background: var(--surface-alt);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-sm);
   padding: 3px 10px;
   color: var(--text-secondary);
 }
 .dash-pill b { color: var(--text); }
 
-/* Fix card – spans 2 columns, prominent */
+/* Fix card */
 .fix-card {
-  grid-column: span 2;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -129,8 +129,8 @@ body {
   font-size: 13px;
   font-weight: 700;
   padding: 3px 12px;
-  border-radius: 20px;
-  letter-spacing: .3px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 .fix-badge.nofix  { background: var(--danger-dim);  color: var(--danger); }
@@ -168,7 +168,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   overflow: hidden;
 }
 .panel-hdr {
@@ -176,7 +176,7 @@ body {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 12px 18px;
+  padding: 14px 18px;
   font: inherit;
   font-weight: 700;
   font-size: 14px;
@@ -186,9 +186,9 @@ body {
   cursor: pointer;
   transition: background .15s;
 }
-.panel-hdr:hover { background: var(--surface-alt); }
+.panel-hdr:hover { background: #fafbfc; }
 .panel-arrow { font-size: 12px; color: var(--text-muted); transition: transform .2s; }
-.panel-body { display: none; padding: 0 18px 16px; }
+.panel-body { display: none; padding: 2px 22px 22px; }
 .panel-body.open { display: block; }
 
 /* Fields */
@@ -237,7 +237,7 @@ input:disabled, select:disabled {
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: .5px;
+  letter-spacing: 0;
   margin-bottom: 6px;
 }
 .radio-item, .check-item, .check-line {
@@ -318,23 +318,30 @@ input:disabled, select:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
-  padding: 0 16px;
+  min-height: 36px;
+  padding: 7px 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background .15s, border-color .15s, box-shadow .15s;
+  line-height: 1.2;
+  transition: background .15s, border-color .15s, box-shadow .15s, color .15s;
 }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn-primary  { background: var(--primary); color: #fff; }
 .btn-primary:hover { background: #1b44c2; }
 .btn-accent   { background: var(--accent); color: #fff; }
 .btn-accent:hover  { background: #26364a; }
+.btn-file     { background: var(--surface); border-color: #cfd6df; color: var(--text); }
+.btn-file:hover { background: var(--surface-alt); border-color: var(--primary); color: var(--primary); }
 .btn-ghost    { background: transparent; border-color: var(--border); color: var(--text-secondary); }
 .btn-ghost:hover   { background: var(--surface-alt); border-color: var(--text-muted); }
+.btn-primary:disabled:hover { background: var(--primary); }
+.btn-accent:disabled:hover { background: var(--accent); }
+.btn-file:disabled:hover { background: var(--surface); border-color: #cfd6df; color: var(--text); }
+.btn-ghost:disabled:hover { border-color: var(--border); }
 .btn-danger-text   { color: var(--danger); }
 
 .btn-row {
@@ -347,6 +354,7 @@ input:disabled, select:disabled {
 .file-btn {
   position: relative;
   overflow: hidden;
+  white-space: nowrap;
 }
 .file-btn input[type="file"] {
   position: absolute;
@@ -356,25 +364,40 @@ input:disabled, select:disabled {
 }
 
 .fw-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(240px, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  max-width: 840px;
+}
+.fw-progress {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 progress {
-  flex: 1;
   height: 6px;
+  width: 100%;
   border-radius: 4px;
   accent-color: var(--primary);
 }
 progress::-webkit-progress-value { background: var(--primary); border-radius: 4px; }
 progress::-webkit-progress-bar   { background: var(--border-light); border-radius: 4px; }
+#firmwareUploadProgressText {
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
 
 /* ── Bottom bar ───────────────────────────── */
 .bottom-actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  margin-top: 18px;
+  margin-top: 22px;
 }
 
 /* ── Overlays ─────────────────────────────── */
@@ -415,11 +438,28 @@ progress::-webkit-progress-bar   { background: var(--border-light); border-radiu
 
 /* ── Responsive ───────────────────────────── */
 @media (max-width: 640px) {
+  .app {
+    padding: 14px 12px 28px;
+  }
+  .topbar {
+    align-items: flex-start;
+    gap: 10px;
+  }
   .dash {
     grid-template-columns: repeat(2, 1fr);
   }
   .fix-card {
     grid-column: span 2;
+  }
+  .fw-row {
+    grid-template-columns: 1fr;
+  }
+  .fw-row .btn {
+    width: 100%;
+  }
+  .fw-progress {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
   .bottom-actions {
     flex-direction: column;

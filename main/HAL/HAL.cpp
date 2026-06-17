@@ -72,7 +72,7 @@ showBootTimes() {
                          bootTimeString[sortedIndex] ? bootTimeString[sortedIndex] : "");
         }
         systemPrintln("-----------------------------------------");
-        systemPrintf("%8lu mSec: Total boot time", static_cast<unsigned long>(totalBootTime));
+        systemPrintf("%8lu mSec: Total boot time\n", static_cast<unsigned long>(totalBootTime));
         systemPrintln();
     }
 }
@@ -105,8 +105,8 @@ HAL_Update(void* e) {
 
 void
 HAL_Init() {
-    DMW_b("Serial.begin");
-    Serial.begin(115200);
+    // DMW_b("Serial.begin");
+    // Serial.begin(115200);
     // Initialize the power module.
     // DMW_b("Power_Init");
     // Power_Init();

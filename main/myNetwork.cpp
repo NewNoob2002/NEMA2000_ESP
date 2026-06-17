@@ -72,7 +72,7 @@ consumerName(NETCONSUMER_t consumer) {
 void
 logRequest(const char* action, NETCONSUMER_t consumer, const char* network, const char* fileName, uint32_t lineNumber) {
     if (settings.debugNetworkLayer) {
-        systemPrintf("Network: %s %s on %s from %s:%lu", action, consumerName(consumer), network, fileName,
+        systemPrintf("[Network]: %s %s on %s from %s:%lu\n", action, consumerName(consumer), network, fileName,
                      static_cast<unsigned long>(lineNumber));
     }
 }
@@ -83,10 +83,11 @@ logStatus(const char* reason) {
         return;
     }
 
-    systemPrintf("Network: %s req_any=0x%04X req_sta=0x%04X req_softap=0x%04X users=0x%04X sta=%s softap=%s clients=%u",
-                 reason, gAnyConsumers, gInterfaceConsumers[NETWORK_WIFI_STATION], gSoftApConsumers, gUsers,
-                 wifiStationOnline() ? "online" : "offline", wifiSoftApRunning() ? "running" : "off",
-                 static_cast<unsigned>(wifiSoftApClientCount()));
+    systemPrintf(
+        "[Network]: %s req_any=0x%04X req_sta=0x%04X req_softap=0x%04X users=0x%04X sta=%s softap=%s clients=%u\n",
+        reason, gAnyConsumers, gInterfaceConsumers[NETWORK_WIFI_STATION], gSoftApConsumers, gUsers,
+        wifiStationOnline() ? "online" : "offline", wifiSoftApRunning() ? "running" : "off",
+        static_cast<unsigned>(wifiSoftApClientCount()));
 }
 
 void
@@ -118,7 +119,7 @@ logStatusIfChanged(const char* reason) {
 void
 logActionResult(const char* action, bool success) {
     if (settings.debugNetworkLayer) {
-        systemPrintf("Network: %s %s", action, success ? "ok" : "failed");
+        systemPrintf("[Network]: %s %s\n", action, success ? "ok" : "failed");
     }
 }
 
@@ -199,7 +200,7 @@ networkUpdate() {
 void
 networkConsumerAdd(NETCONSUMER_t consumer, NetIndex_t network, const char* fileName, uint32_t lineNumber) {
     if (!validConsumer(consumer)) {
-        systemPrintf("Network: invalid consumer %u", static_cast<unsigned>(consumer));
+        systemPrintf("[Network]: invalid consumer %u\n", static_cast<unsigned>(consumer));
         return;
     }
 
@@ -207,7 +208,8 @@ networkConsumerAdd(NETCONSUMER_t consumer, NetIndex_t network, const char* fileN
     const char* networkName = "Any";
     if (network != NETWORK_ANY) {
         if (!validInterface(network)) {
-            systemPrintf("Network: invalid network %u for %s", static_cast<unsigned>(network), consumerName(consumer));
+            systemPrintf("[Network]: invalid network %u for %s\n", static_cast<unsigned>(network),
+                         consumerName(consumer));
             return;
         }
         consumers = &gInterfaceConsumers[network];
@@ -362,8 +364,9 @@ networkGetNameByIndex(NetIndex_t network) {
 
 void
 networkDisplayStatus() {
-    systemPrintf("Network: consumers any=0x%04X softAP=0x%04X users=0x%04X", gAnyConsumers, gSoftApConsumers, gUsers);
-    systemPrintf("Network: WiFi STA=%s SoftAP=%s clients=%u", wifiStationOnline() ? "online" : "offline",
+    systemPrintf("[Network]: consumers any=0x%04X softAP=0x%04X users=0x%04X\n", gAnyConsumers, gSoftApConsumers,
+                 gUsers);
+    systemPrintf("[Network]: WiFi STA=%s SoftAP=%s clients=%u\n", wifiStationOnline() ? "online" : "offline",
                  wifiSoftApRunning() ? "running" : "off", static_cast<unsigned>(wifiSoftApClientCount()));
 }
 

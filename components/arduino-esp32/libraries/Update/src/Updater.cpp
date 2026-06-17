@@ -606,8 +606,10 @@ bool UpdateClass::_writeBuffer() {
   }
 
   // try to skip empty blocks on unencrypted partitions
-  if ((_partition->encrypted || _chkDataInBlock(_buffer + skip / sizeof(uint32_t), _bufferLen - skip))
-      && !ESP.partitionWrite(_partition, _progress + skip, (uint32_t *)_buffer + skip / sizeof(uint32_t), _bufferLen - skip)) {
+  if (
+    (_partition->encrypted || _chkDataInBlock(_buffer + skip / sizeof(uint32_t), _bufferLen - skip))
+    && !ESP.partitionWrite(_partition, _progress + skip, (uint32_t *)_buffer + skip / sizeof(uint32_t), _bufferLen - skip)
+  ) {
     _abort(UPDATE_ERROR_WRITE);
     return false;
   }

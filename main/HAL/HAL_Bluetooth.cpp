@@ -222,7 +222,7 @@ struct BluetoothResponse {
 bool
 allocateResponse(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHeader, const uint16_t payloadLength) {
     if (payloadLength > kBluetoothMaxPayload) {
-        systemPrintf("Bluetooth response too large: %u", payloadLength);
+        systemPrintf("Bluetooth response too large: %u\n", payloadLength);
         return false;
     }
 
@@ -462,7 +462,7 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         settings.fixedBase = false;
     }
 
-    systemPrintf("[Bluetooth] Work mode set: mode=0x%02X fixedBase=0x%02X baseEnable=0x%02X baseId=%s", requestedMode,
+    systemPrintf("[Bluetooth] Work mode set: mode=0x%02X fixedBase=0x%02X baseEnable=0x%02X baseId=%s\n", requestedMode,
                  fixedBaseMode, baseEnable, settings.baseId);
 
     if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)) {
@@ -604,7 +604,7 @@ handleWifiControl(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& request
         uint8_t wifiStatus = payload[0];
         char wifiInfo[4] = {};
         std::memcpy(wifiInfo, &payload[1], 4);
-        systemPrintf("[Bluetooth] Set Wifi Info :%d, %d.%d.%d.%d", wifiStatus, wifiInfo[0], wifiInfo[1], wifiInfo[2],
+        systemPrintf("[Bluetooth] Set Wifi Info :%d, %d.%d.%d.%d\n", wifiStatus, wifiInfo[0], wifiInfo[1], wifiInfo[2],
                      wifiInfo[3]);
         ack(response, requestHeader, 0x01);
         if (wifiStatus == 0x01) {
@@ -683,7 +683,7 @@ void
 processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
     const auto* requestHeader = reinterpret_cast<const SEMP_CUSTOM_HEADER*>(parse->buffer);
     if (!requestHasPayload(parse, *requestHeader)) {
-        systemPrintf("Bluetooth APP frame too short: %u", parse->length);
+        systemPrintf("Bluetooth APP frame too short: %u\n", parse->length);
         return;
     }
 
@@ -812,7 +812,7 @@ btReadTask(void* e) {
         sempBeginParser(kBluetoothParserTable, kBluetoothParserCount, kBluetoothParserNames, kBluetoothParserNameCount,
                         0, kBluetoothParserBufferSize, btDataProcess, "BluetoothDebug", parserDebugPrintf);
     if (!btParser) {
-        systemPrintf("Failed to initialize the Bluetooth parser");
+        systemPrintf("Failed to initialize the Bluetooth parser\n");
         btReadTaskHandle = nullptr;
         vTaskDelete(nullptr);
         return;

@@ -25,7 +25,7 @@ printPartitionTable(void) {
     if (pi != NULL) {
         do {
             const esp_partition_t* p = esp_partition_get(pi);
-            systemPrintf("|  %02x  | %02x  | 0x%06X | 0x%06X | %-16s |", p->type, p->subtype, p->address, p->size,
+            systemPrintf("|  %02x  | %02x  | 0x%06X | 0x%06X | %-16s |\n", p->type, p->subtype, p->address, p->size,
                          p->label);
         } while ((pi = (esp_partition_next(pi))));
     }

@@ -88,12 +88,12 @@ wifiDisplayNetworkData() {
     IPAddress ipAddress = wifiSoftApGetIpAddress();
     const bool hasIP = static_cast<uint32_t>(ipAddress) != 0;
 
-    systemPrintf("%s: %s", wifiSoftApName, wifiSoftApOnline() ? "Online" : "Off");
-    systemPrintf("    SSID: %s", wifiSoftApGetSsid());
-    systemPrintf("    MAC Address: %s", WiFi.softAPmacAddress().c_str());
+    systemPrintf("%s: %s\n", wifiSoftApName, wifiSoftApOnline() ? "Online" : "Off");
+    systemPrintf("    SSID: %s\n", wifiSoftApGetSsid());
+    systemPrintf("    MAC Address: %s\n", WiFi.softAPmacAddress().c_str());
     if (hasIP) {
-        systemPrintf("    IPv4 Address: %s", ipAddress.toString().c_str());
-        systemPrintf("    Subnet Mask: %s", WiFi.softAPSubnetMask().toString().c_str());
+        systemPrintf("    IPv4 Address: %s\n", ipAddress.toString().c_str());
+        systemPrintf("    Subnet Mask: %s\n", WiFi.softAPSubnetMask().toString().c_str());
     }
 }
 
@@ -106,23 +106,23 @@ wifiDisplaySoftApStatus() {
         status = "Starting";
     }
 
-    systemPrintf("    %-10s %s", wifiSoftApName, status);
+    systemPrintf("    %-10s %s\n", wifiSoftApName, status);
 }
 
 void
 wifiDisplayState() {
-    systemPrintf("WiFi Station: %s", wifiStationOnline() ? "Online" : "Offline");
-    systemPrintf("    MAC Address: %s", WiFi.macAddress().c_str());
+    systemPrintf("WiFi Station: %s\n", wifiStationOnline() ? "Online" : "Offline");
+    systemPrintf("    MAC Address: %s\n", WiFi.macAddress().c_str());
 
     if (wifiStationOnline()) {
-        systemPrintf("    SSID: %s", WiFi.SSID().c_str());
-        systemPrintf("    IP Address: %s", WiFi.localIP().toString().c_str());
-        systemPrintf("    Subnet Mask: %s", WiFi.subnetMask().toString().c_str());
-        systemPrintf("    Gateway Address: %s", WiFi.gatewayIP().toString().c_str());
-        systemPrintf("    DNS Address: %s", WiFi.dnsIP().toString().c_str());
-        systemPrintf("    WiFi Strength: %d dBm", WiFi.RSSI());
+        systemPrintf("    SSID: %s\n", WiFi.SSID().c_str());
+        systemPrintf("    IP Address: %s\n", WiFi.localIP().toString().c_str());
+        systemPrintf("    Subnet Mask: %s\n", WiFi.subnetMask().toString().c_str());
+        systemPrintf("    Gateway Address: %s\n", WiFi.gatewayIP().toString().c_str());
+        systemPrintf("    DNS Address: %s\n", WiFi.dnsIP().toString().c_str());
+        systemPrintf("    WiFi Strength: %d dBm\n", WiFi.RSSI());
     }
-    systemPrintf("    WiFi Status: %d (%s)", WiFi.status(), wifiPrintState(WiFi.status()));
+    systemPrintf("    WiFi Status: %d (%s)\n", WiFi.status(), wifiPrintState(WiFi.status()));
 }
 
 int
@@ -170,7 +170,7 @@ wifiSoftApGetSsid() {
 bool
 wifiSoftApOn(const char* fileName, uint32_t lineNumber) {
     if (settings.debugWifiState) {
-        systemPrintf("wifiSoftApOn called in %s at line %lu", fileName, static_cast<unsigned long>(lineNumber));
+        systemPrintf("wifiSoftApOn called in %s at line %lu\n", fileName, static_cast<unsigned long>(lineNumber));
     }
     return wifi.enable(true, online_devices.wifi.wifiStationRunning, __FILE__, __LINE__);
 }
@@ -178,7 +178,7 @@ wifiSoftApOn(const char* fileName, uint32_t lineNumber) {
 bool
 wifiSoftApOff(const char* fileName, uint32_t lineNumber) {
     if (settings.debugWifiState) {
-        systemPrintf("wifiSoftApOff called in %s at line %lu", fileName, static_cast<unsigned long>(lineNumber));
+        systemPrintf("wifiSoftApOff called in %s at line %lu\n", fileName, static_cast<unsigned long>(lineNumber));
     }
     return wifi.enable(false, online_devices.wifi.wifiStationRunning, __FILE__, __LINE__);
 }
@@ -201,7 +201,7 @@ wifiSoftApClientCount() {
 bool
 wifiStationOn(const char* fileName, uint32_t lineNumber) {
     if (settings.debugWifiState) {
-        systemPrintf("wifiStationOn called in %s at line %lu", fileName, static_cast<unsigned long>(lineNumber));
+        systemPrintf("wifiStationOn called in %s at line %lu\n", fileName, static_cast<unsigned long>(lineNumber));
     }
     return wifi.enable(online_devices.wifi.wifiSoftApRunning, true, __FILE__, __LINE__);
 }
@@ -209,7 +209,7 @@ wifiStationOn(const char* fileName, uint32_t lineNumber) {
 bool
 wifiStationOff(const char* fileName, uint32_t lineNumber) {
     if (settings.debugWifiState) {
-        systemPrintf("wifiStationOff called in %s at line %lu", fileName, static_cast<unsigned long>(lineNumber));
+        systemPrintf("wifiStationOff called in %s at line %lu\n", fileName, static_cast<unsigned long>(lineNumber));
     }
     return wifi.enable(online_devices.wifi.wifiSoftApRunning, false, __FILE__, __LINE__);
 }
@@ -269,7 +269,7 @@ RTK_WIFI::connect(unsigned long timeout, bool startAP) {
 bool
 RTK_WIFI::enable(bool enableSoftAP, bool enableStation, const char* fileName, int lineNumber) {
     if (settings.debugWifiState && _verbose) {
-        systemPrintf("WiFi enable from %s:%d AP=%s STA=%s", fileName, lineNumber, enableSoftAP ? "on" : "off",
+        systemPrintf("WiFi enable from %s:%d AP=%s STA=%s\n", fileName, lineNumber, enableSoftAP ? "on" : "off",
                      enableStation ? "on" : "off");
     }
 
@@ -309,7 +309,7 @@ RTK_WIFI::eventHandler(arduino_event_id_t event, arduino_event_info_t info) {
     (void)info;
 
     if (settings.debugWifiState && _verbose) {
-        systemPrintf("WiFi event: %d (%s)", event, WiFi.eventName(event));
+        systemPrintf("WiFi event: %d (%s)\n", event, WiFi.eventName(event));
     }
 
     switch (event) {
@@ -371,7 +371,7 @@ RTK_WIFI::setMode(bool enableSoftAP, bool enableStation) {
     }
 
     if (!WiFi.mode(mode)) {
-        systemPrintf("ERROR: Failed to set WiFi mode %d", mode);
+        systemPrintf("ERROR: Failed to set WiFi mode %d\n", mode);
         return false;
     }
 
@@ -465,7 +465,7 @@ RTK_WIFI::softApStart() {
     online_devices.wifi.wifiSoftApOnline = true;
 
     if (settings.debugWifiState) {
-        systemPrintf("WiFi: Soft AP online, SSID: %s, IP: %s, Password: %s", _apSsid,
+        systemPrintf("WiFi: Soft AP online, SSID: %s, IP: %s, Password: %s\n", _apSsid,
                      WiFi.softAPIP().toString().c_str(), wifiSoftApPassword);
     }
 
@@ -534,14 +534,14 @@ RTK_WIFI::stationConnect(uint32_t timeoutMs) {
 
     wl_status_t beginStatus = WiFi.begin(ssid, password, channel);
     if (beginStatus == WL_CONNECT_FAILED) {
-        systemPrintf("ERROR: WiFi failed to begin connection to %s", ssid);
+        systemPrintf("ERROR: WiFi failed to begin connection to %s\n", ssid);
         return false;
     }
 
     const uint32_t startMsec = millis();
     while (WiFi.status() != WL_CONNECTED) {
         if ((millis() - startMsec) >= timeoutMs) {
-            systemPrintf("ERROR: WiFi timed out connecting to %s (%s)", ssid, wifiPrintState(WiFi.status()));
+            systemPrintf("ERROR: WiFi timed out connecting to %s (%s)\n", ssid, wifiPrintState(WiFi.status()));
             return false;
         }
         delay(50);
@@ -552,7 +552,7 @@ RTK_WIFI::stationConnect(uint32_t timeoutMs) {
     wifiChannel = WiFi.channel();
 
     if (settings.debugWifiState) {
-        systemPrintf("WiFi: Station online, SSID: %s, IP: %s, RSSI: %d dBm", _staRemoteApSsid,
+        systemPrintf("WiFi: Station online, SSID: %s, IP: %s, RSSI: %d dBm\n", _staRemoteApSsid,
                      _staIpAddress.toString().c_str(), WiFi.RSSI());
     }
 
@@ -584,7 +584,7 @@ RTK_WIFI::stationSelectNetwork(char* ssid, size_t ssidLength, char* password, si
     int networkCount = WiFi.scanNetworks(false, true, false, 300, requestedChannel);
 
     if (networkCount < 0) {
-        systemPrintf("ERROR: WiFi scan failed, status: %d", networkCount);
+        systemPrintf("ERROR: WiFi scan failed, status: %d\n", networkCount);
         return false;
     }
 
@@ -655,7 +655,7 @@ RTK_WIFI::verbose(bool enable) {
 void
 RTK_WIFI::verifyTables() {
     if (settings.wifiChannel < 1 || settings.wifiChannel > 14) {
-        systemPrintf("ERROR: WiFi channel must be 1-14, found %d", settings.wifiChannel);
+        systemPrintf("ERROR: WiFi channel must be 1-14, found %d\n", settings.wifiChannel);
         reportFatalError("Invalid WiFi channel");
     }
 }

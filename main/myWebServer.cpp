@@ -6,6 +6,7 @@
 #include <LittleFS.h>
 #include <Update.h>
 #include <ctype.h>
+#include <esp_app_desc.h>
 #include <esp_http_server.h>
 #include <esp_log.h>
 #include <math.h>
@@ -32,6 +33,7 @@ static const size_t firmwareBufferLength = 8 * 1024;
 static const size_t profileUploadBufferLength = 1024;
 static const size_t profileMaxFileSize = 8 * 1024;
 static const size_t profileMaxNameLength = 31;
+static const uint8_t espImageMagic = 0xE9;
 static const uint32_t webServerStartRetryMs = 1000;
 static const uint32_t webServerConfigSessionGraceMs = 5000;
 
@@ -529,6 +531,29 @@ webServerAppendField(char* buffer, size_t bufferLength, const char* key, const c
     return (written > 0) && (static_cast<size_t>(written) < (bufferLength - used));
 }
 
+static const char*
+webServerGetRtkFirmwareVersion() {
+    const esp_app_desc_t* appDescription = esp_app_get_description();
+    if ((appDescription == nullptr) || (appDescription->version[0] == 0)) {
+        return "v0.0";
+    }
+    return appDescription->version;
+}
+
+static const char*
+webServerGetGnssFirmwareVersion() {
+    const UnicoreUM980* gnss = HAL::gUm980;
+    const char* version = gnss ? gnss->getFirmwareVersion() : nullptr;
+    return (version && version[0]) ? version : "v0.0";
+}
+
+static bool
+webServerAppendFirmwareFields(char* buffer, size_t bufferLength) {
+    bool ok = webServerAppendField(buffer, bufferLength, "rtkFirmwareVersion", webServerGetRtkFirmwareVersion());
+    ok = webServerAppendField(buffer, bufferLength, "gnssFirmwareVersion", webServerGetGnssFirmwareVersion()) && ok;
+    return ok;
+}
+
 static bool
 webServerBuildSettingsCsv(char* buffer, size_t bufferLength) {
     buffer[0] = 0;
@@ -550,6 +575,10 @@ webServerBuildSettingsCsv(char* buffer, size_t bufferLength) {
     webServerAppendField(buffer, bufferLength, "hostMessage", "settings-synced");
     webServerAppendField(buffer, bufferLength, "productBrand", "SingularXYZ");
     webServerAppendField(buffer, bufferLength, "platformPrefix", displayName);
+    if (!webServerAppendFirmwareFields(buffer, bufferLength)) {
+        ESP_LOGW(TAG, "Settings CSV buffer full at firmware fields");
+        return false;
+    }
     return true;
 }
 
@@ -1090,6 +1119,30 @@ findBytes(const uint8_t* data, size_t dataLength, const char* needle, size_t nee
     return -1;
 }
 
+static bool
+webServerFirmwareFileNameIsSafeBin(const char* fileName, const char* fileNameEnd) {
+    if ((fileName == nullptr) || (fileNameEnd == nullptr) || (fileNameEnd <= fileName)) {
+        return false;
+    }
+
+    const size_t fileNameLength = fileNameEnd - fileName;
+    if ((fileNameLength < 5) || (fileNameLength > 63)) {
+        return false;
+    }
+
+    for (const char* cursor = fileName; cursor < fileNameEnd; cursor++) {
+        const unsigned char value = static_cast<unsigned char>(*cursor);
+        if ((value <= 0x20) || (*cursor == '/') || (*cursor == '\\') || (*cursor == ':')) {
+            return false;
+        }
+    }
+
+    const char* extension = fileNameEnd - 4;
+    return (extension[0] == '.') && (tolower(static_cast<unsigned char>(extension[1])) == 'b')
+           && (tolower(static_cast<unsigned char>(extension[2])) == 'i')
+           && (tolower(static_cast<unsigned char>(extension[3])) == 'n');
+}
+
 //----------------------------------------
 // Handlers
 //----------------------------------------
@@ -1338,7 +1391,7 @@ webServerHandlerFirmwareUpload(httpd_req_t* req) {
         }
         fileName += strlen("filename=\"");
         const char* fileNameEnd = strchr(fileName, '"');
-        if ((fileNameEnd == nullptr) || (fileNameEnd <= fileName) || (strstr(fileName, ".bin") == nullptr)) {
+        if (!webServerFirmwareFileNameIsSafeBin(fileName, fileNameEnd)) {
             errorMessage = "Firmware must be a .bin file";
             break;
         }
@@ -1373,6 +1426,10 @@ webServerHandlerFirmwareUpload(httpd_req_t* req) {
             }
             received += bytesRead;
             buffered += bytesRead;
+            if ((firmwareBytes == 0) && (buffered > 0) && (buffer[0] != espImageMagic)) {
+                errorMessage = "Firmware image header is invalid";
+                break;
+            }
 
             const int boundaryIndex = findBytes(buffer, buffered, boundary, boundaryLength);
             if (boundaryIndex >= 0) {
@@ -1428,7 +1485,7 @@ webServerHandlerFirmwareUpload(httpd_req_t* req) {
         ESP_LOGI(TAG, "Firmware update complete: %u bytes. Restarting", static_cast<unsigned>(firmwareBytes));
         httpd_resp_set_type(req, text_plain);
         httpd_resp_sendstr(req, "Firmware uploaded successfully. Restarting.");
-        delay(500);
+        delay(1500);
         ESP.restart();
         return ESP_OK;
     } while (0);
@@ -1657,10 +1714,10 @@ webServerSetState(WebServerState newState) {
         // Display the new firmware update state
         endingState = webServerGetStateName(newState, string2);
         if (!online_devices.rtc) {
-            systemPrintf("%s%s%s%s", asterisk, initialState, arrow, endingState);
+            systemPrintf("%s%s%s%s\n", asterisk, initialState, arrow, endingState);
         } else {
             // Timestamp the state change
-            systemPrintf("%s%s%s%s, %s", asterisk, initialState, arrow, endingState, getTimeStamp());
+            systemPrintf("%s%s%s%s, %s\n", asterisk, initialState, arrow, endingState, getTimeStamp());
         }
     }
 
@@ -1733,7 +1790,7 @@ webServerUpdate() {
     // Walk the state machine
     switch (webServerState) {
         default:
-            systemPrintf("ERROR: Unknown Web Server state (%d)", webServerState);
+            systemPrintf("ERROR: Unknown Web Server state (%d)\n", webServerState);
 
             // Stop the machine
             webServerStop();
@@ -1910,12 +1967,10 @@ webServerSendSettings() {
 
 void
 webServerSendFirmwareVersion() {
-    const UnicoreUM980* gnss = HAL::gUm980;
     char message[128] = {};
-    webServerAppendField(message, sizeof(message), "rtkFirmwareVersion", "v0.0");
-    webServerAppendField(message, sizeof(message), "gnssFirmwareVersion",
-                         (gnss && gnss->getFirmwareVersion()) ? gnss->getFirmwareVersion() : "v0.0");
-    webServerSendString(message);
+    if (webServerAppendFirmwareFields(message, sizeof(message))) {
+        webServerSendString(message);
+    }
 }
 
 void

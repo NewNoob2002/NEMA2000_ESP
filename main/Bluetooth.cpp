@@ -289,7 +289,7 @@ bluetoothStart(bool onlineCheck) {
                                                   BLE_RX_UUID, BLE_TX_UUID);
     }
     if (beginSuccess == false) {
-        systemPrintf("An error occurred initializing Bluetooth");
+        systemPrintf("An error occurred initializing Bluetooth\n");
         return;
     }
     // Set PIN to 1234 so we can connect to older BT devices, but not require a
