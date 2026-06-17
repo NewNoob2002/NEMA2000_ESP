@@ -3,6 +3,7 @@
 #include "GNSS.h"
 #include "Support.h"
 #include "Unicore_UM980.h"
+#include "esp32-hal.h"
 #include "mcu_settings.h"
 #include "myWebServer.h"
 
@@ -284,6 +285,9 @@ stateUpdate(UnicoreUM980* gnss) {
 
             /* WEB CONFIG STATES */
             case (STATE_WEB_CONFIG_NOT_STARTED): {
+                if (lastSystemState != STATE_WEB_CONFIG_NOT_STARTED) {
+                    delay(500);
+                }
                 bluetoothEnd();   // Release Bluetooth memory before starting WiFi/WebServer resources.
                 webServerStart(); // Start the webserver state machine for web config
                 RTK_MODE(RTK_MODE_WEB_CONFIG);

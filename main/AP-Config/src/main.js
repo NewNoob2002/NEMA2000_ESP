@@ -316,6 +316,7 @@ function setupPanels() {
       const target = $(btn.dataset.target);
       if (!target) return;
       target.classList.toggle("open");
+      btn.closest(".panel")?.classList.toggle("open", target.classList.contains("open"));
       const arrow = btn.querySelector(".panel-arrow");
       if (arrow) arrow.textContent = target.classList.contains("open") ? "▴" : "▾";
     });
