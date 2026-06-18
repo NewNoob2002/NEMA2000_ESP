@@ -86,7 +86,7 @@ TaskHandle_t HAL_Update_Task = nullptr;
 
 void
 HAL_Update(void* e) {
-    reportHeap();
+    // reportHeap();
 
     stateUpdate(gUm980);
 
@@ -105,8 +105,8 @@ HAL_Update(void* e) {
 
 void
 HAL_Init() {
-    // DMW_b("Serial.begin");
-    // Serial.begin(115200);
+    DMW_b("Serial.begin");
+    Serial.begin(115200);
     // Initialize the power module.
     // DMW_b("Power_Init");
     // Power_Init();

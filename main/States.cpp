@@ -69,7 +69,7 @@ stateUpdate(UnicoreUM980* gnss) {
 
         switch (systemState) {
             default: {
-                systemPrintf("Unknown state: %d\n", systemState);
+                systemPrintf("[State] Unknown state: %d\n", systemState);
             } break;
             /* ROVER STATES */
             case (STATE_ROVER_NOT_STARTED): {
@@ -87,7 +87,7 @@ stateUpdate(UnicoreUM980* gnss) {
             } break;
             case (STATE_ROVER_CONFIG_WAIT): {
                 if (gnssConfigureComplete()) {
-                    systemPrintln("Rover configured");
+                    systemPrintln("[State] Rover configured");
                     changeState(STATE_ROVER_NO_FIX);
                 }
             } break;
@@ -191,7 +191,7 @@ stateUpdate(UnicoreUM980* gnss) {
             } break;
             case (STATE_BASE_CONFIG_WAIT): {
                 if (gnssConfigureComplete()) {
-                    systemPrintln("Base configured");
+                    systemPrintln("[State] Base configured");
 
                     if (settings.fixedBase == false) {
                         changeState(STATE_BASE_TEMP_SETTLE);

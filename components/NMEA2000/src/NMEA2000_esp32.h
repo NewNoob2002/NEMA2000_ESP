@@ -122,10 +122,10 @@ class tNMEA2000_esp32 : public tNMEA2000 {
     void CAN_deinit();
 
   protected:
-    bool CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent = true);
-    bool CANOpen();
-    bool CANGetFrame(unsigned long& id, unsigned char& len, unsigned char* buf);
-    virtual void InitCANFrameBuffers();
+    bool CANSendFrame(unsigned long id, unsigned char len, const unsigned char* buf, bool wait_sent = true) override;
+    bool CANOpen() override;
+    bool CANGetFrame(unsigned long& id, unsigned char& len, unsigned char* buf) override;
+    void InitCANFrameBuffers() override;
 
   public:
     tNMEA2000_esp32(gpio_num_t _TxPin = ESP32_CAN_TX_PIN, gpio_num_t _RxPin = ESP32_CAN_RX_PIN);
