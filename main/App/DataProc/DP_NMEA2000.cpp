@@ -105,6 +105,13 @@ tGatewayPgnGroupFunctionHandler txGroupHandlers[] = {
     {&nmea2000, &txSchedules[2]},
 };
 
+void
+advanceNextSendTime(tN2kTxSchedule& schedule, uint32_t now) {
+    do {
+        schedule.NextSendMs += schedule.IntervalMs;
+    } while (!N2kIsTimeBefore(now, schedule.NextSendMs));
+}
+
 bool
 sendN2kMessage(const tN2kMsg& message) {
     if (!nmea2000Ready) {
@@ -128,7 +135,8 @@ sendDueGnssMessages(uint32_t now) {
 
     tGatewayGnssData gnssData;
     tGatewayN2kMessages messages;
-    if (!ReadGatewayGnssData(*HAL::gUm980, gnssData) || !BuildGatewayN2kMessages(gnssData, messages)) {
+    ReadGatewayGnssData(*HAL::gUm980, gnssData);
+    if (!BuildGatewayN2kMessages(gnssData, messages)) {
         return;
     }
 
@@ -152,7 +160,7 @@ sendDueGnssMessages(uint32_t now) {
         }
 
         if (message != nullptr && sendN2kMessage(*message)) {
-            schedule.NextSendMs = now + schedule.IntervalMs;
+            advanceNextSendTime(schedule, now);
         }
     }
 }

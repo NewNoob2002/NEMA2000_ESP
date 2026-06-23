@@ -85,26 +85,24 @@ bool
 ReadGatewayGnssData(const UnicoreUM980& gnss, tGatewayGnssData& data) {
     data = tGatewayGnssData();
 
-    data.FixValid = gnss.isFixed() && gnss.getFixAgeMilliseconds() <= kMaxGnssFixAgeMs;
-    if (!data.FixValid) {
-        data.GnssMethod = GetN2kGnssMethod(gnss);
-        return false;
-    }
-
-    data.Latitude = gnss.getLatitude();
-    data.Longitude = gnss.getLongitude();
-    data.Altitude = gnss.getAltitude();
-    data.Sog = gnss.getHorizontalSpeed();
-    data.Cog = DegToRad(gnss.getTrackGround());
+    data.GnssMethod = GetN2kGnssMethod(gnss);
     data.Satellites = gnss.getSatellitesUsed();
+    data.FixValid = gnss.isFixed() && gnss.getFixAgeMilliseconds() <= kMaxGnssFixAgeMs;
     data.Hdop = N2kDoubleNA;
     data.GeoidalSeparation = N2kDoubleNA;
-    data.GnssMethod = GetN2kGnssMethod(gnss);
 
-    data.PositionValid = true;
-    data.SpeedCourseValid = true;
     data.TimeValid = gnss.isValidTime();
     data.DateValid = gnss.isValidDate();
+
+    if (data.FixValid) {
+        data.Latitude = gnss.getLatitude();
+        data.Longitude = gnss.getLongitude();
+        data.Altitude = gnss.getAltitude();
+        data.Sog = gnss.getHorizontalSpeed();
+        data.Cog = DegToRad(gnss.getTrackGround());
+        data.PositionValid = true;
+        data.SpeedCourseValid = true;
+    }
 
     if (data.TimeValid) {
         data.SecondsSinceMidnight =
@@ -128,10 +126,6 @@ ReadGatewayGnssData(const UnicoreUM980& gnss, tGatewayGnssData& data) {
 
 bool
 BuildGatewayN2kMessages(const tGatewayGnssData& gnss, tGatewayN2kMessages& messages) {
-    if (!gnss.PositionValid || !gnss.TimeValid || !gnss.DateValid || !gnss.SpeedCourseValid || !gnss.FixValid) {
-        return false;
-    }
-
     SetN2kLatLonRapid(messages.LatLonRapid, gnss.Latitude, gnss.Longitude);
     SetN2kCOGSOGRapid(messages.CogSogRapid, 1, N2khr_true, gnss.Cog, gnss.Sog);
     SetN2kGNSS(messages.Gnss, 1, gnss.DaysSince1970, gnss.SecondsSinceMidnight, gnss.Latitude, gnss.Longitude,

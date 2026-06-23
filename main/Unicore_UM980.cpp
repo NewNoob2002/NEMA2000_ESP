@@ -145,7 +145,6 @@ UnicoreUM980::configureOnceTime() {
 
     UnicoreResult_t result = disableAllOutput();
 
-    result = firstError(result, setElevation(15));
     if (_version.modelType == 18 || _version.modelType == 26) {
         if (queryConfigContains("CONFIG SIGNALGROUP 2") != Unicore_RESULT_CONFIG_PRESENT) {
             result = firstError(result, sendCommandAndWait("CONFIG SIGNALGROUP 2", 1500));

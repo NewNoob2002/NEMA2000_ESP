@@ -10,6 +10,33 @@
 #define UNICORE_NULLPTR_CHECK
 #endif
 
+// Main Unicore handler and RAM inits
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+
+#define CHECK_POINTER_BOOL(packetPointer, initPointer)                                                                 \
+    {                                                                                                                  \
+        if (packetPointer == nullptr)                                                                                  \
+            initPointer();                                                                                             \
+        if (packetPointer == nullptr)                                                                                  \
+            return false;                                                                                              \
+    }
+
+#define CHECK_POINTER_VOID(packetPointer, initPointer)                                                                 \
+    {                                                                                                                  \
+        if (packetPointer == nullptr)                                                                                  \
+            initPointer();                                                                                             \
+        if (packetPointer == nullptr)                                                                                  \
+            return;                                                                                                    \
+    }
+
+#define CHECK_POINTER_CHAR(packetPointer, initPointer)                                                                 \
+    {                                                                                                                  \
+        if (packetPointer == nullptr)                                                                                  \
+            initPointer();                                                                                             \
+        if (packetPointer == nullptr)                                                                                  \
+            return ((char*)"Error");                                                                                   \
+    }
+
 enum class UnicorePort : uint8_t {
     Current = 0,
     Com1,

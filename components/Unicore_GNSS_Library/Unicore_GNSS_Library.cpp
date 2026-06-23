@@ -1214,11 +1214,11 @@ UnicoreGNSSLibrary::handleBinaryMessage(const uint8_t* message, const uint16_t l
         return;
     }
 
+    updateCommandResultFromBinary(_lastBinaryHeader.messageId);
+
     log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "RX binary id=%u payload=%u week=%u sow=%lu",
         _lastBinaryHeader.messageId, payloadLength, _lastBinaryHeader.weekNumber,
         static_cast<unsigned long>(_lastBinaryHeader.secondsOfWeek));
-
-    updateCommandResultFromBinary(_lastBinaryHeader.messageId);
 
     if (_binaryCallback) {
         _binaryCallback(_lastBinaryHeader, payload, payloadLength, _binaryCallbackUserdata);
