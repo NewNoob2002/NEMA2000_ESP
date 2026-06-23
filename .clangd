@@ -1,7 +1,9 @@
 CompileFlags:
   CompilationDatabase: build
+  Add:
+    - -D__XTENSA__
+    - -D__xtensa__
   Remove:
-    - --target=*
     - -mlongcalls
     - -fno-shrink-wrap
     - -fstrict-volatile-bitfields
@@ -9,8 +11,12 @@ CompileFlags:
     - -fno-jump-tables
     - -fdiagnostics-color=*
     - -fmacro-prefix-map=*
+    - -Werror=*
+    - -ffunction-sections
+    - -fdata-sections
+    - -fno-builtin-*
+    - -fuse-cxa-atexit
     - -gdwarf-*
-    - "@*"
 
 Index:
   Background: Build

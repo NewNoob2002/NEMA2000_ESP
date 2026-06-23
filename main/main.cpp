@@ -109,8 +109,7 @@ logTaskDetails() {
 #endif
 }
 
-void __attribute__((unused))
-taskMonitor(void* arg) {
+void __attribute__((unused)) taskMonitor(void* arg) {
     (void)arg;
 
     while (true) {
@@ -137,8 +136,7 @@ taskMonitor(void* arg) {
     }
 }
 
-void __attribute__((unused))
-startTaskMonitor() {
+void __attribute__((unused)) startTaskMonitor() {
     TaskHandle_t monitorTask = nullptr;
     const BaseType_t result = xTaskCreatePinnedToCore(taskMonitor, "task_monitor", kTaskMonitorStackSize, nullptr,
                                                       kTaskMonitorPriority, &monitorTask, kTaskMonitorCore);

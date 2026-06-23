@@ -7,20 +7,13 @@
 AccessModifierOffset: -2
 AlignAfterOpenBracket: Align
 AlignArrayOfStructures: None
-AlignConsecutiveMacros:
-    Enabled: true
-    AcrossEmptyLines: true
-    AcrossComments: true
+AlignConsecutiveMacros: true
 AlignConsecutiveAssignments: None
-AlignConsecutiveBitFields:
-    Enabled: true
-    AcrossEmptyLines: true
-    AcrossComments: true
+AlignConsecutiveBitFields: true
 AlignConsecutiveDeclarations: None
 AlignEscapedNewlines: Right
 AlignOperands: Align
 SortIncludes: true
-InsertBraces: true # Control statements must have curly brackets
 AlignTrailingComments: true
 AllowAllArgumentsOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: true

@@ -143,7 +143,7 @@ gnssUpdate(UnicoreUM980* gnss) {
         if (gnssConfigureRequested(GNSS_CONFIG_ONCE)) {
             if (gnss->configure() == true) {
                 gnssConfigureClear(GNSS_CONFIG_ONCE);
-                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
+                gnssConfigure(GNSS_CONFIG_ELEVATION, __FILE__, __LINE__);
             }
         }
 

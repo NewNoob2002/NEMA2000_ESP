@@ -156,9 +156,6 @@ UnicoreUM980::configureOnceTime() {
         }
     }
 
-    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
-        result = firstError(result, saveConfiguration());
-    }
     // first disable all output to ensure a known state, then re-enable the desired messages with their current periods
     return result;
 }

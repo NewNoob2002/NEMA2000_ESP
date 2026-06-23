@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Configure clangd",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/configure_clangd.py"
+      ],
+      "windows": {
+        "command": "python",
+        "args": [
+          "${workspaceFolder}\\scripts\\configure_clangd.py"
+        ]
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

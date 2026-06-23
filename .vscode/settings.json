@@ -1,13 +1,14 @@
 {
-    "clangd.arguments": [
-        "--background-index",
-        "--compile-commands-dir=${workspaceFolder}/build",
-        "--query-driver=**/xtensa-esp32-elf-gcc,**/xtensa-esp32-elf-g++,**/xtensa-esp-elf-gcc,**/xtensa-esp-elf-g++,**/riscv32-esp-elf-gcc,**/riscv32-esp-elf-g++,C:/Espressif/tools/**/xtensa-esp32-elf-gcc.exe,C:/Espressif/tools/**/xtensa-esp32-elf-g++.exe,C:/Espressif/tools/**/xtensa-esp-elf-gcc.exe,C:/Espressif/tools/**/xtensa-esp-elf-g++.exe,C:/Espressif/tools/**/riscv32-esp-elf-gcc.exe,C:/Espressif/tools/**/riscv32-esp-elf-g++.exe"
-    ],
-    "C_Cpp.intelliSenseEngine": "disabled",
-    "idf.flashType": "UART",
-    "idf.portWin": "COM6",
-    "idf.customExtraVars": {},
-    "idf.port": "/dev/ttyACM0",
-    "idf.currentSetup": "/home/gtc/.espressif/v5.5.4/esp-idf"
+  "clangd.arguments": [
+    "--background-index",
+    "--compile-commands-dir=${workspaceFolder}/build",
+    "--query-driver=**/xtensa-esp32-elf-gcc,**/xtensa-esp32-elf-g++,**/xtensa-esp-elf-gcc,**/xtensa-esp-elf-g++,**/riscv32-esp-elf-gcc,**/riscv32-esp-elf-g++,${env:HOME}/.espressif/tools/**/xtensa-esp32-elf-*,${env:HOME}/.espressif/tools/**/xtensa-esp-elf-*,${env:HOME}/.espressif/tools/**/riscv32-esp-elf-*,${env:USERPROFILE}\\.espressif\\tools\\**\\xtensa-esp32-elf-*,${env:USERPROFILE}\\.espressif\\tools\\**\\xtensa-esp-elf-*,${env:USERPROFILE}\\.espressif\\tools\\**\\riscv32-esp-elf-*,C:/Espressif/tools/**/xtensa-esp32-elf-gcc.exe,C:/Espressif/tools/**/xtensa-esp32-elf-g++.exe,C:/Espressif/tools/**/xtensa-esp-elf-gcc.exe,C:/Espressif/tools/**/xtensa-esp-elf-g++.exe,C:/Espressif/tools/**/riscv32-esp-elf-gcc.exe,C:/Espressif/tools/**/riscv32-esp-elf-g++.exe"
+  ],
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "idf.flashType": "UART",
+  "idf.portWin": "COM6",
+  "idf.customExtraVars": {},
+  "idf.port": "/dev/ttyACM0",
+  "idf.currentSetup": "/home/gtc/.espressif/v5.5.4/esp-idf",
+  "clangd.path": "/home/gtc/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd"
 }
