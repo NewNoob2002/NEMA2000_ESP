@@ -1,9 +1,13 @@
 {
     "clangd.arguments": [
+        "--background-index",
         "--compile-commands-dir=${workspaceFolder}/build",
-        "--query-driver=C:\\Espressif\\tools\\xtensa-esp-elf\\esp-14.2.0_20260121\\xtensa-esp-elf\\bin\\xtensa-esp32-elf-*"
+        "--query-driver=**/xtensa-esp32-elf-gcc,**/xtensa-esp32-elf-g++,**/xtensa-esp-elf-gcc,**/xtensa-esp-elf-g++,**/riscv32-esp-elf-gcc,**/riscv32-esp-elf-g++,C:/Espressif/tools/**/xtensa-esp32-elf-gcc.exe,C:/Espressif/tools/**/xtensa-esp32-elf-g++.exe,C:/Espressif/tools/**/xtensa-esp-elf-gcc.exe,C:/Espressif/tools/**/xtensa-esp-elf-g++.exe,C:/Espressif/tools/**/riscv32-esp-elf-gcc.exe,C:/Espressif/tools/**/riscv32-esp-elf-g++.exe"
     ],
-    "idf.currentSetup": "C:\\esp\\v5.5.4\\esp-idf",
+    "C_Cpp.intelliSenseEngine": "disabled",
     "idf.flashType": "UART",
     "idf.portWin": "COM6",
+    "idf.customExtraVars": {},
+    "idf.port": "/dev/ttyACM0",
+    "idf.currentSetup": "/home/gtc/.espressif/v5.5.4/esp-idf"
 }
