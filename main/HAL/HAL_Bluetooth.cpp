@@ -11,6 +11,7 @@
 #include "Support.h"
 #include "Unicore_UM980.h"
 #include "esp_app_desc.h"
+#include "esp_log.h"
 #include "mcu_settings.h"
 
 namespace HAL {
@@ -419,6 +420,7 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         return;
     }
     if (!payload || (payloadLength < 3)) {
+        ESP_LOGE(TAG, "handleWorkMode invalid parameters in payload(nullptr) or payloadLength(%d)", payloadLength);
         ack(response, requestHeader, kResponseError);
         return;
     }
@@ -427,15 +429,21 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
     const uint8_t fixedBaseMode = payload[1];
     const uint8_t baseEnable = payload[2];
 
+    ESP_LOGI(TAG, "Work mode set: mode=0x%02X fixedBase=0x%02X baseEnable=0x%02X baseId=%s\n", requestedMode,
+             fixedBaseMode, baseEnable, settings.baseId);
+
     if ((requestedMode != kWorkModeRover) && (requestedMode != kWorkModeBase)) {
+        ESP_LOGE(TAG, "handleWorkMode invalid parameters in requestedMode(%d)", requestedMode);
         ack(response, requestHeader, kResponseError);
         return;
     }
     if ((baseEnable != kBaseDisabled) && (baseEnable != kBaseEnabled)) {
+        ESP_LOGE(TAG, "handleWorkMode invalid parameters in baseEnable(%d)", baseEnable);
         ack(response, requestHeader, kResponseError);
         return;
     }
     if ((fixedBaseMode != kBaseKnownPoint) && (fixedBaseMode != kBaseSinglePoint)) {
+        ESP_LOGE(TAG, "handleWorkMode invalid parameters in fixedBaseMode(%d)", fixedBaseMode);
         ack(response, requestHeader, kResponseError);
         return;
     }
@@ -447,6 +455,7 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
 
     if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled) && (fixedBaseMode == kBaseKnownPoint)) {
         if (payloadLength < 44) {
+            ESP_LOGE(TAG, "handleWorkMode invalid parameters in payloadLength(too short (%d))", payloadLength);
             ack(response, requestHeader, kResponseError);
             return;
         }
@@ -461,6 +470,8 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         latitude = applyHemisphere(latitude, 'N', 'S', static_cast<char>(payload[32]));
 
         if (!isValidGeodeticPosition(longitude, latitude, altitude)) {
+            ESP_LOGE(TAG, "handleWorkMode invalid parameters in longitude, latitude, altitude(invalid %f, %f, %f)",
+                     longitude, latitude, altitude);
             ack(response, requestHeader, kResponseError);
             return;
         }
@@ -474,18 +485,9 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         settings.fixedBase = false;
     }
 
-    systemPrintf("[Bluetooth] Work mode set: mode=0x%02X fixedBase=0x%02X baseEnable=0x%02X baseId=%s\n", requestedMode,
-                 fixedBaseMode, baseEnable, settings.baseId);
-
     if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)) {
-        settings.pppMode = PPP_MODE_DISABLE;
         requestChangeState(STATE_BASE_NOT_STARTED);
     } else {
-        if (settings.radioConfigStatus != 0) {
-            settings.pppMode = PPP_MODE_DISABLE;
-        } else if (settings.pppMode == PPP_MODE_DISABLE) {
-            settings.pppMode = PPP_MODE_HAS;
-        }
         requestChangeState(STATE_ROVER_NOT_STARTED);
     }
 
@@ -546,12 +548,7 @@ handleRadioConfig(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& request
     settings.radioConfigDataFormat = payload[17];
     settings.enableExtCorrRadio = settings.radioConfigStatus;
 
-    if (settings.radioConfigStatus != 0) {
-        settings.pppMode = PPP_MODE_DISABLE;
-        requestChangeState(STATE_ROVER_NOT_STARTED);
-    }
-
-    ESP_LOGI(TAG,
+    ESP_LOGD(TAG,
              "Radio config set: status=%u mode=%u channel=%u tx=%.2f rx=%.2f power=%u protocol=0x%02X air=%u format=%u",
              static_cast<unsigned>(settings.radioConfigStatus), static_cast<unsigned>(settings.radioConfigWorkMode),
              static_cast<unsigned>(settings.radioConfigChannel), static_cast<double>(settings.radioConfigTxFrequency),

@@ -130,6 +130,7 @@ gnssUpdate(UnicoreUM980* gnss) {
         //     setLoggingType(); // Update Standard, PPP, or custom for icon selection
         // }
 
+        gnss->updateBinaryMessageInit();
         return; // No configuration requests
     }
 

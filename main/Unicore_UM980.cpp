@@ -15,6 +15,7 @@ constexpr uint8_t kPosTypePsrDiff = 17;
 constexpr uint8_t kPosTypeNarrowFloat = 34;
 constexpr uint8_t kPosTypeWideInt = 49;
 constexpr uint8_t kPosTypeNarrowInt = 50;
+constexpr unsigned long kBinaryMessageInitRetryMs = 2000;
 
 bool
 copyModeToken(char* destination, const size_t destinationSize, const char*& cursor) {
@@ -156,14 +157,6 @@ UnicoreUM980::configureOnceTime() {
     }
 
     // first disable all output to ensure a known state, then re-enable the desired messages with their current periods
-    return result;
-}
-
-UnicoreResult_t
-UnicoreUM980::configureGNSS(const UnicorePort port) {
-    UnicoreResult_t result = requestVersion();
-    result = firstError(result, setConstellations());
-    result = firstError(result, enableBinaryNavigation(port, static_cast<float>(_rateSeconds)));
     return result;
 }
 
@@ -346,6 +339,28 @@ UnicoreUM980::enableBinaryNavigation(const UnicorePort port, const float periodS
     }
 
     return result;
+}
+
+void
+UnicoreUM980::updateBinaryMessageInit() {
+    if ((millis() - _lastBinaryMessageInitAttemptMs) < kBinaryMessageInitRetryMs) {
+        return;
+    }
+    _lastBinaryMessageInitAttemptMs = millis();
+
+    const float rateSeconds = static_cast<float>(_rateSeconds);
+
+    if (_recTime == nullptr) {
+        initRecTime(rateSeconds);
+    }
+
+    if (_bestNav == nullptr) {
+        initBestnav(rateSeconds);
+    }
+
+    if (_bestNavXyz == nullptr) {
+        initBestnavXyz(rateSeconds);
+    }
 }
 
 UnicoreResult_t
@@ -764,60 +779,38 @@ UnicoreUM980::isGgaActive() const {
 }
 
 double
-UnicoreUM980::getLatitude() {
-    CHECK_POINTER_FLOAT(_bestNav,
-                        initBestnav); // Check that RAM has been allocated
-    return _bestNav->latitude;
+UnicoreUM980::getLatitude() const {
+    return _bestNav ? _bestNav->latitude : 0.0;
 }
 
 double
-UnicoreUM980::getLongitude() {
-    CHECK_POINTER_FLOAT(_bestNav,
-                        initBestnav); // Check that RAM has been allocated
-    return _bestNav->longitude;
+UnicoreUM980::getLongitude() const {
+    return _bestNav ? _bestNav->longitude : 0.0;
 }
 
 double
-UnicoreUM980::getAltitude() {
-    CHECK_POINTER_FLOAT(_bestNav,
-                        initBestnav); // Check that RAM has been allocated
-    return _bestNav->altitude;
+UnicoreUM980::getAltitude() const {
+    return _bestNav ? _bestNav->altitude : 0.0;
 }
 
 double
 UnicoreUM980::getHorizontalSpeed() const {
-    if (_bestNav) {
-        return _bestNav->horizontalSpeed;
-    } else {
-        return 0.0;
-    }
+    return _bestNav ? _bestNav->horizontalSpeed : 0.0;
 }
 
 double
 UnicoreUM980::getTrackGround() const {
-    if (_bestNav) {
-        return _bestNav->trackGround;
-    } else {
-        return 0.0;
-    }
+    return _bestNav ? _bestNav->trackGround : 0.0;
 }
 
 float
 UnicoreUM980::getLatitudeDeviation() const {
-    if (_bestNav) {
-        return _bestNav->latitudeDeviation;
-    } else {
-        return 0.0f;
-    }
+    return _bestNav ? _bestNav->latitudeDeviation : 0.0f;
 }
 
 float
 UnicoreUM980::getLongitudeDeviation() const {
-    if (_bestNav) {
-        return _bestNav->longitudeDeviation;
-    } else {
-        return 0.0f;
-    }
+    return _bestNav ? _bestNav->longitudeDeviation : 0.0f;
 }
 
 float
@@ -865,101 +858,57 @@ UnicoreUM980::isSurveyInComplete() const {
 
 uint8_t
 UnicoreUM980::getFixType() const {
-    if (_bestNav) {
-        return _bestNav->positionType;
-    } else {
-        return 0;
-    }
+    return _bestNav ? _bestNav->positionType : 0;
 }
 
 uint8_t
 UnicoreUM980::getCarrierSolution() const {
-    if (_bestNav) {
-        return _bestNav->rtkSolution;
-    } else {
-        return 0;
-    }
+    return _bestNav ? _bestNav->rtkSolution : 0;
 }
 
 uint8_t
 UnicoreUM980::getSatellitesInView() const {
-    if (_bestNav) {
-        return _bestNav->satellitesTracked;
-    } else {
-        return 0;
-    }
+    return _bestNav ? _bestNav->satellitesTracked : 0;
 }
 
 uint8_t
 UnicoreUM980::getSatellitesUsed() const {
-    if (_bestNav) {
-        return _bestNav->satellitesUsed;
-    } else {
-        return 0;
-    }
+    return _bestNav ? _bestNav->satellitesUsed : 0;
 }
 
 uint8_t
 UnicoreUM980::getDay() const {
-    if (_recTime) {
-        return _recTime->day;
-    } else {
-        return 0;
-    }
+    return _recTime ? _recTime->day : 0;
 }
 
 uint8_t
 UnicoreUM980::getMonth() const {
-    if (_recTime) {
-        return _recTime->month;
-    } else {
-        return 0;
-    }
+    return _recTime ? _recTime->month : 0;
 }
 
 uint16_t
 UnicoreUM980::getYear() const {
-    if (_recTime) {
-        return _recTime->year;
-    } else {
-        return 0;
-    }
+    return _recTime ? _recTime->year : 0;
 }
 
 uint8_t
 UnicoreUM980::getHour() const {
-    if (_recTime) {
-        return _recTime->hour;
-    } else {
-        return 0;
-    }
+    return _recTime ? _recTime->hour : 0;
 }
 
 uint8_t
 UnicoreUM980::getMinute() const {
-    if (_recTime) {
-        return _recTime->minute;
-    } else {
-        return 0;
-    }
+    return _recTime ? _recTime->minute : 0;
 }
 
 uint8_t
 UnicoreUM980::getSecond() const {
-    if (_recTime) {
-        return _recTime->second;
-    } else {
-        return 0;
-    }
+    return _recTime ? _recTime->second : 0;
 }
 
 uint16_t
 UnicoreUM980::getMillisecond() const {
-    if (_recTime) {
-        return _recTime->millisecond;
-    } else {
-        return 0;
-    }
+    return _recTime ? _recTime->millisecond : 0;
 }
 
 uint8_t
@@ -969,29 +918,17 @@ UnicoreUM980::getLeapSeconds() const {
 
 double
 UnicoreUM980::getEcefX() const {
-    if (_bestNavXyz) {
-        return _bestNavXyz->ecefX;
-    } else {
-        return 0;
-    }
+    return _bestNavXyz ? _bestNavXyz->ecefX : 0.0;
 }
 
 double
 UnicoreUM980::getEcefY() const {
-    if (_bestNavXyz) {
-        return _bestNavXyz->ecefY;
-    } else {
-        return 0;
-    }
+    return _bestNavXyz ? _bestNavXyz->ecefY : 0.0;
 }
 
 double
 UnicoreUM980::getEcefZ() const {
-    if (_bestNavXyz) {
-        return _bestNavXyz->ecefZ;
-    } else {
-        return 0;
-    }
+    return _bestNavXyz ? _bestNavXyz->ecefZ : 0.0;
 }
 
 uint16_t

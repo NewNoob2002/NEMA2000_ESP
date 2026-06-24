@@ -1004,26 +1004,66 @@ UnicoreGNSSLibrary::initBestnavXyz(float rate) {
 
     // Start outputting BESTNAV_XYZ in Binary on this COM port
     char command[50];
-    snprintf(command, sizeof(command), "BESTNAVB %0.2f", rate);
+    snprintf(command, sizeof(command), "BESTNAVXYZB %0.2f", rate);
     if (sendCommandAndWait(command, 2000) != Unicore_RESULT_RESPONSE_COMMAND_OK) {
-        delete _bestNav;
-        _bestNav = nullptr; // Remove pointer so we will re-init next check
+        delete _bestNavXyz;
+        _bestNavXyz = nullptr; // Remove pointer so we will re-init next check
         return (false);
     }
 
-    log(UnicoreLogLevel::Info, UNICORE_LOG_COMMAND, "bestnav init ok");
-    lastUpdateGeodetic = 0;
+    log(UnicoreLogLevel::Info, UNICORE_LOG_COMMAND, "bestnavxyz init ok");
+    lastUpdateEcef = 0;
     uint16_t maxWait = (1000 / rate) + 100; // Wait for one response to come in
     unsigned long startTime = millis();
 
     while (1) {
-        if (lastUpdateGeodetic > 0) {
+        if (lastUpdateEcef > 0) {
             break;
         }
         if (millis() - startTime > maxWait) {
-            log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "Failed to get response from BestNav start");
-            delete _bestNav;
-            _bestNav = nullptr;
+            log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "Failed to get response from BestNavXyz start");
+            delete _bestNavXyz;
+            _bestNavXyz = nullptr;
+            return (false);
+        }
+        delay(10);
+    }
+    return true;
+}
+
+bool
+UnicoreGNSSLibrary::initRecTime(float rate) {
+    if ((startBinaryBeforeFix == false) && (isNmeaFixed() == false)) {
+        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "rectime init delayed until fix");
+        return (false);
+    }
+    _recTime = new UNICORE_RECTIME_data_t;
+    if (_recTime == nullptr) {
+        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "failed to allocate rectime data");
+        return (false);
+    }
+
+    char command[50];
+    snprintf(command, sizeof(command), "RECTIMEB %0.2f", rate);
+    if (sendCommandAndWait(command, 2000) != Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        delete _recTime;
+        _recTime = nullptr; // Remove pointer so we will re-init next check
+        return (false);
+    }
+
+    log(UnicoreLogLevel::Info, UNICORE_LOG_COMMAND, "rectime init ok");
+    lastUpdateDateTime = 0;
+    uint16_t maxWait = (1000 / rate) + 100; // Wait for one response to come in
+    unsigned long startTime = millis();
+
+    while (1) {
+        if (lastUpdateDateTime > 0) {
+            break;
+        }
+        if (millis() - startTime > maxWait) {
+            log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "Failed to get response from RecTime start");
+            delete _recTime;
+            _recTime = nullptr;
             return (false);
         }
         delay(10);
@@ -1227,20 +1267,35 @@ UnicoreGNSSLibrary::handleBinaryMessage(const uint8_t* message, const uint16_t l
 
     switch (_lastBinaryHeader.messageId) {
         case messageIdBestnav: {
-            CHECK_POINTER_VOID(_bestNav,
-                               initBestnav); // Check that RAM has been allocated
+            if (_bestNav == nullptr) {
+                _bestNav = new UNICORE_BESTNAV_data_t;
+            }
+            if (_bestNav == nullptr) {
+                log(UnicoreLogLevel::Error, UNICORE_LOG_DATA, "failed to allocate bestnav data");
+                return;
+            }
             decodeBestNav(payload, payloadLength);
             break;
         }
         case messageIdBestnavXyz: {
-            CHECK_POINTER_VOID(_bestNavXyz,
-                               initBestnavXyz); // Check that RAM has been allocated
+            if (_bestNavXyz == nullptr) {
+                _bestNavXyz = new UNICORE_BESTNAVXYZ_data_t;
+            }
+            if (_bestNavXyz == nullptr) {
+                log(UnicoreLogLevel::Error, UNICORE_LOG_DATA, "failed to allocate bestnavxyz data");
+                return;
+            }
             decodeBestNavXyz(payload, payloadLength);
             break;
         }
         case messageIdRectime: {
-            CHECK_POINTER_VOID(_recTime,
-                               initRecTime); // Check that RAM has been allocated
+            if (_recTime == nullptr) {
+                _recTime = new UNICORE_RECTIME_data_t;
+            }
+            if (_recTime == nullptr) {
+                log(UnicoreLogLevel::Error, UNICORE_LOG_DATA, "failed to allocate rectime data");
+                return;
+            }
             decodeRecTime(payload, payloadLength);
             break;
         }

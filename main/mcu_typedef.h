@@ -5,31 +5,31 @@
 #include "CompileConfig.h"
 #include "FreeRTOSConfig.h"
 
-#define PIN_UNDEFINED                   0xFF
-#define INCHES_IN_A_METER               (float)39.37007874
-#define FEET_IN_A_METER                 (float)3.280839895
+#define PIN_UNDEFINED     0xFF
+#define INCHES_IN_A_METER (float)39.37007874
+#define FEET_IN_A_METER   (float)3.280839895
 
-#define HOURS_IN_A_DAY                  24L
-#define MINUTES_IN_AN_HOUR              60L
-#define SECONDS_IN_A_MINUTE             60L
-#define MILLISECONDS_IN_A_SECOND        1000L
-#define MILLISECONDS_IN_A_MINUTE        (SECONDS_IN_A_MINUTE * MILLISECONDS_IN_A_SECOND)
-#define MILLISECONDS_IN_AN_HOUR         (MINUTES_IN_AN_HOUR * MILLISECONDS_IN_A_MINUTE)
-#define MILLISECONDS_IN_A_DAY           (HOURS_IN_A_DAY * MILLISECONDS_IN_AN_HOUR)
+#define HOURS_IN_A_DAY           24L
+#define MINUTES_IN_AN_HOUR       60L
+#define SECONDS_IN_A_MINUTE      60L
+#define MILLISECONDS_IN_A_SECOND 1000L
+#define MILLISECONDS_IN_A_MINUTE (SECONDS_IN_A_MINUTE * MILLISECONDS_IN_A_SECOND)
+#define MILLISECONDS_IN_AN_HOUR  (MINUTES_IN_AN_HOUR * MILLISECONDS_IN_A_MINUTE)
+#define MILLISECONDS_IN_A_DAY    (HOURS_IN_A_DAY * MILLISECONDS_IN_AN_HOUR)
 
-#define SECONDS_IN_AN_HOUR              (MINUTES_IN_AN_HOUR * SECONDS_IN_A_MINUTE)
-#define SECONDS_IN_A_DAY                (HOURS_IN_A_DAY * SECONDS_IN_AN_HOUR)
+#define SECONDS_IN_AN_HOUR (MINUTES_IN_AN_HOUR * SECONDS_IN_A_MINUTE)
+#define SECONDS_IN_A_DAY   (HOURS_IN_A_DAY * SECONDS_IN_AN_HOUR)
 
 // Define the index values into the parserTable
-#define RTK_NMEA_PARSER_INDEX           0
-#define RTK_UNICORE_HASH_PARSER_INDEX   1
-#define RTK_RTCM_PARSER_INDEX           2
+#define RTK_NMEA_PARSER_INDEX         0
+#define RTK_UNICORE_HASH_PARSER_INDEX 1
+#define RTK_RTCM_PARSER_INDEX         2
 // #define RTK_UBLOX_PARSER_INDEX 3
 #define RTK_UNICORE_BINARY_PARSER_INDEX 3
 
-#define WIFI_SSID_LENGTH                32
-#define WIFI_PASSWORD_LENGTH            32
-#define MAX_WIFI_NETWORKS               4
+#define WIFI_SSID_LENGTH     32
+#define WIFI_PASSWORD_LENGTH 32
+#define MAX_WIFI_NETWORKS    4
 
 typedef uint16_t RING_BUFFER_OFFSET;
 
@@ -550,7 +550,7 @@ typedef struct settings_t {
 
     // Bluetooth app radio configuration
     uint8_t radioConfigNumber = 1;
-    uint8_t radioConfigStatus = 1;   // 0 = disabled, 1 = enabled
+    uint8_t radioConfigStatus = 0;   // 0 = disabled, 1 = enabled
     uint8_t radioConfigWorkMode = 1; // 0 = transmit, 1 = receive
     uint8_t radioConfigChannel = 1;
     float radioConfigTxFrequency = 460.05f;
@@ -599,13 +599,13 @@ typedef struct settings_t {
     uint8_t um980Constellations[MAX_UM980_CONSTELLATIONS] = {
         254};                                                // Mark first record with key so defaults will be applied.
     float um980MessageRatesNMEA[MAX_UM980_NMEA_MSG] = {254}; // Mark first record with key so defaults will be applied.
-    float um980MessageRatesRTCMBase[MAX_UM980_RTCM_MSG] = {
-        254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-              // rates for RTCM Base. Default to Unicore recommended rates.
-    float um980MessageRatesRTCMRover[MAX_UM980_RTCM_MSG] = {
-        254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-              // rates for RTCM Base. Default to Unicore recommended rates.
-#endif        // COMPILE_UM980
+    float um980MessageRatesRTCMBase[MAX_UM980_RTCM_MSG] =
+        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+               // rates for RTCM Base. Default to Unicore recommended rates.
+    float um980MessageRatesRTCMRover[MAX_UM980_RTCM_MSG] =
+        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+               // rates for RTCM Base. Default to Unicore recommended rates.
+#endif         // COMPILE_UM980
 
     // mosaic
 #ifdef COMPILE_MOSAICX5

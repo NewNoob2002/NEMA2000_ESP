@@ -92,11 +92,11 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     bool fixedBaseStart();
 
     UnicoreResult_t configureOnceTime();
-    UnicoreResult_t configureGNSS(UnicorePort port = UnicorePort::Current);
 
     UnicoreResult_t requestVersion(uint32_t timeoutMs = 1000);
     UnicoreResult_t enableBinaryNavigation(UnicorePort port = UnicorePort::Current, float periodSeconds = 1.0f);
     UnicoreResult_t disableBinaryNavigation(UnicorePort port = UnicorePort::Current);
+    void updateBinaryMessageInit();
     UnicoreResult_t disableAllOutput();
 
     //-----------------------
@@ -144,16 +144,16 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     int16_t getRtcmMessageNumberByName(const char* msgName) const;
     bool isGgaActive() const;
 
-    double getLatitude();
-    double getLongitude();
-    double getAltitude();
-    double getHorizontalSpeed();
-    double getTrackGround();
-    float getLatitudeDeviation();
-    float getLongitudeDeviation();
-    float getHorizontalAccuracy();
-    float getSurveyInMeanAccuracy();
-    uint32_t getSurveyInObservationTimeSeconds();
+    double getLatitude() const;
+    double getLongitude() const;
+    double getAltitude() const;
+    double getHorizontalSpeed() const;
+    double getTrackGround() const;
+    float getLatitudeDeviation() const;
+    float getLongitudeDeviation() const;
+    float getHorizontalAccuracy() const;
+    float getSurveyInMeanAccuracy() const;
+    uint32_t getSurveyInObservationTimeSeconds() const;
     bool isSurveyInComplete() const;
     uint8_t getFixType() const;
     uint8_t getCarrierSolution() const;
@@ -228,6 +228,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
 
     double _rateSeconds = 1.0;
     uint32_t _autoBaseStartTimer = 0;
+    unsigned long _lastBinaryMessageInitAttemptMs = 0;
     bool _online = false;
     Um980Mode _mode = Um980Mode::Unknown;
     uint8_t _model = UM980_DYN_MODEL_ROVER_SURVEY;

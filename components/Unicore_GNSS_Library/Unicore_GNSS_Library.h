@@ -14,36 +14,44 @@
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 #define CHECK_POINTER_BOOL(packetPointer, initPointer)                                                                 \
-    {                                                                                                                  \
-        if (packetPointer == nullptr)                                                                                  \
+    do {                                                                                                               \
+        if ((packetPointer) == nullptr) {                                                                              \
             initPointer();                                                                                             \
-        if (packetPointer == nullptr)                                                                                  \
+        }                                                                                                              \
+        if ((packetPointer) == nullptr) {                                                                              \
             return false;                                                                                              \
-    }
+        }                                                                                                              \
+    } while (0)
 
 #define CHECK_POINTER_FLOAT(packetPointer, initPointer)                                                                \
-    {                                                                                                                  \
-        if (packetPointer == nullptr)                                                                                  \
+    do {                                                                                                               \
+        if ((packetPointer) == nullptr) {                                                                              \
             initPointer();                                                                                             \
-        if (packetPointer == nullptr)                                                                                  \
+        }                                                                                                              \
+        if ((packetPointer) == nullptr) {                                                                              \
             return 0.0f;                                                                                               \
-    }
+        }                                                                                                              \
+    } while (0)
 
 #define CHECK_POINTER_VOID(packetPointer, initPointer)                                                                 \
-    {                                                                                                                  \
-        if (packetPointer == nullptr)                                                                                  \
+    do {                                                                                                               \
+        if ((packetPointer) == nullptr) {                                                                              \
             initPointer();                                                                                             \
-        if (packetPointer == nullptr)                                                                                  \
+        }                                                                                                              \
+        if ((packetPointer) == nullptr) {                                                                              \
             return;                                                                                                    \
-    }
+        }                                                                                                              \
+    } while (0)
 
 #define CHECK_POINTER_CHAR(packetPointer, initPointer)                                                                 \
-    {                                                                                                                  \
-        if (packetPointer == nullptr)                                                                                  \
+    do {                                                                                                               \
+        if ((packetPointer) == nullptr) {                                                                              \
             initPointer();                                                                                             \
-        if (packetPointer == nullptr)                                                                                  \
-            return ((char*)"Error");                                                                                   \
-    }
+        }                                                                                                              \
+        if ((packetPointer) == nullptr) {                                                                              \
+            return "Error";                                                                                            \
+        }                                                                                                              \
+    } while (0)
 
 enum class UnicorePort : uint8_t {
     Current = 0,
@@ -192,7 +200,7 @@ class UnicoreGNSSLibrary {
     // This may lead to command timeouts as the UM980 does not appear to respond to BESTNAVB commands if 3D fix is not
     // achieved. Set startBinartBeforeFix = false via disableBinaryBeforeFix() to block binary commands before a fix is
     // achieved
-    bool startBinaryBeforeFix = true;
+    bool startBinaryBeforeFix = false;
 
     bool _printBadChecksum = false;       // Display bad checksum message from the parser
     bool _printParserTransitions = false; // Display the parser transitions
