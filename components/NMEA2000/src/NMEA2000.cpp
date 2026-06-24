@@ -32,13 +32,13 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define DebugStream Serial // outputs debug messages to the serial console (only for Arduino)
 // #define DebugStream (*ForwardStream) // outputs debug messages to same destination as ForwardStream
 
-#define NMEA2000_FRAME_ERROR_DEBUG
-#define NMEA2000_FRAME_IN_DEBUG
-#define NMEA2000_FRAME_OUT_DEBUG
+// #define NMEA2000_FRAME_ERROR_DEBUG
+// #define NMEA2000_FRAME_IN_DEBUG
+// #define NMEA2000_FRAME_OUT_DEBUG
 #define NMEA2000_MSG_TX_DEBUG
 #define NMEA2000_MSG_RX_DEBUG // This one spams the console with every parsed message
-#define NMEA2000_BUF_DEBUG
-#define NMEA2000_DEBUG
+// #define NMEA2000_BUF_DEBUG
+// #define NMEA2000_DEBUG
 
 #if defined(NMEA2000_FRAME_ERROR_DEBUG)
 #define N2kFrameErrDbgStart(fmt, args...)                                                                              \
@@ -137,34 +137,34 @@ N2kPrintFreeMemory(const char* Source) {
 /** \brief Timeout value for the ISO Address Claim in ms*/
 #define N2kAddressClaimTimeout 250
 /** \brief Maximum value for the ISO Heartbeat interval in ms */
-#define MaxHeartbeatInterval   655320UL
+#define MaxHeartbeatInterval 655320UL
 
 /** \brief Max frames, which can be received at time */
-#define TP_MAX_FRAMES          5
+#define TP_MAX_FRAMES 5
 /** \brief Multi packet connection management, TP.CM */
-#define TP_CM                  60416L
+#define TP_CM 60416L
 /** \brief Multi packet data transfer */
-#define TP_DT                  60160L
+#define TP_DT 60160L
 /** \brief Multi packet connection management, Broadcast Announce Message */
-#define TP_CM_BAM              32
+#define TP_CM_BAM 32
 /** \brief Multi packet connection management, Request To Send */
-#define TP_CM_RTS              16
+#define TP_CM_RTS 16
 /** \brief Multi packet connection management, Clear To Send */
-#define TP_CM_CTS              17
+#define TP_CM_CTS 17
 /** \brief Multi packet connection management, End of Message Acknowledgement */
-#define TP_CM_ACK              19
+#define TP_CM_ACK 19
 /** \brief Multi packet connection management, Abort Connection */
-#define TP_CM_Abort            255
+#define TP_CM_Abort 255
 
 /** \brief Already in one or more connection managed sessions and cannot 
  * support another */
-#define TP_CM_AbortBusy        1
+#define TP_CM_AbortBusy 1
 /** \brief System resources were needed for another task so this connection 
  * managed session was terminated */
 #define TP_CM_AbortNoResources 2
 /** \brief A timeout occurred and this is the connection abort to close the
  * session */
-#define TP_CM_AbortTimeout     3
+#define TP_CM_AbortTimeout 3
 
 /************************************************************************/ /**
  * \
