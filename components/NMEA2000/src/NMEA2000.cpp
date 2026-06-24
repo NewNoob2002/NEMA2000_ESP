@@ -35,8 +35,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // #define NMEA2000_FRAME_ERROR_DEBUG
 // #define NMEA2000_FRAME_IN_DEBUG
 // #define NMEA2000_FRAME_OUT_DEBUG
-#define NMEA2000_MSG_TX_DEBUG
-#define NMEA2000_MSG_RX_DEBUG // This one spams the console with every parsed message
+// #define NMEA2000_MSG_TX_DEBUG
+// #define NMEA2000_MSG_RX_DEBUG // This one spams the console with every parsed message
 // #define NMEA2000_BUF_DEBUG
 // #define NMEA2000_DEBUG
 

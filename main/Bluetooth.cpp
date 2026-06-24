@@ -25,6 +25,11 @@ bluetoothGetState() {
     return bluetoothState;
 }
 
+static bool
+bluetoothCanUseDataInterface() {
+    return bluetoothDataInterfaceEnabled && online_devices.bluetooth && (bluetoothState != BT_OFF);
+}
+
 void
 bluetoothSetDataInterfaceEnabled(bool enabled) {
     bluetoothDataInterfaceEnabled = enabled;
@@ -37,11 +42,14 @@ bluetoothDataInterfaceIsEnabled() {
 
 int
 bluetoothRead(uint8_t* buffer, int length) {
-    if (!bluetoothDataInterfaceEnabled) {
+    if (!bluetoothCanUseDataInterface() || !buffer || (length <= 0)) {
         return 0;
     }
 
     if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
+        if (!bluetoothSerialBle || !bluetoothSerialSpp) {
+            return 0;
+        }
         int bytesRead = 0;
 
         // Give incoming BLE the priority
@@ -55,8 +63,14 @@ bluetoothRead(uint8_t* buffer, int length) {
 
         return (bytesRead);
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_SPP) {
+        if (!bluetoothSerialSpp) {
+            return 0;
+        }
         return bluetoothSerialSpp->readBytes(buffer, length);
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
+        if (!bluetoothSerialBle) {
+            return 0;
+        }
         return bluetoothSerialBle->readBytes(buffer, length);
     }
 
@@ -66,11 +80,14 @@ bluetoothRead(uint8_t* buffer, int length) {
 // Determine if data is available
 int
 bluetoothRxDataAvailable() {
-    if (!bluetoothDataInterfaceEnabled) {
+    if (!bluetoothCanUseDataInterface()) {
         return 0;
     }
 
     if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
+        if (!bluetoothSerialBle || !bluetoothSerialSpp) {
+            return 0;
+        }
         // Give incoming BLE the priority
         if (bluetoothSerialBle->available()) {
             return (bluetoothSerialBle->available());
@@ -78,8 +95,14 @@ bluetoothRxDataAvailable() {
 
         return (bluetoothSerialSpp->available());
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_SPP) {
+        if (!bluetoothSerialSpp) {
+            return 0;
+        }
         return bluetoothSerialSpp->available();
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
+        if (!bluetoothSerialBle) {
+            return 0;
+        }
         return bluetoothSerialBle->available();
     }
 
@@ -89,11 +112,14 @@ bluetoothRxDataAvailable() {
 // Write data to the Bluetooth device
 int
 bluetoothWrite(const uint8_t* buffer, int length) {
-    if (!bluetoothDataInterfaceEnabled) {
+    if (!bluetoothCanUseDataInterface() || !buffer || (length <= 0) || !bluetoothIsConnected()) {
         return 0;
     }
 
     if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
+        if (!bluetoothSerialBle || !bluetoothSerialSpp) {
+            return 0;
+        }
         // Write to both interfaces
         int bleWrite = bluetoothSerialBle->write(buffer, length);
         int sppWrite = bluetoothSerialSpp->write(buffer, length);
@@ -105,8 +131,14 @@ bluetoothWrite(const uint8_t* buffer, int length) {
         }
         return (sppWrite);
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_SPP) {
+        if (!bluetoothSerialSpp) {
+            return 0;
+        }
         return bluetoothSerialSpp->write(buffer, length);
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
+        if (!bluetoothSerialBle) {
+            return 0;
+        }
         // BLE write does not handle 0 length requests correctly
         if (length > 0) {
             return bluetoothSerialBle->write(buffer, length);
@@ -125,16 +157,25 @@ bluetoothWrite(uint8_t value) {
 // Flush Bluetooth device
 void
 bluetoothFlush() {
-    if (!bluetoothDataInterfaceEnabled) {
+    if (!bluetoothCanUseDataInterface()) {
         return;
     }
 
     if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
+        if (!bluetoothSerialBle || !bluetoothSerialSpp) {
+            return;
+        }
         bluetoothSerialBle->flush();
         bluetoothSerialSpp->flush();
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_SPP) {
+        if (!bluetoothSerialSpp) {
+            return;
+        }
         bluetoothSerialSpp->flush();
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
+        if (!bluetoothSerialBle) {
+            return;
+        }
         bluetoothSerialBle->flush();
     }
 }
@@ -148,10 +189,19 @@ bluetoothIsConnected() {
     }
 
     if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
+        if (!bluetoothSerialBle || !bluetoothSerialSpp) {
+            return false;
+        }
         return (bluetoothSerialSpp->connected() == true || bluetoothSerialBle->connected() == true);
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_SPP) {
+        if (!bluetoothSerialSpp) {
+            return false;
+        }
         return (bluetoothSerialSpp->connected());
     } else if (bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
+        if (!bluetoothSerialBle) {
+            return false;
+        }
         return (bluetoothSerialBle->connected());
     }
 
@@ -192,6 +242,8 @@ bluetoothStart(bool onlineCheck) {
         return;
     }
 
+    bluetoothRadioType = settings.bluetoothRadioType;
+
     if (bluetoothRadioType == BLUETOOTH_RADIO_OFF) {
         return;
     }
@@ -219,6 +271,7 @@ bluetoothStart(bool onlineCheck) {
 #else
         systemPrintf("Error: Bluetooth BLE mode is not supported in BR/EDR only controller mode. Please check your "
                      "Bluetooth settings and hardware configuration.");
+        return;
 #endif // CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY
     } else if (settings.bluetoothRadioType == BLUETOOTH_RADIO_SPP) {
         if (bluetoothSerialSpp == nullptr) {
@@ -339,6 +392,7 @@ bluetoothStart(bool onlineCheck) {
     }
 
     online_devices.bluetooth = true;
+    bluetoothDataInterfaceEnabled = true;
     bluetoothState = BT_NOTCONNECTED;
     reportHeapNow(false);
     systemPrintln(productPropertiesTable[RTK_S20].displayName);
@@ -365,10 +419,15 @@ bluetoothEndCommon(bool endMe) {
         }
 
         bluetoothState = BT_OFF; // Indicate to tasks that BT is unavailable
+        bluetoothDataInterfaceEnabled = false;
+
+        task.bluetoothReadTaskStopRequest = true;
+        while (task.bluetoothReadTaskRunning == true) {
+            delay(1);
+        }
 
         // Stop BLE Command Task if BLE is enabled
-        if (settings.bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE
-            || settings.bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
+        if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE || bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
             task.bluetoothCommandTaskStopRequest = true;
             while (task.bluetoothCommandTaskRunning == true) {
                 delay(1);
@@ -376,60 +435,72 @@ bluetoothEndCommon(bool endMe) {
         }
 
         // end and delete BT instances
-        if (settings.bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
-            bluetoothSerialBle->flush();      // Complete any transfers
-            bluetoothSerialBle->disconnect(); // Drop any clients
-            bluetoothSerialBle->end();        // Release resources : needs vTaskDelete in SparkFun fork
-            if (endMe) {
-                delete bluetoothSerialBle;
-                bluetoothSerialBle = nullptr;
+        if (bluetoothRadioType == BLUETOOTH_RADIO_SPP_AND_BLE) {
+            if (bluetoothSerialBle) {
+                bluetoothSerialBle->flush();      // Complete any transfers
+                bluetoothSerialBle->disconnect(); // Drop any clients
+                bluetoothSerialBle->end();        // Release resources : needs vTaskDelete in SparkFun fork
+                if (endMe) {
+                    delete bluetoothSerialBle;
+                    bluetoothSerialBle = nullptr;
+                }
             }
 
-            bluetoothSerialBleCommands->flush();      // Complete any transfers
-            bluetoothSerialBleCommands->disconnect(); // Drop any clients
-            bluetoothSerialBleCommands->end();        // Release resources : needs vTaskDelete in SparkFun fork
-            if (endMe) {
-                delete bluetoothSerialBleCommands;
-                bluetoothSerialBleCommands = nullptr;
+            if (bluetoothSerialBleCommands) {
+                bluetoothSerialBleCommands->flush();      // Complete any transfers
+                bluetoothSerialBleCommands->disconnect(); // Drop any clients
+                bluetoothSerialBleCommands->end();        // Release resources : needs vTaskDelete in SparkFun fork
+                if (endMe) {
+                    delete bluetoothSerialBleCommands;
+                    bluetoothSerialBleCommands = nullptr;
+                }
             }
 
-            bluetoothSerialSpp->flush();      // Complete any transfers
-            bluetoothSerialSpp->disconnect(); // Drop any clients
-            bluetoothSerialSpp->end();        // Release resources
-            //sppAccessoryMode = false;         // Done with Accessory Mode
-            if (endMe) {
-                bluetoothSerialSpp->register_callback(nullptr);
-                bluetoothSerialSpp->memrelease(BT_MODE_BTDM); // Release memory - using correct mode
-                delete bluetoothSerialSpp;
-                bluetoothSerialSpp = nullptr;
+            if (bluetoothSerialSpp) {
+                bluetoothSerialSpp->flush();      // Complete any transfers
+                bluetoothSerialSpp->disconnect(); // Drop any clients
+                bluetoothSerialSpp->end();        // Release resources
+                //sppAccessoryMode = false;         // Done with Accessory Mode
+                if (endMe) {
+                    bluetoothSerialSpp->register_callback(nullptr);
+                    bluetoothSerialSpp->memrelease(BT_MODE_BTDM); // Release memory - using correct mode
+                    delete bluetoothSerialSpp;
+                    bluetoothSerialSpp = nullptr;
+                }
             }
 
             // bluetoothBatteryService.end();
-        } else if (settings.bluetoothRadioType == BLUETOOTH_RADIO_SPP) {
-            bluetoothSerialSpp->flush();      // Complete any transfers
-            bluetoothSerialSpp->disconnect(); // Drop any clients
-            bluetoothSerialSpp->end();        // Release resources
-            if (endMe) {
-                bluetoothSerialSpp->register_callback(nullptr);
-                bluetoothSerialSpp->memrelease(BT_MODE_CLASSIC_BT); // Release memory - using correct mode
-                delete bluetoothSerialSpp;
-                bluetoothSerialSpp = nullptr;
+        } else if (bluetoothRadioType == BLUETOOTH_RADIO_SPP) {
+            if (bluetoothSerialSpp) {
+                bluetoothSerialSpp->flush();      // Complete any transfers
+                bluetoothSerialSpp->disconnect(); // Drop any clients
+                bluetoothSerialSpp->end();        // Release resources
+                if (endMe) {
+                    bluetoothSerialSpp->register_callback(nullptr);
+                    bluetoothSerialSpp->memrelease(BT_MODE_CLASSIC_BT); // Release memory - using correct mode
+                    delete bluetoothSerialSpp;
+                    bluetoothSerialSpp = nullptr;
+                }
             }
-        } else if (settings.bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
-            bluetoothSerialBle->flush();      // Complete any transfers
-            bluetoothSerialBle->disconnect(); // Drop any clients
-            bluetoothSerialBle->end();        // Release resources : needs vTaskDelete in SparkFun fork
-            if (endMe) {
-                delete bluetoothSerialBle;
-                bluetoothSerialBle = nullptr;
+        } else if (bluetoothRadioType == BLUETOOTH_RADIO_BLE) {
+            if (bluetoothSerialBle) {
+                bluetoothSerialBle->flush();      // Complete any transfers
+                bluetoothSerialBle->disconnect(); // Drop any clients
+                bluetoothSerialBle->end();        // Release resources : needs vTaskDelete in SparkFun fork
+                if (endMe) {
+                    delete bluetoothSerialBle;
+                    bluetoothSerialBle = nullptr;
+                }
             }
 
-            bluetoothSerialBleCommands->flush();      // Complete any transfers
-            bluetoothSerialBleCommands->disconnect(); // Drop any clients
-            bluetoothSerialBleCommands->end();        // Release resources : needs vTaskDelete in SparkFun fork
-            if (endMe) {
-                delete bluetoothSerialBleCommands;
-                bluetoothSerialBleCommands = nullptr;
+            if (bluetoothSerialBleCommands) {
+                bluetoothSerialBleCommands->flush();      // Complete any transfers
+                bluetoothSerialBleCommands->disconnect(); // Drop any clients
+                bluetoothSerialBleCommands->end();        // Release resources : needs vTaskDelete in SparkFun fork
+                if (endMe) {
+                    delete bluetoothSerialBleCommands;
+                    bluetoothSerialBleCommands = nullptr;
+                }
             }
 
             // bluetoothBatteryService.end();

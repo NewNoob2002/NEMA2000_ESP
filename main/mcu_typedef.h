@@ -548,6 +548,18 @@ typedef struct settings_t {
                                     // hardware serial reports data available.
     bool enableNmeaOnRadio = true;  // Depends on the platform and GNSS
 
+    // Bluetooth app radio configuration
+    uint8_t radioConfigNumber = 1;
+    uint8_t radioConfigStatus = 1;   // 0 = disabled, 1 = enabled
+    uint8_t radioConfigWorkMode = 1; // 0 = transmit, 1 = receive
+    uint8_t radioConfigChannel = 1;
+    float radioConfigTxFrequency = 460.05f;
+    float radioConfigRxFrequency = 460.05f;
+    uint8_t radioConfigPower = 1;      // 0 = low, 1 = high
+    uint8_t radioConfigProtocol = 1;   // 1 = TRIMTALK, 2 = TRIMMK3, ...
+    uint8_t radioConfigAirRate = 2;    // 2 = 9600, 4 = 19200
+    uint8_t radioConfigDataFormat = 3; // 3 = RTCM23, 4 = RTCM30, 5 = RTCM32, 6 = CMR
+
     // State
     bool enablePrintDuplicateStates = false;
     bool enablePrintStates = true;

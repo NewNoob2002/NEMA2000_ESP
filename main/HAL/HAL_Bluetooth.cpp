@@ -178,6 +178,18 @@ writeLe32(uint8_t* dest, const uint32_t value) {
     dest[3] = static_cast<uint8_t>((value >> 24) & 0xFF);
 }
 
+float
+readFloat(const uint8_t* source) {
+    float value = 0.0f;
+    std::memcpy(&value, source, sizeof(value));
+    return value;
+}
+
+void
+writeFloat(uint8_t* dest, const float value) {
+    std::memcpy(dest, &value, sizeof(value));
+}
+
 double
 applyHemisphere(double value, const char positiveHemisphere, const char negativeHemisphere, const char hemisphere) {
     if ((hemisphere == positiveHemisphere) || (hemisphere == negativeHemisphere)) {
@@ -466,8 +478,14 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
                  fixedBaseMode, baseEnable, settings.baseId);
 
     if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)) {
+        settings.pppMode = PPP_MODE_DISABLE;
         requestChangeState(STATE_BASE_NOT_STARTED);
     } else {
+        if (settings.radioConfigStatus != 0) {
+            settings.pppMode = PPP_MODE_DISABLE;
+        } else if (settings.pppMode == PPP_MODE_DISABLE) {
+            settings.pppMode = PPP_MODE_HAS;
+        }
         requestChangeState(STATE_ROVER_NOT_STARTED);
     }
 
@@ -485,25 +503,62 @@ handleComConfig(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHe
 }
 
 void
-handleRadioConfig(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHeader) {
+handleRadioConfig(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHeader, const uint8_t* payload,
+                  const uint16_t payloadLength) {
     if (requestHeader.messageType == kMsgQueryType) {
-        allocateResponse(response, requestHeader, 28);
-        response.payload[0] = 0x01; //radio number
-        response.payload[1] = 0x01; //radio status 0x00:disabled, 0x01:enabled
-        response.payload[2] = 0x01; //radio work mode 0x00:transmit, 0x01:receive
-        response.payload[3] = 0x01; //radio channel
-
-        std::memcpy(response.payload + 4, "460.05", sizeof(float));
-        std::memcpy(response.payload + 8, "460.05", sizeof(float));
-
-        response.payload[12] = 0x01; //radio power 0x00:low, 0x01:high
-        response.payload[13] =
-            0x01; //radio protocol 0x01-TRIMTALK，0x02-TRIMMK3，0x04-TT450S，0x05-TRANSEOT，0x09-SOUTH，0x0a-HUACE，0x0d-SATEL，0xf0-CCS
-        response.payload[14] = 0x02; //radio airrate 0x02- 9600 and 0x04- 19200
-
-        response.payload[17] = 0x03; //radio data format 0x03-RTCM23，0x04-RTCM30，0x05-RTCM32，0x06-CMR。
+        if (!allocateResponse(response, requestHeader, 28)) {
+            return;
+        }
+        response.payload[0] = settings.radioConfigNumber;
+        response.payload[1] = settings.radioConfigStatus;
+        response.payload[2] = settings.radioConfigWorkMode;
+        response.payload[3] = settings.radioConfigChannel;
+        writeFloat(response.payload + 4, settings.radioConfigTxFrequency);
+        writeFloat(response.payload + 8, settings.radioConfigRxFrequency);
+        response.payload[12] = settings.radioConfigPower;
+        response.payload[13] = settings.radioConfigProtocol;
+        response.payload[14] = settings.radioConfigAirRate;
+        response.payload[17] = settings.radioConfigDataFormat;
         return;
     }
+
+    if (!payload || (payloadLength < 18)) {
+        ack(response, requestHeader, kResponseError);
+        return;
+    }
+
+    const float txFrequency = readFloat(payload + 4);
+    const float rxFrequency = readFloat(payload + 8);
+    if (!std::isfinite(txFrequency) || !std::isfinite(rxFrequency) || (txFrequency <= 0.0f) || (rxFrequency <= 0.0f)) {
+        ack(response, requestHeader, kResponseError);
+        return;
+    }
+
+    settings.radioConfigNumber = payload[0];
+    settings.radioConfigStatus = payload[1] ? 1 : 0;
+    settings.radioConfigWorkMode = payload[2];
+    settings.radioConfigChannel = payload[3];
+    settings.radioConfigTxFrequency = txFrequency;
+    settings.radioConfigRxFrequency = rxFrequency;
+    settings.radioConfigPower = payload[12];
+    settings.radioConfigProtocol = payload[13];
+    settings.radioConfigAirRate = payload[14];
+    settings.radioConfigDataFormat = payload[17];
+    settings.enableExtCorrRadio = settings.radioConfigStatus;
+
+    if (settings.radioConfigStatus != 0) {
+        settings.pppMode = PPP_MODE_DISABLE;
+        requestChangeState(STATE_ROVER_NOT_STARTED);
+    }
+
+    ESP_LOGI(TAG,
+             "Radio config set: status=%u mode=%u channel=%u tx=%.2f rx=%.2f power=%u protocol=0x%02X air=%u format=%u",
+             static_cast<unsigned>(settings.radioConfigStatus), static_cast<unsigned>(settings.radioConfigWorkMode),
+             static_cast<unsigned>(settings.radioConfigChannel), static_cast<double>(settings.radioConfigTxFrequency),
+             static_cast<double>(settings.radioConfigRxFrequency), static_cast<unsigned>(settings.radioConfigPower),
+             static_cast<unsigned>(settings.radioConfigProtocol), static_cast<unsigned>(settings.radioConfigAirRate),
+             static_cast<unsigned>(settings.radioConfigDataFormat));
+
     ack(response, requestHeader, 1);
 }
 
@@ -581,8 +636,14 @@ handlePhoneNetworkConfig(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& 
         if (!allocateResponse(response, requestHeader, 4)) {
             return;
         }
-        response.payload[0] = 0x02;
+        response.payload[0] = settings.pppMode == PPP_MODE_DISABLE ? 0x00 : 0x02;
         return;
+    }
+    if (payload && (payloadLength >= 1) && (payload[0] != 0)) {
+        settings.radioConfigStatus = 0;
+        settings.enableExtCorrRadio = 0;
+        settings.pppMode = PPP_MODE_HAS;
+        requestChangeState(STATE_ROVER_NOT_STARTED);
     }
     ack(response, requestHeader, 0x01);
 }
@@ -727,7 +788,7 @@ processBluetoothAppMessage(SEMP_PARSE_STATE* parse) {
             break;
         case kMsgIdWorkModeConfig: handleWorkMode(response, *requestHeader, payload, payloadLength); break;
         case kMsgIdCOMConfig: handleComConfig(response, *requestHeader, payload, payloadLength); break;
-        case kMsgIdRadioConfig: handleRadioConfig(response, *requestHeader); break;
+        case kMsgIdRadioConfig: handleRadioConfig(response, *requestHeader, payload, payloadLength); break;
         case kMsgIdLogConfig: handleLogConfig(response, *requestHeader, payload, payloadLength); break;
         case kMsgIdGPGSTGnssMessageSet: {
             response.messageType = kMsgSetRespType;
@@ -867,6 +928,8 @@ bluetoothInit() {
     }
 
     if (btReadTaskHandle == nullptr) {
+        task.bluetoothReadTaskStopRequest = false;
+        task.bluetoothReadTaskRunning = false;
         xTaskCreatePinnedToCore(btReadTask, "btReadTask", kBluetoothReadTaskStack, nullptr, settings.btReadTaskPriority,
                                 &btReadTaskHandle, settings.btReadTaskCore);
         ESP_LOGI(TAG, "Bluetooth read task created on core %d", settings.btReadTaskCore);
