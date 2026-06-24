@@ -764,30 +764,24 @@ UnicoreUM980::isGgaActive() const {
 }
 
 double
-UnicoreUM980::getLatitude() const {
-    if (_bestNav) {
-        return _bestNav->latitude;
-    } else {
-        return 0.0f;
-    }
+UnicoreUM980::getLatitude() {
+    CHECK_POINTER_FLOAT(_bestNav,
+                        initBestnav); // Check that RAM has been allocated
+    return _bestNav->latitude;
 }
 
 double
-UnicoreUM980::getLongitude() const {
-    if (_bestNav) {
-        return _bestNav->longitude;
-    } else {
-        return 0.0f;
-    }
+UnicoreUM980::getLongitude() {
+    CHECK_POINTER_FLOAT(_bestNav,
+                        initBestnav); // Check that RAM has been allocated
+    return _bestNav->longitude;
 }
 
 double
-UnicoreUM980::getAltitude() const {
-    if (_bestNav) {
-        return _bestNav->altitude;
-    } else {
-        return 0.0f;
-    }
+UnicoreUM980::getAltitude() {
+    CHECK_POINTER_FLOAT(_bestNav,
+                        initBestnav); // Check that RAM has been allocated
+    return _bestNav->altitude;
 }
 
 double
@@ -1053,24 +1047,32 @@ UnicoreUM980::inRoverMode() const {
 
 bool
 UnicoreUM980::isFixed() const {
-    return (getFixType() != 0) && (getLastBestNavMs() != 0);
+    if (_online)
+        return (getFixType() >= kPosTypeSingle);
+    return false;
 }
 
 bool
 UnicoreUM980::isDgpsFixed() const {
-    return (getFixType() == kPosTypePsrDiff) || isRTKFix() || isRTKFloat();
+    if (_online)
+        return (getFixType() == kPosTypePsrDiff);
+    return false;
 }
 
 bool
 UnicoreUM980::isRTKFix() const {
-    uint8_t _fixType = getFixType();
-    return (_fixType == kPosTypeNarrowInt);
+    if (_online)
+        return (getFixType() == kPosTypeNarrowInt);
+    return false;
 }
 
 bool
 UnicoreUM980::isRTKFloat() const {
-    uint8_t _fixType = getFixType();
-    return (_fixType == kPosTypeWideInt) || (_fixType == kPosTypeNarrowFloat);
+    if (_online) {
+        uint8_t _fixType = getFixType();
+        return (_fixType == kPosTypeWideInt) || (_fixType == kPosTypeNarrowFloat);
+    }
+    return false;
 }
 
 bool

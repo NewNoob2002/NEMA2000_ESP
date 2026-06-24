@@ -144,16 +144,16 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     int16_t getRtcmMessageNumberByName(const char* msgName) const;
     bool isGgaActive() const;
 
-    double getLatitude() const;
-    double getLongitude() const;
-    double getAltitude() const;
-    double getHorizontalSpeed() const;
-    double getTrackGround() const;
-    float getLatitudeDeviation() const;
-    float getLongitudeDeviation() const;
-    float getHorizontalAccuracy() const;
-    float getSurveyInMeanAccuracy() const;
-    uint32_t getSurveyInObservationTimeSeconds() const;
+    double getLatitude();
+    double getLongitude();
+    double getAltitude();
+    double getHorizontalSpeed();
+    double getTrackGround();
+    float getLatitudeDeviation();
+    float getLongitudeDeviation();
+    float getHorizontalAccuracy();
+    float getSurveyInMeanAccuracy();
+    uint32_t getSurveyInObservationTimeSeconds();
     bool isSurveyInComplete() const;
     uint8_t getFixType() const;
     uint8_t getCarrierSolution() const;

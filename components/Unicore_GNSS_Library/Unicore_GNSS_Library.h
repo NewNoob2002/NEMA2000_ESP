@@ -21,6 +21,14 @@
             return false;                                                                                              \
     }
 
+#define CHECK_POINTER_FLOAT(packetPointer, initPointer)                                                                \
+    {                                                                                                                  \
+        if (packetPointer == nullptr)                                                                                  \
+            initPointer();                                                                                             \
+        if (packetPointer == nullptr)                                                                                  \
+            return 0.0f;                                                                                               \
+    }
+
 #define CHECK_POINTER_VOID(packetPointer, initPointer)                                                                 \
     {                                                                                                                  \
         if (packetPointer == nullptr)                                                                                  \

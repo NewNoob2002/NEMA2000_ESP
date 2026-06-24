@@ -1105,13 +1105,13 @@ UnicoreGNSSLibrary::handleNmeaSentence(const char* sentence, const uint16_t leng
         return;
     }
 
-    log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "Unicore NMEA %s", sentence);
-
     if (strncmp(sentence, "$CONFIG,", 8) == 0) {
         handleConfigSentence(sentence, length);
     }
 
     updateCommandResultFromSentence(sentence);
+
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "Unicore NMEA %s", sentence);
 
     const size_t sentenceLength = (length > 0) ? length : strlen(sentence);
     if (sentenceLength < 6) {
@@ -1136,6 +1136,7 @@ UnicoreGNSSLibrary::handleNmeaSentence(const char* sentence, const uint16_t leng
             cursor++;
         }
         nmeaPositionStatus = static_cast<uint8_t>(strtoul(cursor, nullptr, 10));
+        log(UnicoreLogLevel::Debug, UNICORE_LOG_DATA, "GGA position status :%d", nmeaPositionStatus);
     }
     if (_nmeaCallback) {
         _nmeaCallback(sentence, length, _nmeaCallbackUserdata);
@@ -1225,9 +1226,24 @@ UnicoreGNSSLibrary::handleBinaryMessage(const uint8_t* message, const uint16_t l
     }
 
     switch (_lastBinaryHeader.messageId) {
-        case messageIdBestnav: decodeBestNav(payload, payloadLength); break;
-        case messageIdBestnavXyz: decodeBestNavXyz(payload, payloadLength); break;
-        case messageIdRectime: decodeRecTime(payload, payloadLength); break;
+        case messageIdBestnav: {
+            CHECK_POINTER_VOID(_bestNav,
+                               initBestnav); // Check that RAM has been allocated
+            decodeBestNav(payload, payloadLength);
+            break;
+        }
+        case messageIdBestnavXyz: {
+            CHECK_POINTER_VOID(_bestNavXyz,
+                               initBestnavXyz); // Check that RAM has been allocated
+            decodeBestNavXyz(payload, payloadLength);
+            break;
+        }
+        case messageIdRectime: {
+            CHECK_POINTER_VOID(_recTime,
+                               initRecTime); // Check that RAM has been allocated
+            decodeRecTime(payload, payloadLength);
+            break;
+        }
         case messageIdVersion: decodeVersionBinary(payload, payloadLength); break;
         default: break;
     }
