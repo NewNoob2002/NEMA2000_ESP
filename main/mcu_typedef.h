@@ -314,7 +314,7 @@ typedef struct settings_t {
     int observationSeconds = 15;             // Default survey in time of 15 seconds
     float observationPositionAccuracy = 5.0; // Default survey in pos accy of 5m
     float surveyInStartingAccuracy =
-        1.0; // Wait for this horizontal positional accuracy in meters before starting survey in
+        3.0; // Wait for this horizontal positional accuracy in meters before starting survey in
 
     // Battery
     bool enablePrintBatteryMessages = true;

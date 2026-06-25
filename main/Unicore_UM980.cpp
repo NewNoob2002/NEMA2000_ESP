@@ -127,6 +127,7 @@ UnicoreUM980::configureReceiverOnce() {
         if (queryConfigContains("CONFIG SIGNALGROUP 4 5") != Unicore_RESULT_CONFIG_PRESENT) {
             result = firstError(result, sendCommandAndWait("CONFIG SIGNALGROUP 4 5", 1500));
         }
+        result = firstError(result, sendCommandAndWait("CONFIG PVTALG MULTI", 1500));
     }
 
     // first disable all output to ensure a known state, then re-enable the desired messages with their current periods

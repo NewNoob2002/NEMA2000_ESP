@@ -4,7 +4,7 @@
 #define HAL_UPDATE_TASK_PROI         tskIDLE_PRIORITY + 2
 #define HAL_UPDATE_TASK_RUNNING_CORE (1)
 
-#define HAL_BT_READ_TASK_STACK_SIZE          (1024 * 3)
+#define HAL_BT_READ_TASK_STACK_SIZE          (1024 * 5)
 #define HAL_BT_READ_UPDATE_TASK_PROI         (settings.btReadTaskPriority)
 #define HAL_BT_READ_UPDATE_TASK_RUNNING_CORE (settings.btReadTaskCore)
 // GNSS Module Config

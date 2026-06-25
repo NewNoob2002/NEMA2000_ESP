@@ -94,7 +94,7 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
         pUm980 = new UnicoreUM980(GNSS_POWER_PIN);
     }
     pUm980->enableDebugLogging(UnicoreLogLevel::Debug,
-                               UNICORE_LOG_COMMAND | UNICORE_LOG_TX | UNICORE_LOG_DATA | UNICORE_LOG_CHILD_CLASS);
+                               UNICORE_LOG_COMMAND | UNICORE_LOG_TX | UNICORE_LOG_RX|UNICORE_LOG_DATA | UNICORE_LOG_CHILD_CLASS);
     pUm980->init();
     pUm980->powerOn();
     delay(2000); // Wait for the GNSS to power up
@@ -102,6 +102,7 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
         if (pUm980->requestVersion(2000) == Unicore_RESULT_RESPONSE_COMMAND_OK) {
             online_devices.gnss = true;
             pUm980->setOnline(true);
+            // pUm980->factoryReset();
         } else {
             ESP_LOGE(TAG, "Failed to get GNSS version");
         }

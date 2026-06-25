@@ -11,6 +11,13 @@ userGnssNmeaCallback(const char* sentence, uint16_t length, void* userdata) {
     }
 }
 
+void
+userGnssHashcallback(const char* sentence, uint16_t length, void* userdata) {
+    if (sentence[0] == '#') {
+        DP_GNSS_DataHandler(sentence, length, userdata);
+    }
+}
+
 namespace HAL {
 HardwareSerial* gnssSerial = nullptr;
 
@@ -24,6 +31,7 @@ gnssInit() {
     gnssBegin(gnssSerial, gUm980);
     if (gUm980) {
         gUm980->setUserNmeaCallback(userGnssNmeaCallback);
+        gUm980->setUserHashCallback(userGnssHashcallback);
     } else {
         ESP_LOGE("[HAL_GNSS]", "Failed to initialize GNSS: Unicore UM980 instance not created");
     }

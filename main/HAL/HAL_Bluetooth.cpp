@@ -849,6 +849,7 @@ processRtcmMessage(SEMP_PARSE_STATE* parse) {
             ESP_LOGE(TAG, "Failed to write RTCM%u to GNSS serial: wrote %d of %u", sempRtcmGetMessageNumber(parse),
                      bytesWritten, parse->length);
         }
+        // ESP_LOGW(TAG, "Witer %d bytes RTCM%u to GNSS", bytesWritten);
     } else {
         ESP_LOGW(TAG, "Dropped RTCM%u: GNSS serial not ready", sempRtcmGetMessageNumber(parse));
     }

@@ -1151,7 +1151,7 @@ UnicoreGNSSLibrary::handleNmeaSentence(const char* sentence, const uint16_t leng
 
     updateCommandResultFromSentence(sentence);
 
-    log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "Unicore NMEA %s", sentence);
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "RX Unicore NMEA %s", sentence);
 
     const size_t sentenceLength = (length > 0) ? length : strlen(sentence);
     if (sentenceLength < 6) {
@@ -1176,7 +1176,15 @@ UnicoreGNSSLibrary::handleNmeaSentence(const char* sentence, const uint16_t leng
             cursor++;
         }
         nmeaPositionStatus = static_cast<uint8_t>(strtoul(cursor, nullptr, 10));
-        log(UnicoreLogLevel::Debug, UNICORE_LOG_DATA, "GGA position status :%d", nmeaPositionStatus);
+        /*0 = Invalid / no fix
+  1 = GPS/SPS fix
+  2 = DGPS fix
+  4 = RTK fixed
+  5 = RTK float
+  6 = Estimated / dead reckoning
+  7 = Manual input
+  8 = Simulation */
+        //log(UnicoreLogLevel::Info, UNICORE_LOG_DATA, "GGA position status :%d", nmeaPositionStatus);
     }
     if (_nmeaCallback) {
         _nmeaCallback(sentence, length, _nmeaCallbackUserdata);
@@ -1203,7 +1211,7 @@ UnicoreGNSSLibrary::handleRtcmMessage(const uint8_t* message, const uint16_t len
         return;
     }
 
-    log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "Unicore RTCM%u length=%u", messageNumber, length);
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "RX Unicore RTCM%u length=%u", messageNumber, length);
     if (_rtcmCallback) {
         _rtcmCallback(message, length, messageNumber, _rtcmCallbackUserdata);
     }
@@ -1215,7 +1223,7 @@ UnicoreGNSSLibrary::handleHashSentence(const char* sentence, const uint16_t leng
         return;
     }
 
-    log(UnicoreLogLevel::Verbose, UNICORE_LOG_RX, "RX HASH %s", sentence);
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "RX Unicore HASH %s", sentence);
 
     if (strncmp(sentence, "#VERSION", 8) == 0) {
         decodeVersionHash(sentence);
@@ -1257,7 +1265,7 @@ UnicoreGNSSLibrary::handleBinaryMessage(const uint8_t* message, const uint16_t l
 
     updateCommandResultFromBinary(_lastBinaryHeader.messageId);
 
-    log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "RX binary id=%u payload=%u week=%u sow=%lu",
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_RX, "RX Unicore Binary id=%u payload=%u week=%u sow=%lu",
         _lastBinaryHeader.messageId, payloadLength, _lastBinaryHeader.weekNumber,
         static_cast<unsigned long>(_lastBinaryHeader.secondsOfWeek));
 
