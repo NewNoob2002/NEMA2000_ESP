@@ -1,6 +1,7 @@
 #ifndef NMEA0183_TO_N2K_H_
 #define NMEA0183_TO_N2K_H_
 
+#include <cstdint>
 #include <stdint.h>
 
 #include "N2kMsg.h"
@@ -25,7 +26,11 @@ struct tGatewayGnssData {
     double Altitude = N2kDoubleNA;
     double GeoidalSeparation = N2kDoubleNA;
     double Hdop = N2kDoubleNA;
+    double Pdop = N2kDoubleNA;
+    double AgeOfCorrection = N2kDoubleNA;
     uint8_t Satellites = N2kUInt8NA;
+    unsigned char nReferenceStations = N2kUInt8NA;
+    uint8_t ReferenceStationsID = N2kUInt8NA;
     tN2kGNSSmethod GnssMethod = N2kGNSSm_Unavailable;
 };
 

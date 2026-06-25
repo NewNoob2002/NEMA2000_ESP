@@ -129,7 +129,8 @@ BuildGatewayN2kMessages(const tGatewayGnssData& gnss, tGatewayN2kMessages& messa
     SetN2kLatLonRapid(messages.LatLonRapid, gnss.Latitude, gnss.Longitude);
     SetN2kCOGSOGRapid(messages.CogSogRapid, 1, N2khr_true, gnss.Cog, gnss.Sog);
     SetN2kGNSS(messages.Gnss, 1, gnss.DaysSince1970, gnss.SecondsSinceMidnight, gnss.Latitude, gnss.Longitude,
-               gnss.Altitude, N2kGNSSt_GPS, gnss.GnssMethod, gnss.Satellites, gnss.Hdop, N2kDoubleNA,
-               gnss.GeoidalSeparation, 0);
+               gnss.Altitude, N2kGNSSt_integrated, gnss.GnssMethod, gnss.Satellites, gnss.Hdop, gnss.Pdop,
+               gnss.GeoidalSeparation, gnss.nReferenceStations, N2kGNSSt_integrated, gnss.ReferenceStationsID,
+               gnss.AgeOfCorrection);
     return true;
 }
