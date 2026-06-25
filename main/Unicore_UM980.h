@@ -66,10 +66,12 @@ typedef void (*UserHashCallback)(const char* sentence, uint16_t length, void* us
 
 class UnicoreUM980 : public UnicoreGNSSLibrary {
   public:
-    static constexpr const char* MSG_BESTNAVB = "BESTNAVB";
-    static constexpr const char* MSG_BESTNAVXYZB = "BESTNAVXYZB";
-    static constexpr const char* MSG_RECTIMEB = "RECTIMEB";
-    static constexpr const char* MSG_VERSION = "VERSION";
+    const char* MSG_BESTNAVB = "BESTNAVB";
+    const char* MSG_BESTNAVXYZB = "BESTNAVXYZB";
+    const char* MSG_RECTIMEB = "RECTIMEB";
+    const char* MSG_VERSION = "VERSION";
+
+    const char* MSG_BASEINFOA = "BASEINFOA";
 
     UnicoreUM980(gpio_num_t PowerPin);
 
@@ -92,24 +94,27 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     bool fixedBaseStart();
 
     UnicoreResult_t configureOnceTime();
-
     UnicoreResult_t requestVersion(uint32_t timeoutMs = 1000);
-    UnicoreResult_t enableBinaryNavigation(UnicorePort port = UnicorePort::Current, float periodSeconds = 1.0f);
-    UnicoreResult_t disableBinaryNavigation(UnicorePort port = UnicorePort::Current);
+
     void updateBinaryMessageInit();
+
     UnicoreResult_t disableAllOutput();
 
     //-----------------------
     // Message configuration
     //-----------------------
     bool setMessagesNMEA();
-    UnicoreResult_t enableNmeaMessages(UnicorePort port = UnicorePort::Current);
-    UnicoreResult_t disableNmeaMessages(UnicorePort port = UnicorePort::Current);
     bool setMessagesRTCMRover();
     bool setMessagesRTCMBase();
+    bool setMessagesBASEINFOA();
+    UnicoreResult_t enableNmeaMessages(UnicorePort port = UnicorePort::Current);
+    UnicoreResult_t disableNmeaMessages(UnicorePort port = UnicorePort::Current);
+
     UnicoreResult_t enableRtcmRoverMessages(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t enableRtcmBaseMessages(UnicorePort port = UnicorePort::Current);
     UnicoreResult_t disableRtcmMessages(UnicorePort port = UnicorePort::Current);
+
+    UnicoreResult_t disableBinaryNavigation(UnicorePort port = UnicorePort::Current);
 
     bool setModel(uint8_t modelNumber);
     bool setModeRoverSurvey();
@@ -249,6 +254,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     static void HashCallback(const char* sentence, uint16_t length, void* userdata);
 
     UnicoreResult_t setPortMessage(const Um980MessageConfig* messages, float periods, UnicorePort port);
+    UnicoreResult_t setPortMessage(const char* messages, float periods, UnicorePort port);
     bool setMessagePeriod(const Um980MessageConfig* messages, float* periods, size_t count, const char* msgName,
                           float periodSeconds);
     float getMessagePeriod(const Um980MessageConfig* messages, const float* periods, size_t count,

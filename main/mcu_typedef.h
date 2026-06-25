@@ -120,11 +120,11 @@ typedef enum GNSS_CONFIG_ACTIONS_T {
     GNSS_CONFIG_CN0,
     GNSS_CONFIG_PPS,
     GNSS_CONFIG_MODEL,
-    GNSS_CONFIG_MESSAGE_RATE_NMEA,       // Update NMEA message rates
-    GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER, // Update RTCM Rover message rates
-    GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE,  // Update RTCM Base message rates
-    GNSS_CONFIG_MESSAGE_RATE_OTHER,      // Update any other messages (UBX, PQTM, etc)
-    GNSS_CONFIG_PPP,                     // Enable/disable HAS E6 capabilities
+    GNSS_CONFIG_MESSAGE_RATE_NMEA,            // Update NMEA message rates
+    GNSS_CONFIG_MESSAGE_RATE_RTCM_ROVER,      // Update RTCM Rover message rates
+    GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE,       // Update RTCM Base message rates
+    GNSS_CONFIG_MESSAGE_RATE_BASEINFOA_ROVER, // Update BASEINFOA messages
+    GNSS_CONFIG_PPP,                          // Enable/disable HAS E6 capabilities
     GNSS_CONFIG_MULTIPATH,
     GNSS_CONFIG_TILT,            // Enable/disable any output needed for tilt compensation
     GNSS_CONFIG_EXT_CORRECTIONS, // Enable / disable corrections protocol(s) on the Radio External port
@@ -249,9 +249,11 @@ typedef struct TaskManager_t {
     //Running flags
     volatile bool bluetoothCommandTaskRunning = false;
     volatile bool bluetoothReadTaskRunning = false;
+    volatile bool halUpdateTaskRunning = false;
     //Stop Requests
     volatile bool bluetoothCommandTaskStopRequest = false;
     volatile bool bluetoothReadTaskStopRequest = false;
+    volatile bool halUpdateTaskStopRequest = false;
 } TaskManager_t;
 
 #endif
@@ -452,7 +454,7 @@ typedef struct settings_t {
     uint8_t bluetoothInterruptsCore = 1;
     uint8_t btReadTaskCore = 1; // Core where task should run, 0=core, 1=Arduino
     // Read from BT SPP and Write to GNSS
-    uint8_t btReadTaskPriority = configMAX_PRIORITIES - 20;
+    uint8_t btReadTaskPriority = configMAX_PRIORITIES - 15;
     bool debugMalloc = false;
     bool enableHeapReport = false; // Turn on to display free heap
     bool enablePrintIdleTime = false;

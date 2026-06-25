@@ -8,6 +8,7 @@
 #include <freertos/task.h>
 #include "App/App.h"
 #include "HAL/HAL.h"
+#include "HAL/HAL_Config.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 
@@ -109,7 +110,8 @@ logTaskDetails() {
 #endif
 }
 
-void __attribute__((unused)) taskMonitor(void* arg) {
+void __attribute__((unused))
+taskMonitor(void* arg) {
     (void)arg;
 
     while (true) {
@@ -136,7 +138,8 @@ void __attribute__((unused)) taskMonitor(void* arg) {
     }
 }
 
-void __attribute__((unused)) startTaskMonitor() {
+void __attribute__((unused))
+startTaskMonitor() {
     TaskHandle_t monitorTask = nullptr;
     const BaseType_t result = xTaskCreatePinnedToCore(taskMonitor, "task_monitor", kTaskMonitorStackSize, nullptr,
                                                       kTaskMonitorPriority, &monitorTask, kTaskMonitorCore);
@@ -147,14 +150,14 @@ void __attribute__((unused)) startTaskMonitor() {
 
 } // namespace
 
+TaskHandle_t halUpdateTaskHandle = nullptr;
+
 extern "C" void
 app_main(void) {
     HAL::HAL_Init();
     App_Init();
     // startTaskMonitor();
-
-    while (true) {
-        HAL::HAL_Update(nullptr);
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
+    xTaskCreatePinnedToCore(HAL::HAL_Update, "Hal Update", HAL_UPDATE_TASK_STACK_SIZE, nullptr, HAL_UPDATE_TASK_PROI,
+                            &halUpdateTaskHandle, HAL_UPDATE_TASK_RUNNING_CORE);
+    ESP_LOGI("[main]", "hal update task created on core %d", HAL_UPDATE_TASK_RUNNING_CORE);
 }

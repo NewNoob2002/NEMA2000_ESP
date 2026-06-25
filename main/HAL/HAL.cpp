@@ -1,7 +1,7 @@
 #include "HAL.h"
 #include "Bluetooth.h"
 #include "States.h"
-#include "mcu_settings.h"
+#include "freertos/idf_additions.h"
 #include "myNetwork.h"
 #include "myWIFI.h"
 #include "myWebServer.h"
@@ -86,21 +86,35 @@ TaskHandle_t HAL_Update_Task = nullptr;
 
 void
 HAL_Update(void* e) {
-    // reportHeap();
+    (void)e;
+    if (settings.printTaskStartStop) {
+        systemPrintln("Task: halUpdateTask started");
+    }
+    task.halUpdateTaskRunning = true;
 
-    stateUpdate(gUm980);
+    while (!task.halUpdateTaskStopRequest) {
+        // reportHeap();
 
-    gnssUpdate();
+        stateUpdate(gUm980);
 
-    bluetoothUpdate();
+        gnssUpdate();
 
-    networkUpdate();
+        bluetoothUpdate();
 
-    webServerUpdate();
+        networkUpdate();
+
+        webServerUpdate();
 
 #ifdef COMPILE_WEBSERVER
-    bluetoothSetDataInterfaceEnabled(!webServerHasActiveConfigSession());
+        bluetoothSetDataInterfaceEnabled(!webServerHasActiveConfigSession());
 #endif
+        vTaskDelay(50);
+    }
+    task.bluetoothReadTaskRunning = false;
+    if (settings.printTaskStartStop) {
+        systemPrintln("Task: halUpdateTask stopped");
+    }
+    vTaskDelete(nullptr);
 }
 
 void

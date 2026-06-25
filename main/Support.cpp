@@ -43,9 +43,9 @@ systemRead() {
  */
 void
 systemWrite(const uint8_t* buffer, uint16_t length) {
-    printf("%.*s", length, buffer);
+    // printf("%.*s", length, buffer);
     // Serial.write(buffer, length);
-    // ESP_LOGI("[systemLog]", "%.*s", length, buffer);
+    ESP_LOGW("[systemLog]", "%.*s", length, buffer);
 }
 
 /**
@@ -76,7 +76,7 @@ systemPrint(const char* string) {
 void
 systemPrintln(const char* value) {
     systemPrint(value);
-    systemPrintln();
+    // systemPrintln();
 }
 
 /**

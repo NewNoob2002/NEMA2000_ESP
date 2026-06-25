@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 
+#include "HAL_Config.h"
 #include "HardwareSerial.h"
 #include "SparkFun_Extensible_Message_Parser.h"
 #include "States.h"
@@ -43,7 +44,6 @@ constexpr size_t kBluetoothRxBufferSize = 512;
 constexpr size_t kBluetoothMaxPayload = 256;
 constexpr size_t kBluetoothTxBufferSize = sizeof(SEMP_CUSTOM_HEADER) + kBluetoothMaxPayload + sizeof(uint32_t);
 constexpr uint32_t kBluetoothParserBufferSize = 1024 * 2;
-constexpr uint32_t kBluetoothReadTaskStack = 3072;
 
 enum BluetoothMessageId : uint16_t {
     kMsgIdModelQuery = 0x0001,
@@ -442,7 +442,8 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         ack(response, requestHeader, kResponseError);
         return;
     }
-    if ((fixedBaseMode != kBaseKnownPoint) && (fixedBaseMode != kBaseSinglePoint)) {
+    const bool startBaseMode = (requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled);
+    if (startBaseMode && (fixedBaseMode != kBaseKnownPoint) && (fixedBaseMode != kBaseSinglePoint)) {
         ESP_LOGE(TAG, "handleWorkMode invalid parameters in fixedBaseMode(%d)", fixedBaseMode);
         ack(response, requestHeader, kResponseError);
         return;
@@ -453,7 +454,7 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
                         reinterpret_cast<const char*>(payload + 4));
     }
 
-    if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled) && (fixedBaseMode == kBaseKnownPoint)) {
+    if (startBaseMode && (fixedBaseMode == kBaseKnownPoint)) {
         if (payloadLength < 44) {
             ESP_LOGE(TAG, "handleWorkMode invalid parameters in payloadLength(too short (%d))", payloadLength);
             ack(response, requestHeader, kResponseError);
@@ -485,7 +486,7 @@ handleWorkMode(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& requestHea
         settings.fixedBase = false;
     }
 
-    if ((requestedMode == kWorkModeBase) && (baseEnable == kBaseEnabled)) {
+    if (startBaseMode) {
         requestChangeState(STATE_BASE_NOT_STARTED);
     } else {
         requestChangeState(STATE_ROVER_NOT_STARTED);
@@ -884,9 +885,6 @@ btReadTask(void* e) {
 
     // Start notification
     task.bluetoothReadTaskRunning = true;
-    if (settings.printTaskStartStop) {
-        systemPrintln("Task bluetoothReadTask started");
-    }
     // Run task until a request is raised
     while (!task.bluetoothReadTaskStopRequest) {
         if ((bluetoothGetState() == BT_CONNECTED) && bluetoothDataInterfaceIsEnabled()) {
@@ -927,9 +925,9 @@ bluetoothInit() {
     if (btReadTaskHandle == nullptr) {
         task.bluetoothReadTaskStopRequest = false;
         task.bluetoothReadTaskRunning = false;
-        xTaskCreatePinnedToCore(btReadTask, "btReadTask", kBluetoothReadTaskStack, nullptr, settings.btReadTaskPriority,
-                                &btReadTaskHandle, settings.btReadTaskCore);
-        ESP_LOGI(TAG, "Bluetooth read task created on core %d", settings.btReadTaskCore);
+        xTaskCreatePinnedToCore(btReadTask, "btReadTask", HAL_BT_READ_TASK_STACK_SIZE, nullptr,
+                                HAL_BT_READ_UPDATE_TASK_PROI, &btReadTaskHandle, HAL_BT_READ_UPDATE_TASK_RUNNING_CORE);
+        ESP_LOGI(TAG, "Bluetooth read task created on core %d", HAL_BT_READ_UPDATE_TASK_RUNNING_CORE);
     }
 }
 } // namespace HAL

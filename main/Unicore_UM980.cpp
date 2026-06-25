@@ -328,19 +328,6 @@ UnicoreUM980::requestVersion(const uint32_t timeoutMs) {
     return requestMessage(MSG_VERSION, timeoutMs);
 }
 
-UnicoreResult_t
-UnicoreUM980::enableBinaryNavigation(const UnicorePort port, const float periodSeconds) {
-    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
-
-    result = firstError(result, logMessage(MSG_RECTIMEB, port, UnicoreLogTrigger::OnTime, periodSeconds));
-    if (startBinaryBeforeFix || (nmeaPositionStatus > 0)) {
-        result = firstError(result, logMessage(MSG_BESTNAVB, port, UnicoreLogTrigger::OnTime, periodSeconds));
-        result = firstError(result, logMessage(MSG_BESTNAVXYZB, port, UnicoreLogTrigger::OnTime, periodSeconds));
-    }
-
-    return result;
-}
-
 void
 UnicoreUM980::updateBinaryMessageInit() {
     if ((millis() - _lastBinaryMessageInitAttemptMs) < kBinaryMessageInitRetryMs) {
@@ -370,7 +357,7 @@ UnicoreUM980::disableBinaryNavigation(const UnicorePort port) {
     result = firstError(result, unlogMessage(MSG_RECTIMEB, port));
     result = firstError(result, unlogMessage(MSG_BESTNAVB, port));
     result = firstError(result, unlogMessage(MSG_BESTNAVXYZB, port));
-
+    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {}
     return result;
 }
 
@@ -507,6 +494,20 @@ UnicoreUM980::setMessagesRTCMBase() {
         return true;
     }
     log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS, "Failed to enable RTCM base messages. Result: %d", result);
+    return false;
+}
+
+bool
+UnicoreUM980::setMessagesBASEINFOA() {
+    log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting BASEINFOA messages on COM ports...");
+
+    UnicoreResult_t result = setPortMessage(MSG_BASEINFOA, 1.0f, UnicorePort::Current);
+
+    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "BASEINFOA messages enabled successfully.");
+        return true;
+    }
+    log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS, "Failed to enable BASEINFOAmessages. Result: %d", result);
     return false;
 }
 
@@ -1285,6 +1286,23 @@ UnicoreUM980::setPortMessage(const Um980MessageConfig* messages, const float per
         result = firstError(result, logMessage(messages->name, port, UnicoreLogTrigger::OnTime, periods));
     } else {
         result = firstError(result, unlogMessage(messages->name, port));
+    }
+    return result;
+}
+
+UnicoreResult_t
+UnicoreUM980::setPortMessage(const char* messages, float periods, UnicorePort port) {
+#ifdef UNICORE_NULLPTR_CHECK
+    if (!messages || (messages[0] == 0)) {
+        return Unicore_RESULT_WRONG_COMMAND;
+    }
+#endif //UNICORE_NULLPTR_CHECK
+
+    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
+    if (periods > 0.0f) {
+        result = firstError(result, logMessage(messages, port, UnicoreLogTrigger::OnTime, periods));
+    } else {
+        result = firstError(result, unlogMessage(messages, port));
     }
     return result;
 }

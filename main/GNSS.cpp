@@ -158,10 +158,12 @@ gnssUpdate(UnicoreUM980* gnss) {
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_ROVER)) {
-            gnss->configureRover();
-            gnssConfigureClear(GNSS_CONFIG_ROVER);
-            gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA, __FILE__, __LINE__); // Request update to NMEA
-            gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
+            if (gnss->configureRover()) {
+                gnssConfigureClear(GNSS_CONFIG_ROVER);
+                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA, __FILE__, __LINE__);            // Request update to NMEA
+                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_BASEINFOA_ROVER, __FILE__, __LINE__); // Request update to NMEA
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
+            }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_BASE)) {
@@ -277,8 +279,11 @@ gnssUpdate(UnicoreUM980* gnss) {
             }
         }
 
-        if (gnssConfigureRequested(GNSS_CONFIG_MESSAGE_RATE_OTHER)) {
-            gnssConfigureUnsupported(GNSS_CONFIG_MESSAGE_RATE_OTHER);
+        if (gnssConfigureRequested(GNSS_CONFIG_MESSAGE_RATE_BASEINFOA_ROVER)) {
+            if (gnss->setMessagesBASEINFOA()) {
+                gnssConfigureClear(GNSS_CONFIG_MESSAGE_RATE_BASEINFOA_ROVER);
+                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
+            }
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_PPS)) {
