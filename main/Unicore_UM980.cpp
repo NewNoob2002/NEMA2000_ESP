@@ -6,6 +6,7 @@
 #include <cstring>
 #include "GNSS.h"
 #include "States.h"
+#include "Unicore_GNSS_Library.h"
 #include "Unicore_Struct.h"
 #include "mcu_settings.h"
 
@@ -70,7 +71,7 @@ UnicoreUM980::powerOff() {
 }
 
 void
-UnicoreUM980::isOnline(bool online) {
+UnicoreUM980::setOnline(bool online) {
     _online = online;
 }
 
@@ -97,38 +98,10 @@ UnicoreUM980::resetDefaults() {
     _rateSeconds = 1.0;
 }
 
-void
-UnicoreUM980::baseRtcmDefault() {
-    for (size_t index = 0; index < MAX_UM980_RTCM_MSG; index++) {
-        _rtcmBasePeriods[index] = 0.0f;
-    }
-
-    setRtcmBaseMessagePeriod("RTCM1005", 1.0f);
-    setRtcmBaseMessagePeriod("RTCM1033", 10.0f);
-    setRtcmBaseMessagePeriod("RTCM1074", 1.0f);
-    setRtcmBaseMessagePeriod("RTCM1084", 1.0f);
-    setRtcmBaseMessagePeriod("RTCM1094", 1.0f);
-    setRtcmBaseMessagePeriod("RTCM1124", 1.0f);
-}
-
-void
-UnicoreUM980::baseRtcmLowDataRate() {
-    for (size_t index = 0; index < MAX_UM980_RTCM_MSG; index++) {
-        _rtcmBasePeriods[index] = 0.0f;
-    }
-
-    setRtcmBaseMessagePeriod("RTCM1005", 10.0f);
-    setRtcmBaseMessagePeriod("RTCM1033", 10.0f);
-    setRtcmBaseMessagePeriod("RTCM1074", 2.0f);
-    setRtcmBaseMessagePeriod("RTCM1084", 2.0f);
-    setRtcmBaseMessagePeriod("RTCM1094", 2.0f);
-    setRtcmBaseMessagePeriod("RTCM1124", 2.0f);
-}
-
 bool
-UnicoreUM980::configure() {
+UnicoreUM980::configureReceiver() {
     for (int x = 0; x < 3; x++) {
-        if (configureOnceTime() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        if (configureReceiverOnce() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
             return true;
         }
         delay(1000);
@@ -141,10 +114,10 @@ UnicoreUM980::configure() {
 }
 
 UnicoreResult_t
-UnicoreUM980::configureOnceTime() {
+UnicoreUM980::configureReceiverOnce() {
     log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Configuring UM980 with current settings...");
 
-    UnicoreResult_t result = disableAllOutput();
+    UnicoreResult_t result = disableAllReceiverOutput();
 
     if (_version.modelType == 18 || _version.modelType == 26) {
         if (queryConfigContains("CONFIG SIGNALGROUP 2") != Unicore_RESULT_CONFIG_PRESENT) {
@@ -161,31 +134,31 @@ UnicoreUM980::configureOnceTime() {
 }
 
 UnicoreResult_t
-UnicoreUM980::setModeBaseAverage(uint16_t averageSeconds) {
+UnicoreUM980::applyBaseSurveyInMode(uint16_t averageSeconds) {
     char command[50];
     snprintf(command, sizeof(command), "TIME %d", averageSeconds);
 
-    return (setBaseMode(command));
+    return (sendBaseModeCommand(command));
 }
 
 bool
-UnicoreUM980::setBaseModeECEF(double coordinateX, double coordinateY, double coordinateZ) {
+UnicoreUM980::applyFixedBaseEcef(double coordinateX, double coordinateY, double coordinateZ) {
     char command[50];
     snprintf(command, sizeof(command), "%0.4f %0.4f %0.4f", coordinateX, coordinateY, coordinateZ);
 
-    return (setBaseMode(command) == Unicore_RESULT_RESPONSE_COMMAND_OK);
+    return (sendBaseModeCommand(command) == Unicore_RESULT_RESPONSE_COMMAND_OK);
 }
 
 bool
-UnicoreUM980::setBaseModeGeodetic(double latitude, double longitude, double altitude) {
+UnicoreUM980::applyFixedBaseGeodetic(double latitude, double longitude, double altitude) {
     char command[50];
     snprintf(command, sizeof(command), "%0.11f %0.11f %0.6f", latitude, longitude, altitude);
 
-    return (setBaseMode(command) == Unicore_RESULT_RESPONSE_COMMAND_OK);
+    return (sendBaseModeCommand(command) == Unicore_RESULT_RESPONSE_COMMAND_OK);
 }
 
 bool
-UnicoreUM980::configureRover() {
+UnicoreUM980::prepareRoverMode() {
     if (!_online) {
         log(UnicoreLogLevel::Warn, UNICORE_LOG_CHILD_CLASS, "Cannot configure Rover mode while GNSS is offline");
         return false;
@@ -226,7 +199,7 @@ UnicoreUM980::configureRover() {
 }
 
 bool
-UnicoreUM980::configureBase() {
+UnicoreUM980::prepareBaseMode() {
     static bool firstTime = true;
     requestModel();
     if (firstTime) {
@@ -251,12 +224,11 @@ UnicoreUM980::configureBase() {
     // settings.dynamicModel = settings.fixedBase ? UM980_DYN_MODEL_BASE_FIXED : UM980_DYN_MODEL_BASE_SURVEY;
     // Set the dynamic mode. This will cancel any base averaging mode and is
     // needed to allow a freshly started device to settle in regular GNSS
-    // reception mode before issuing a surveyInStart().
-    // gnss->setModel(settings.dynamicModel) sets the model
-    // setModel(settings.dynamicModel);
+    // reception mode before issuing startSurveyIn().
+    // gnss->applyDynamicModel(settings.dynamicModel) sets the model.
     gnssConfigure(GNSS_CONFIG_MODEL, __FILE__, __LINE__);
 
-    // Request a change to Base RTCM. gnss->setMessagesRTCMBase() sets the
+    // Request a change to Base RTCM. gnss->applyBaseRtcmMessageConfig() sets the
     // messages
     gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_RTCM_BASE, __FILE__, __LINE__);
 
@@ -264,13 +236,13 @@ UnicoreUM980::configureBase() {
 }
 
 bool
-UnicoreUM980::surveyInStart() {
+UnicoreUM980::startSurveyIn() {
     if (_online) {
         if (gnssInBaseSurveyInMode()) {
             return (true);
         }
         // Set base averaging to the specified seconds to start the survey-in process. The receiver will automatically determine when it has enough data for a position solution and switch from "Survey" to "Fixed" mode at that time.
-        UnicoreResult_t result = setModeBaseAverage(settings.observationSeconds);
+        UnicoreResult_t result = applyBaseSurveyInMode(settings.observationSeconds);
 
         if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
             log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS,
@@ -291,16 +263,16 @@ UnicoreUM980::surveyInStart() {
 }
 
 bool
-UnicoreUM980::surveyInReset() {
+UnicoreUM980::cancelSurveyIn() {
     bool result = false;
     if (_online) {
-        result = setModeRoverSurvey();
+        result = sendRoverModeCommand("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
     }
     return (result);
 }
 
 bool
-UnicoreUM980::fixedBaseStart() {
+UnicoreUM980::startFixedBase() {
     if (_online == false) {
         return (false);
     }
@@ -313,11 +285,11 @@ UnicoreUM980::fixedBaseStart() {
     bool result = true;
 
     if (settings.fixedBaseCoordinateType == COORD_TYPE_ECEF) {
-        result &= setBaseModeECEF(settings.fixedEcefX, settings.fixedEcefY, settings.fixedEcefZ);
+        result &= applyFixedBaseEcef(settings.fixedEcefX, settings.fixedEcefY, settings.fixedEcefZ);
     } else if (settings.fixedBaseCoordinateType == COORD_TYPE_GEODETIC) {
         float totalFixedAltitude =
             settings.fixedAltitude + ((settings.antennaHeight_mm + settings.antennaPhaseCenter_mm) / 1000.0);
-        result &= setBaseModeGeodetic(settings.fixedLat, settings.fixedLong, totalFixedAltitude);
+        result &= applyFixedBaseGeodetic(settings.fixedLat, settings.fixedLong, totalFixedAltitude);
     }
 
     return result;
@@ -329,7 +301,7 @@ UnicoreUM980::requestVersion(const uint32_t timeoutMs) {
 }
 
 void
-UnicoreUM980::updateBinaryMessageInit() {
+UnicoreUM980::ensureBinaryNavigationMessages() {
     if ((millis() - _lastBinaryMessageInitAttemptMs) < kBinaryMessageInitRetryMs) {
         return;
     }
@@ -351,18 +323,7 @@ UnicoreUM980::updateBinaryMessageInit() {
 }
 
 UnicoreResult_t
-UnicoreUM980::disableBinaryNavigation(const UnicorePort port) {
-    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
-
-    result = firstError(result, unlogMessage(MSG_RECTIMEB, port));
-    result = firstError(result, unlogMessage(MSG_BESTNAVB, port));
-    result = firstError(result, unlogMessage(MSG_BESTNAVXYZB, port));
-    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {}
-    return result;
-}
-
-UnicoreResult_t
-UnicoreUM980::disableAllOutput() {
+UnicoreUM980::disableAllReceiverOutput() {
     UnicoreResult_t firstFailure = Unicore_RESULT_RESPONSE_COMMAND_OK;
     bool com1Done = false;
     bool com2Done = false;
@@ -392,14 +353,20 @@ UnicoreUM980::disableAllOutput() {
         }
     }
 
-    return (com1Done && com2Done && com3Done) ? Unicore_RESULT_RESPONSE_COMMAND_OK : firstFailure;
+    if (com1Done && com2Done && com3Done) {
+        stopAutoReports();
+        log(UnicoreLogLevel::Info, UNICORE_LOG_DATA, "Mode change, delete Binnary Points for next malloc");
+        return Unicore_RESULT_RESPONSE_COMMAND_OK;
+    }
+
+    return firstFailure;
 }
 
 bool
-UnicoreUM980::setMessagesNMEA() {
+UnicoreUM980::applyNmeaMessageConfig() {
     log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting NMEA messages on COM ports...");
 
-    UnicoreResult_t result = disableAllOutput(); // Disable all NMEA and RTCM output on all ports...
+    UnicoreResult_t result = disableAllReceiverOutput(); // Disable all NMEA and RTCM output on all ports...
 
     um980MessagesEnabled_NMEA.enabled = false;
 
@@ -445,29 +412,8 @@ UnicoreUM980::enableNmeaMessages(const UnicorePort port) {
     return result;
 }
 
-UnicoreResult_t
-UnicoreUM980::disableNmeaMessages(const UnicorePort port) {
-    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
-    for (int messageNumber = 0; messageNumber < MAX_UM980_NMEA_MSG; messageNumber++) {
-        if (_nmeaPeriods[messageNumber] == 0.0f) {
-            // Enable the message
-            result = firstError(result,
-                                setPortMessage(&kUm980NmeaMessages[messageNumber], _nmeaPeriods[messageNumber], port));
-        }
-        if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
-            if (settings.debugGnssConfig) {
-                log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS,
-                    "setMessagesNMEA failed to set %0.2f for message %s [%d] on port %s.\r\n",
-                    _nmeaPeriods[messageNumber], kUm980NmeaMessages[messageNumber].name, messageNumber, portName(port));
-            }
-            return Unicore_RESULT_RESPONSE_COMMAND_ERROR; // Don't attempt other messages, assume communication is down
-        }
-    }
-    return result;
-}
-
 bool
-UnicoreUM980::setMessagesRTCMRover() {
+UnicoreUM980::applyRoverRtcmMessageConfig() {
     log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting RTCM rover messages on COM ports...");
     UnicoreResult_t result = enableRtcmRoverMessages();
 
@@ -482,7 +428,7 @@ UnicoreUM980::setMessagesRTCMRover() {
 }
 
 bool
-UnicoreUM980::setMessagesRTCMBase() {
+UnicoreUM980::applyBaseRtcmMessageConfig() {
     log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting RTCM base messages on COM ports...");
 
     UnicoreResult_t result = enableRtcmBaseMessages();
@@ -498,7 +444,7 @@ UnicoreUM980::setMessagesRTCMBase() {
 }
 
 bool
-UnicoreUM980::setMessagesBASEINFOA() {
+UnicoreUM980::applyBaseInfoMessageConfig() {
     log(UnicoreLogLevel::Info, UNICORE_LOG_CHILD_CLASS, "Setting BASEINFOA messages on COM ports...");
 
     UnicoreResult_t result = setPortMessage(MSG_BASEINFOA, 1.0f, UnicorePort::Current);
@@ -542,19 +488,7 @@ UnicoreUM980::enableRtcmBaseMessages(const UnicorePort port) {
 }
 
 UnicoreResult_t
-UnicoreUM980::disableRtcmMessages(const UnicorePort port) {
-    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
-    for (int messageNumber = 0; messageNumber < MAX_UM980_RTCM_MSG; messageNumber++) {
-        result = firstError(result, unlogMessage(kUm980RtcmMessages[messageNumber].name, port));
-        if (result != Unicore_RESULT_RESPONSE_COMMAND_OK) {
-            return result;
-        }
-    }
-    return result;
-}
-
-UnicoreResult_t
-UnicoreUM980::setMode(const char* modeCommand) {
+UnicoreUM980::sendModeCommand(const char* modeCommand) {
 #ifdef UNICORE_NULLPTR_CHECK
     if (!modeCommand) {
         return Unicore_RESULT_WRONG_COMMAND;
@@ -567,7 +501,7 @@ UnicoreUM980::setMode(const char* modeCommand) {
 }
 
 UnicoreResult_t
-UnicoreUM980::setRoverMode(const char* roverType) {
+UnicoreUM980::sendRoverModeCommand(const char* roverType) {
 #ifdef UNICORE_NULLPTR_CHECK
     if (!roverType) {
         return Unicore_RESULT_WRONG_COMMAND;
@@ -575,11 +509,11 @@ UnicoreUM980::setRoverMode(const char* roverType) {
 #endif // UNICORE_NULLPTR_CHECK
     char command[50];
     snprintf(command, sizeof(command), "ROVER %s", roverType);
-    return setMode(command);
+    return sendModeCommand(command);
 }
 
 UnicoreResult_t
-UnicoreUM980::setBaseMode(const char* baseType) {
+UnicoreUM980::sendBaseModeCommand(const char* baseType) {
 #ifdef UNICORE_NULLPTR_CHECK
     if (!baseType) {
         return Unicore_RESULT_WRONG_COMMAND;
@@ -587,11 +521,11 @@ UnicoreUM980::setBaseMode(const char* baseType) {
 #endif // UNICORE_NULLPTR_CHECK
     char command[50];
     snprintf(command, sizeof(command), "BASE %s", baseType);
-    return setMode(command);
+    return sendModeCommand(command);
 }
 
 UnicoreResult_t
-UnicoreUM980::setRate(const double secondsBetweenSolutions) {
+UnicoreUM980::setNavigationRate(const double secondsBetweenSolutions) {
     if (!std::isfinite(secondsBetweenSolutions) || (secondsBetweenSolutions <= 0.0)) {
         return Unicore_RESULT_WRONG_COMMAND;
     }
@@ -601,36 +535,21 @@ UnicoreUM980::setRate(const double secondsBetweenSolutions) {
 }
 
 bool
-UnicoreUM980::setModel(const uint8_t modelNumber) {
+UnicoreUM980::applyDynamicModel(const uint8_t modelNumber) {
     if (_online) {
         if (modelNumber == UM980_DYN_MODEL_ROVER_SURVEY) {
-            return setRoverMode("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+            return sendRoverModeCommand("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
         } else if (modelNumber == UM980_DYN_MODEL_ROVER_UAV) {
-            return setRoverMode("UAV") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+            return sendRoverModeCommand("UAV") == Unicore_RESULT_RESPONSE_COMMAND_OK;
         } else if (modelNumber == UM980_DYN_MODEL_ROVER_AUTOMOTIVE) {
-            return setRoverMode("AUTOMOTIVE") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+            return sendRoverModeCommand("AUTOMOTIVE") == Unicore_RESULT_RESPONSE_COMMAND_OK;
         } else {
             log(UnicoreLogLevel::Error, UNICORE_LOG_CHILD_CLASS,
                 "Unsupported UM980 model number: %u, Use SURVEY default", modelNumber);
-            return setRoverMode("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
+            return sendRoverModeCommand("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
         }
     }
     return false;
-}
-
-bool
-UnicoreUM980::setModeRoverSurvey() {
-    return setRoverMode("SURVEY") == Unicore_RESULT_RESPONSE_COMMAND_OK;
-}
-
-bool
-UnicoreUM980::setModeRoverUAV() {
-    return setRoverMode("UAV") == Unicore_RESULT_RESPONSE_COMMAND_OK;
-}
-
-bool
-UnicoreUM980::setModeRoverAutomotive() {
-    return setRoverMode("AUTOMOTIVE") == Unicore_RESULT_RESPONSE_COMMAND_OK;
 }
 
 uint8_t
@@ -642,28 +561,28 @@ UnicoreUM980::requestModel() {
 }
 
 UnicoreResult_t
-UnicoreUM980::setElevation(const uint8_t elevationDegrees) {
+UnicoreUM980::applyElevationMask(const uint8_t elevationDegrees) {
     char command[32];
     snprintf(command, sizeof(command), "%d", elevationDegrees);
     return disableSystem(command);
 }
 
 UnicoreResult_t
-UnicoreUM980::setMinCno(const uint8_t cnoValue) {
+UnicoreUM980::applyMinCno(const uint8_t cnoValue) {
     char command[32] = {};
     snprintf(command, sizeof(command), "CONFIG MINCNO %u", cnoValue);
     return sendCommandAndWait(command, 1000);
 }
 
 UnicoreResult_t
-UnicoreUM980::setMultipathMitigation(const bool enable) {
+UnicoreUM980::applyMultipathMitigation(const bool enable) {
     char command[48] = {};
     snprintf(command, sizeof(command), "CONFIG MULTIPATHMITIGATION %s", enable ? "ENABLE" : "DISABLE");
     return sendCommandAndWait(command, 1000);
 }
 
 UnicoreResult_t
-UnicoreUM980::setConstellations() {
+UnicoreUM980::applyConstellationConfig() {
     char command[96] = {};
     snprintf(command, sizeof(command), "CONFIG SIGNALGROUP");
 

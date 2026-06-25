@@ -78,62 +78,30 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     void init();
     void powerOn();
     void powerOff();
+    void setOnline(bool online);
 
-    void isOnline(bool online);
-    void setConnectCom(const char* com);
+    bool configureReceiver();
+    bool prepareRoverMode();
+    bool prepareBaseMode();
+    bool startSurveyIn();
+    bool cancelSurveyIn();
+    bool startFixedBase();
 
-    void resetDefaults();
-    void baseRtcmDefault();
-    void baseRtcmLowDataRate();
-
-    bool configure();
-    bool configureRover();
-    bool configureBase();
-    bool surveyInStart();
-    bool surveyInReset();
-    bool fixedBaseStart();
-
-    UnicoreResult_t configureOnceTime();
     UnicoreResult_t requestVersion(uint32_t timeoutMs = 1000);
+    void ensureBinaryNavigationMessages();
 
-    void updateBinaryMessageInit();
-
-    UnicoreResult_t disableAllOutput();
-
-    //-----------------------
-    // Message configuration
-    //-----------------------
-    bool setMessagesNMEA();
-    bool setMessagesRTCMRover();
-    bool setMessagesRTCMBase();
-    bool setMessagesBASEINFOA();
-    UnicoreResult_t enableNmeaMessages(UnicorePort port = UnicorePort::Current);
-    UnicoreResult_t disableNmeaMessages(UnicorePort port = UnicorePort::Current);
-
-    UnicoreResult_t enableRtcmRoverMessages(UnicorePort port = UnicorePort::Current);
-    UnicoreResult_t enableRtcmBaseMessages(UnicorePort port = UnicorePort::Current);
-    UnicoreResult_t disableRtcmMessages(UnicorePort port = UnicorePort::Current);
-
-    UnicoreResult_t disableBinaryNavigation(UnicorePort port = UnicorePort::Current);
-
-    bool setModel(uint8_t modelNumber);
-    bool setModeRoverSurvey();
-    bool setModeRoverUAV();
-    bool setModeRoverAutomotive();
-    uint8_t requestModel();
-    UnicoreResult_t setMode(const char* modeCommand);
-    UnicoreResult_t setRoverMode(const char* roverType);
-    UnicoreResult_t setBaseMode(const char* baseType);
-    UnicoreResult_t setModeBaseAverage(uint16_t averageSeconds = 60);
-    bool setBaseModeECEF(double coordinateX, double coordinateY, double coordinateZ);
-    bool setBaseModeGeodetic(double latitude, double longitude, double altitude);
-
-    UnicoreResult_t setRate(double secondsBetweenSolutions);
-    UnicoreResult_t setElevation(uint8_t elevationDegrees);
-    UnicoreResult_t setMinCno(uint8_t cnoValue);
-    UnicoreResult_t setMultipathMitigation(bool enable);
-    UnicoreResult_t setConstellations();
+    bool applyDynamicModel(uint8_t modelNumber);
+    UnicoreResult_t setNavigationRate(double secondsBetweenSolutions);
+    UnicoreResult_t applyElevationMask(uint8_t elevationDegrees);
+    UnicoreResult_t applyMinCno(uint8_t cnoValue);
+    UnicoreResult_t applyMultipathMitigation(bool enable);
+    UnicoreResult_t applyConstellationConfig();
     UnicoreResult_t setConstellationEnabled(const char* commandName, bool enabled);
+
+    bool applyNmeaMessageConfig();
+    bool applyRoverRtcmMessageConfig();
+    bool applyBaseRtcmMessageConfig();
+    bool applyBaseInfoMessageConfig();
 
     bool setNmeaMessagePeriod(const char* msgName, float periodSeconds);
     bool setRtcmRoverMessagePeriod(const char* msgName, float periodSeconds);
@@ -203,20 +171,34 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     void setUserBinaryCallback(UserBinaryCallback callback, void* context = nullptr);
     void setUserHashCallback(UserHashCallback callback, void* context = nullptr);
 
-    // process
+  private:
+    void resetDefaults();
+    void setConnectCom(const char* com);
+
+    UnicoreResult_t configureReceiverOnce();
+    uint8_t requestModel();
+    UnicoreResult_t disableAllReceiverOutput();
+
+    UnicoreResult_t enableNmeaMessages(UnicorePort port = UnicorePort::Current);
+    UnicoreResult_t enableRtcmRoverMessages(UnicorePort port = UnicorePort::Current);
+    UnicoreResult_t enableRtcmBaseMessages(UnicorePort port = UnicorePort::Current);
+
+    UnicoreResult_t sendModeCommand(const char* modeCommand);
+    UnicoreResult_t sendRoverModeCommand(const char* roverType);
+    UnicoreResult_t sendBaseModeCommand(const char* baseType);
+    UnicoreResult_t applyBaseSurveyInMode(uint16_t averageSeconds = 60);
+    bool applyFixedBaseEcef(double coordinateX, double coordinateY, double coordinateZ);
+    bool applyFixedBaseGeodetic(double latitude, double longitude, double altitude);
+
     void processNmeaSentence(const char* sentence, uint16_t length = 0);
     void processRtcmMessage(const uint8_t* message, uint16_t length, uint16_t messageNumber);
     void processBinaryMessage(const UnicoreBinaryHeader& header, const uint8_t* payload, uint16_t length);
     void processHashSentence(const char* sentence, uint16_t length = 0);
-    //handle
     void handleModeSentence(const char* sentence, uint16_t length);
     void handleDevicenameSentence(const char* sentence, uint16_t length);
 
-  private:
     gpio_num_t _powerPin;
     char _connectCom[8] = {0};
-
-  private:
     float _nmeaPeriods[MAX_UM980_NMEA_MSG] = {};
     float _rtcmRoverPeriods[MAX_UM980_RTCM_MSG] = {};
     float _rtcmBasePeriods[MAX_UM980_RTCM_MSG] = {};

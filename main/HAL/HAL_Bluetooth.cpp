@@ -386,12 +386,12 @@ handleSatelliteTracking(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& r
         if (valid) {
             settings.minElev = payload[1];
             if (HAL::gUm980) {
-                // HAL::gUm980->setElevation(settings.minElev);
+                // HAL::gUm980->applyElevationMask(settings.minElev);
                 // HAL::gUm980->setConstellationEnabled("GPS", payload[4] != 0);
                 // HAL::gUm980->setConstellationEnabled("GLO", payload[5] != 0);
                 // HAL::gUm980->setConstellationEnabled("BDS", payload[6] != 0);
                 // HAL::gUm980->setConstellationEnabled("GAL", payload[7] != 0);
-                // HAL::gUm980->setConstellations();
+                // HAL::gUm980->applyConstellationConfig();
             }
         }
         ack(response, requestHeader, 0x01);

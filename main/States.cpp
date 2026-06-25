@@ -7,7 +7,7 @@
 #include "mcu_settings.h"
 #include "myWebServer.h"
 
-#define RTK_MODE(mode)     RTK_MODE = mode;
+#define RTK_MODE(mode) RTK_MODE = mode;
 
 #define EQ_RTK_MODE(mode)  (RTK_MODE && (RTK_MODE == (mode & RTK_MODE)))
 #define NEQ_RTK_MODE(mode) ((RTK_MODE == 0) || ((mode & RTK_MODE) == 0))
@@ -255,11 +255,11 @@ stateUpdate(UnicoreUM980* gnss) {
                         systemPrintf("Survey-In took more than %d minutes. Returning to rover mode.\n",
                                      60UL * 15UL / 60UL);
 
-                        if (gnss->surveyInReset() == false) {
+                        if (gnss->cancelSurveyIn() == false) {
                             systemPrintln("Survey reset failed - attempt 1/3");
-                            if (gnss->surveyInReset() == false) {
+                            if (gnss->cancelSurveyIn() == false) {
                                 systemPrintln("Survey reset failed - attempt 2/3");
-                                if (gnss->surveyInReset() == false) {
+                                if (gnss->cancelSurveyIn() == false) {
                                     systemPrintln("Survey reset failed - attempt 3/3");
                                 }
                             }
@@ -332,7 +332,7 @@ void
 requestChangeState(SystemState_t requestedState) {
     requestedSystemState = requestedState;
     newSystemStateRequested = true;
-    systemPrintf("Requested System State: %d\n", requestedSystemState);
+    systemPrintf("Requested System State: %s\n", getState(requestedSystemState));
 }
 
 SystemState_t
