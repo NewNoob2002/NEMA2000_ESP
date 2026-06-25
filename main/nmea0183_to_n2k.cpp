@@ -4,6 +4,8 @@
 #include "Unicore_UM980.h"
 #include "esp_log.h"
 
+#include <cmath>
+
 namespace {
 
 const char* kTag = "[nmea0183_to_n2k]";
@@ -16,6 +18,12 @@ const unsigned long kGatewayTransmitMessages[] = {
 };
 
 constexpr uint16_t kMaxGnssFixAgeMs = 3000;
+constexpr uint16_t kNoReferenceStationId = UINT16_MAX;
+
+double
+ToN2kValueOrNA(const double value) {
+    return std::isfinite(value) ? value : N2kDoubleNA;
+}
 
 bool
 IsLeapYear(int year) {
@@ -89,7 +97,9 @@ ReadGatewayGnssData(const UnicoreUM980& gnss, tGatewayGnssData& data) {
     data.Satellites = gnss.getSatellitesUsed();
     data.FixValid = gnss.isFixed() && gnss.getFixAgeMilliseconds() <= kMaxGnssFixAgeMs;
     data.Hdop = N2kDoubleNA;
+    data.Pdop = N2kDoubleNA;
     data.GeoidalSeparation = N2kDoubleNA;
+    data.AgeOfCorrection = N2kDoubleNA;
 
     data.TimeValid = gnss.isValidTime();
     data.DateValid = gnss.isValidDate();
@@ -97,9 +107,28 @@ ReadGatewayGnssData(const UnicoreUM980& gnss, tGatewayGnssData& data) {
     if (data.FixValid) {
         data.Latitude = gnss.getLatitude();
         data.Longitude = gnss.getLongitude();
+        const double geoidalSeparation = gnss.getGeoidalSeparation();
+        data.GeoidalSeparation = ToN2kValueOrNA(geoidalSeparation);
         data.Altitude = gnss.getAltitude();
+        if (std::isfinite(geoidalSeparation)) {
+            data.Altitude += geoidalSeparation;
+        }
         data.Sog = gnss.getHorizontalSpeed();
         data.Cog = DegToRad(gnss.getTrackGround());
+        data.AgeOfCorrection = ToN2kValueOrNA(gnss.getAgeOfCorrection());
+        data.Hdop = ToN2kValueOrNA(gnss.getHdop());
+        data.Pdop = ToN2kValueOrNA(gnss.getPdop());
+
+        const uint16_t referenceStationId = gnss.getReferenceStationId();
+        if ((referenceStationId != kNoReferenceStationId) && std::isfinite(data.AgeOfCorrection)
+            && (data.AgeOfCorrection >= 0.0)) {
+            data.nReferenceStations = 1;
+            data.ReferenceStationsID = referenceStationId;
+        } else {
+            data.nReferenceStations = 0;
+            data.ReferenceStationsID = 0;
+        }
+
         data.PositionValid = true;
         data.SpeedCourseValid = true;
     }

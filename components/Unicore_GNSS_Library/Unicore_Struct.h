@@ -3,25 +3,25 @@
 
 #include <stdint.h>
 
-#define UnicoreBinarySyncA           ((uint8_t)0xAA)
-#define UnicoreBinarySyncB           ((uint8_t)0x44)
-#define UnicoreBinarySyncC           ((uint8_t)0xB5)
-#define UnicoreASCIISyncEnd          ((uint8_t)'\n')
+#define UnicoreBinarySyncA  ((uint8_t)0xAA)
+#define UnicoreBinarySyncB  ((uint8_t)0x44)
+#define UnicoreBinarySyncC  ((uint8_t)0xB5)
+#define UnicoreASCIISyncEnd ((uint8_t)'\n')
 
-#define UnicoreHeaderLength          ((uint16_t)24)
-#define offsetHeaderSyncA            ((uint16_t)0)
-#define offsetHeaderSyncB            ((uint16_t)1)
-#define offsetHeaderSyncC            ((uint16_t)2)
-#define offsetHeaderCpuIdle          ((uint16_t)3)
-#define offsetHeaderMessageId        ((uint16_t)4)
-#define offsetHeaderMessageLength    ((uint16_t)6)
-#define offsetHeaderReferenceTime    ((uint16_t)8)
-#define offsetHeaderTimeStatus       ((uint16_t)9)
-#define offsetHeaderWeekNumber       ((uint16_t)10)
-#define offsetHeaderSecondsOfWeek    ((uint16_t)12)
-#define offsetHeaderReleaseVersion   ((uint16_t)20)
-#define offsetHeaderLeapSecond       ((uint16_t)21)
-#define offsetHeaderOutputDelay      ((uint16_t)22)
+#define UnicoreHeaderLength        ((uint16_t)24)
+#define offsetHeaderSyncA          ((uint16_t)0)
+#define offsetHeaderSyncB          ((uint16_t)1)
+#define offsetHeaderSyncC          ((uint16_t)2)
+#define offsetHeaderCpuIdle        ((uint16_t)3)
+#define offsetHeaderMessageId      ((uint16_t)4)
+#define offsetHeaderMessageLength  ((uint16_t)6)
+#define offsetHeaderReferenceTime  ((uint16_t)8)
+#define offsetHeaderTimeStatus     ((uint16_t)9)
+#define offsetHeaderWeekNumber     ((uint16_t)10)
+#define offsetHeaderSecondsOfWeek  ((uint16_t)12)
+#define offsetHeaderReleaseVersion ((uint16_t)20)
+#define offsetHeaderLeapSecond     ((uint16_t)21)
+#define offsetHeaderOutputDelay    ((uint16_t)22)
 
 // VERSIONB
 #define messageIdVersion             ((uint16_t)37)
@@ -33,51 +33,67 @@
 #define offsetVersionCompTime        ((uint16_t)265)
 
 // BESTNAVB contains HPA, sats tracked/used, lat/long, RTK status, fix status
-#define messageIdBestnav             ((uint16_t)2118)
-#define offsetBestnavPsolStatus      ((uint16_t)0)
-#define offsetBestnavPosType         ((uint16_t)4)
-#define offsetBestnavLat             ((uint16_t)8)
-#define offsetBestnavLon             ((uint16_t)16)
-#define offsetBestnavHgt             ((uint16_t)24)
-#define offsetBestnavLatDeviation    ((uint16_t)40)
-#define offsetBestnavLonDeviation    ((uint16_t)44)
-#define offsetBestnavHgtDeviation    ((uint16_t)48)
-#define offsetBestnavSatsTracked     ((uint16_t)64)
-#define offsetBestnavSatsUsed        ((uint16_t)65)
-#define offsetBestnavExtSolStat      ((uint16_t)69)
-#define offsetBestnavVelType         ((uint16_t)76)
-#define offsetBestnavHorSpd          ((uint16_t)88)
-#define offsetBestnavTrkGnd          ((uint16_t)96)
-#define offsetBestnavVertSpd         ((uint16_t)104)
-#define offsetBestnavVerspdStd       ((uint16_t)112)
-#define offsetBestnavHorspdStd       ((uint16_t)116)
+#define messageIdBestnav          ((uint16_t)2118)
+#define offsetBestnavPsolStatus   ((uint16_t)0)
+#define offsetBestnavPosType      ((uint16_t)4)
+#define offsetBestnavLat          ((uint16_t)8)
+#define offsetBestnavLon          ((uint16_t)16)
+#define offsetBestnavHgt          ((uint16_t)24)
+#define offsetBestnavUndulation   ((uint16_t)32)
+#define offsetBestnavLatDeviation ((uint16_t)40)
+#define offsetBestnavLonDeviation ((uint16_t)44)
+#define offsetBestnavHgtDeviation ((uint16_t)48)
+#define offsetBestnavStationId    ((uint16_t)52)
+#define offsetBestnavDiffAge      ((uint16_t)56)
+#define offsetBestnavSolAge       ((uint16_t)60)
+#define offsetBestnavSatsTracked  ((uint16_t)64)
+#define offsetBestnavSatsUsed     ((uint16_t)65)
+#define offsetBestnavExtSolStat   ((uint16_t)69)
+#define offsetBestnavVelType      ((uint16_t)76)
+#define offsetBestnavHorSpd       ((uint16_t)88)
+#define offsetBestnavTrkGnd       ((uint16_t)96)
+#define offsetBestnavVertSpd      ((uint16_t)104)
+#define offsetBestnavVerspdStd    ((uint16_t)112)
+#define offsetBestnavHorspdStd    ((uint16_t)116)
 
 // BESTNAVXYZB
-#define messageIdBestnavXyz          ((uint16_t)240)
-#define offsetBestnavXyzPsolStatus   ((uint16_t)0)
-#define offsetBestnavXyzPosType      ((uint16_t)4)
-#define offsetBestnavXyzPX           ((uint16_t)8)
-#define offsetBestnavXyzPY           ((uint16_t)16)
-#define offsetBestnavXyzPZ           ((uint16_t)24)
-#define offsetBestnavXyzPXDeviation  ((uint16_t)32)
-#define offsetBestnavXyzPYDeviation  ((uint16_t)36)
-#define offsetBestnavXyzPZDeviation  ((uint16_t)40)
-#define offsetBestnavXyzSatsTracked  ((uint16_t)104)
-#define offsetBestnavXyzSatsUsed     ((uint16_t)105)
-#define offsetBestnavXyzExtSolStat   ((uint16_t)109)
+#define messageIdBestnavXyz         ((uint16_t)240)
+#define offsetBestnavXyzPsolStatus  ((uint16_t)0)
+#define offsetBestnavXyzPosType     ((uint16_t)4)
+#define offsetBestnavXyzPX          ((uint16_t)8)
+#define offsetBestnavXyzPY          ((uint16_t)16)
+#define offsetBestnavXyzPZ          ((uint16_t)24)
+#define offsetBestnavXyzPXDeviation ((uint16_t)32)
+#define offsetBestnavXyzPYDeviation ((uint16_t)36)
+#define offsetBestnavXyzPZDeviation ((uint16_t)40)
+#define offsetBestnavXyzSatsTracked ((uint16_t)104)
+#define offsetBestnavXyzSatsUsed    ((uint16_t)105)
+#define offsetBestnavXyzExtSolStat  ((uint16_t)109)
 
 // RECTIMEB for time/date
-#define messageIdRectime             ((uint16_t)102)
-#define offsetRectimeClockStatus     ((uint16_t)0)
-#define offsetRectimeOffset          ((uint16_t)4)
-#define offsetRectimeOffsetStd       ((uint16_t)12)
-#define offsetRectimeUtcYear         ((uint16_t)28)
-#define offsetRectimeUtcMonth        ((uint16_t)32)
-#define offsetRectimeUtcDay          ((uint16_t)33)
-#define offsetRectimeUtcHour         ((uint16_t)34)
-#define offsetRectimeUtcMinute       ((uint16_t)35)
-#define offsetRectimeUtcMillisecond  ((uint16_t)36)
-#define offsetRectimeUtcStatus       ((uint16_t)40)
+#define messageIdRectime            ((uint16_t)102)
+#define offsetRectimeClockStatus    ((uint16_t)0)
+#define offsetRectimeOffset         ((uint16_t)4)
+#define offsetRectimeOffsetStd      ((uint16_t)12)
+#define offsetRectimeUtcYear        ((uint16_t)28)
+#define offsetRectimeUtcMonth       ((uint16_t)32)
+#define offsetRectimeUtcDay         ((uint16_t)33)
+#define offsetRectimeUtcHour        ((uint16_t)34)
+#define offsetRectimeUtcMinute      ((uint16_t)35)
+#define offsetRectimeUtcMillisecond ((uint16_t)36)
+#define offsetRectimeUtcStatus      ((uint16_t)40)
+
+// STADOPB for DOP values from the BESTNAV solution
+#define messageIdStadop      ((uint16_t)954)
+#define offsetStadopGdop     ((uint16_t)4)
+#define offsetStadopPdop     ((uint16_t)8)
+#define offsetStadopTdop     ((uint16_t)12)
+#define offsetStadopVdop     ((uint16_t)16)
+#define offsetStadopHdop     ((uint16_t)20)
+#define offsetStadopNdop     ((uint16_t)24)
+#define offsetStadopEdop     ((uint16_t)28)
+#define offsetStadopCutoff   ((uint16_t)32)
+#define offsetStadopPrnCount ((uint16_t)40)
 
 typedef enum {
     Unicore_RESULT_SEND_COMMAND_OK = 0,
@@ -105,6 +121,7 @@ typedef struct {
     double latitude;
     double longitude;
     double altitude;
+    float undulation;
     double horizontalSpeed;
     double verticalSpeed;
     double trackGround;
@@ -114,6 +131,9 @@ typedef struct {
     float heightDeviation;
     float horizontalSpeedDeviation;
     float verticalSpeedDeviation;
+    float diffAge;
+    float solutionAge;
+    char stationId[5];
     // 0 = None, 1 = FixedPos, 8 = DopplerVelocity, 16 = Single, ...
     uint8_t positionType;
     // 0 = None, 1 = FixedPos, 8 = DopplerVelocity, 16 = Single, ...
@@ -164,6 +184,18 @@ typedef struct {
     double timeOffset;
     double timeDeviation;
 } UNICORE_RECTIME_data_t;
+
+typedef struct {
+    float gdop;
+    float pdop;
+    float tdop;
+    float vdop;
+    float hdop;
+    float ndop;
+    float edop;
+    float cutoff;
+    uint16_t prnCount;
+} UNICORE_STADOP_data_t;
 
 // typedef struct {
 //     // ubxAutomaticFlags automaticFlags;

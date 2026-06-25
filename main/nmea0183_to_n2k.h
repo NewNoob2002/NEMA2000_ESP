@@ -30,7 +30,7 @@ struct tGatewayGnssData {
     double AgeOfCorrection = N2kDoubleNA;
     uint8_t Satellites = N2kUInt8NA;
     unsigned char nReferenceStations = N2kUInt8NA;
-    uint8_t ReferenceStationsID = N2kUInt8NA;
+    uint16_t ReferenceStationsID = N2kUInt16NA;
     tN2kGNSSmethod GnssMethod = N2kGNSSm_Unavailable;
 };
 

@@ -69,6 +69,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     const char* MSG_BESTNAVB = "BESTNAVB";
     const char* MSG_BESTNAVXYZB = "BESTNAVXYZB";
     const char* MSG_RECTIMEB = "RECTIMEB";
+    const char* MSG_STADOPB = "STADOPB";
     const char* MSG_VERSION = "VERSION";
 
     const char* MSG_BASEINFOA = "BASEINFOA";
@@ -120,8 +121,13 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     double getLatitude() const;
     double getLongitude() const;
     double getAltitude() const;
+    double getGeoidalSeparation() const;
     double getHorizontalSpeed() const;
     double getTrackGround() const;
+    double getAgeOfCorrection() const;
+    uint16_t getReferenceStationId() const;
+    double getHdop() const;
+    double getPdop() const;
     float getLatitudeDeviation() const;
     float getLongitudeDeviation() const;
     float getHorizontalAccuracy() const;

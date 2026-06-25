@@ -277,6 +277,7 @@ binaryMessageName(const uint16_t messageId) {
         case messageIdBestnav: return "BESTNAVB";
         case messageIdBestnavXyz: return "BESTNAVXYZB";
         case messageIdRectime: return "RECTIMEB";
+        case messageIdStadop: return "STADOPB";
         case messageIdVersion: return "VERSIONB";
         default: return "";
     }
@@ -945,6 +946,10 @@ UnicoreGNSSLibrary::stopAutoReports() {
         delete _recTime;
         _recTime = nullptr;
     }
+    if (_staDop != nullptr) {
+        delete _staDop;
+        _staDop = nullptr;
+    }
 }
 
 bool
@@ -1064,6 +1069,47 @@ UnicoreGNSSLibrary::initRecTime(float rate) {
             log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "Failed to get response from RecTime start");
             delete _recTime;
             _recTime = nullptr;
+            return (false);
+        }
+        delay(10);
+    }
+    return true;
+}
+
+bool
+UnicoreGNSSLibrary::initStadop(float rate) {
+    if ((startBinaryBeforeFix == false) && (isNmeaFixed() == false)) {
+        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "stadop init delayed until fix");
+        return (false);
+    }
+
+    _staDop = new UNICORE_STADOP_data_t;
+    if (_staDop == nullptr) {
+        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "failed to allocate stadop data");
+        return (false);
+    }
+
+    char command[50];
+    snprintf(command, sizeof(command), "STADOPB %0.2f", rate);
+    if (sendCommandAndWait(command, 2000) != Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        delete _staDop;
+        _staDop = nullptr;
+        return (false);
+    }
+
+    log(UnicoreLogLevel::Info, UNICORE_LOG_COMMAND, "stadop init ok");
+    lastUpdateDop = 0;
+    uint16_t maxWait = (1000 / rate) + 100;
+    unsigned long startTime = millis();
+
+    while (1) {
+        if (lastUpdateDop > 0) {
+            break;
+        }
+        if (millis() - startTime > maxWait) {
+            log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "Failed to get response from Stadop start");
+            delete _staDop;
+            _staDop = nullptr;
             return (false);
         }
         delay(10);
@@ -1307,6 +1353,17 @@ UnicoreGNSSLibrary::handleBinaryMessage(const uint8_t* message, const uint16_t l
             decodeRecTime(payload, payloadLength);
             break;
         }
+        case messageIdStadop: {
+            if (_staDop == nullptr) {
+                _staDop = new UNICORE_STADOP_data_t;
+            }
+            if (_staDop == nullptr) {
+                log(UnicoreLogLevel::Error, UNICORE_LOG_DATA, "failed to allocate stadop data");
+                return;
+            }
+            decodeStadop(payload, payloadLength);
+            break;
+        }
         case messageIdVersion: decodeVersionBinary(payload, payloadLength); break;
         default: break;
     }
@@ -1324,9 +1381,13 @@ UnicoreGNSSLibrary::decodeBestNav(const uint8_t* payload, const uint16_t length)
     _bestNav->latitude = readF8(payload, offsetBestnavLat);
     _bestNav->longitude = readF8(payload, offsetBestnavLon);
     _bestNav->altitude = readF8(payload, offsetBestnavHgt);
+    _bestNav->undulation = readF4(payload, offsetBestnavUndulation);
     _bestNav->latitudeDeviation = readF4(payload, offsetBestnavLatDeviation);
     _bestNav->longitudeDeviation = readF4(payload, offsetBestnavLonDeviation);
     _bestNav->heightDeviation = readF4(payload, offsetBestnavHgtDeviation);
+    copyFixedString(_bestNav->stationId, sizeof(_bestNav->stationId), payload, offsetBestnavStationId, length, 4);
+    _bestNav->diffAge = readF4(payload, offsetBestnavDiffAge);
+    _bestNav->solutionAge = readF4(payload, offsetBestnavSolAge);
     _bestNav->satellitesTracked = readU1(payload, offsetBestnavSatsTracked);
     _bestNav->satellitesUsed = readU1(payload, offsetBestnavSatsUsed);
     const uint8_t extendedStatus = readU1(payload, offsetBestnavExtSolStat);
@@ -1393,6 +1454,27 @@ UnicoreGNSSLibrary::decodeRecTime(const uint8_t* payload, const uint16_t length)
 
     log(UnicoreLogLevel::Debug, UNICORE_LOG_DATA, "RECTIME %04u-%02u-%02u %02u:%02u:%02u.%03u", _recTime->year,
         _recTime->month, _recTime->day, _recTime->hour, _recTime->minute, _recTime->second, _recTime->millisecond);
+}
+
+void
+UnicoreGNSSLibrary::decodeStadop(const uint8_t* payload, const uint16_t length) {
+    if (!payload || (length < (offsetStadopPrnCount + sizeof(uint16_t))) || !_staDop) {
+        return;
+    }
+
+    lastUpdateDop = millis();
+    _staDop->gdop = readF4(payload, offsetStadopGdop);
+    _staDop->pdop = readF4(payload, offsetStadopPdop);
+    _staDop->tdop = readF4(payload, offsetStadopTdop);
+    _staDop->vdop = readF4(payload, offsetStadopVdop);
+    _staDop->hdop = readF4(payload, offsetStadopHdop);
+    _staDop->ndop = readF4(payload, offsetStadopNdop);
+    _staDop->edop = readF4(payload, offsetStadopEdop);
+    _staDop->cutoff = readF4(payload, offsetStadopCutoff);
+    _staDop->prnCount = readU2(payload, offsetStadopPrnCount);
+
+    log(UnicoreLogLevel::Debug, UNICORE_LOG_DATA, "STADOP hdop=%.2f pdop=%.2f prns=%u", _staDop->hdop, _staDop->pdop,
+        _staDop->prnCount);
 }
 
 void

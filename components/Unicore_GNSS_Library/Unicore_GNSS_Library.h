@@ -221,9 +221,11 @@ class UnicoreGNSSLibrary {
     bool initBestnav(float rate = 1.0);
     bool initBestnavXyz(float rate = 1.0);
     bool initRecTime(float rate = 1.0);
+    bool initStadop(float rate = 1.0);
     UNICORE_BESTNAV_data_t* _bestNav = nullptr;
     UNICORE_BESTNAVXYZ_data_t* _bestNavXyz = nullptr;
     UNICORE_RECTIME_data_t* _recTime = nullptr;
+    UNICORE_STADOP_data_t* _staDop = nullptr;
     UNICORE_VERSION_data_t _version = {};
     float _horizontalAccuracy = 0.0f;
     bool _validDate = false;
@@ -240,6 +242,7 @@ class UnicoreGNSSLibrary {
     unsigned long lastUpdateGeodetic = 0;
     unsigned long lastUpdateEcef = 0;
     unsigned long lastUpdateDateTime = 0;
+    unsigned long lastUpdateDop = 0;
     unsigned long lastUpdateVersion = 0;
 
     UnicoreBinaryHeader _lastBinaryHeader = {};
@@ -285,6 +288,7 @@ class UnicoreGNSSLibrary {
     void decodeBestNav(const uint8_t* payload, uint16_t length);
     void decodeBestNavXyz(const uint8_t* payload, uint16_t length);
     void decodeRecTime(const uint8_t* payload, uint16_t length);
+    void decodeStadop(const uint8_t* payload, uint16_t length);
     void decodeVersionBinary(const uint8_t* payload, uint16_t length);
     void decodeVersionHash(const char* sentence);
     // Command result handling

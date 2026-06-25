@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include "GNSS.h"
 #include "States.h"
 #include "Unicore_GNSS_Library.h"
@@ -17,6 +18,7 @@ constexpr uint8_t kPosTypeNarrowFloat = 34;
 constexpr uint8_t kPosTypeWideInt = 49;
 constexpr uint8_t kPosTypeNarrowInt = 50;
 constexpr unsigned long kBinaryMessageInitRetryMs = 2000;
+constexpr uint16_t kNoReferenceStationId = UINT16_MAX;
 
 bool
 copyModeToken(char* destination, const size_t destinationSize, const char*& cursor) {
@@ -320,6 +322,10 @@ UnicoreUM980::ensureBinaryNavigationMessages() {
 
     if (_bestNavXyz == nullptr) {
         initBestnavXyz(rateSeconds);
+    }
+
+    if (_staDop == nullptr) {
+        initStadop(rateSeconds);
     }
 }
 
@@ -715,6 +721,11 @@ UnicoreUM980::getAltitude() const {
 }
 
 double
+UnicoreUM980::getGeoidalSeparation() const {
+    return _bestNav ? _bestNav->undulation : std::numeric_limits<double>::quiet_NaN();
+}
+
+double
 UnicoreUM980::getHorizontalSpeed() const {
     return _bestNav ? _bestNav->horizontalSpeed : 0.0;
 }
@@ -722,6 +733,35 @@ UnicoreUM980::getHorizontalSpeed() const {
 double
 UnicoreUM980::getTrackGround() const {
     return _bestNav ? _bestNav->trackGround : 0.0;
+}
+
+double
+UnicoreUM980::getAgeOfCorrection() const {
+    return _bestNav ? _bestNav->diffAge : std::numeric_limits<double>::quiet_NaN();
+}
+
+uint16_t
+UnicoreUM980::getReferenceStationId() const {
+    if (!_bestNav || (_bestNav->stationId[0] == 0)) {
+        return kNoReferenceStationId;
+    }
+
+    char* end = nullptr;
+    const unsigned long value = strtoul(_bestNav->stationId, &end, 10);
+    if ((end == _bestNav->stationId) || (value > UINT16_MAX)) {
+        return kNoReferenceStationId;
+    }
+    return static_cast<uint16_t>(value);
+}
+
+double
+UnicoreUM980::getHdop() const {
+    return _staDop ? _staDop->hdop : std::numeric_limits<double>::quiet_NaN();
+}
+
+double
+UnicoreUM980::getPdop() const {
+    return _staDop ? _staDop->pdop : std::numeric_limits<double>::quiet_NaN();
 }
 
 float
