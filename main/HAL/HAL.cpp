@@ -93,7 +93,7 @@ HAL_Update(void* e) {
     task.halUpdateTaskRunning = true;
 
     while (!task.halUpdateTaskStopRequest) {
-        // reportHeap();
+        reportHeap();
 
         stateUpdate(gUm980);
 
