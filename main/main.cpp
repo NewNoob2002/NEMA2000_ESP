@@ -156,7 +156,7 @@ extern "C" void
 app_main(void) {
     HAL::HAL_Init();
     App_Init();
-    // startTaskMonitor();
+    startTaskMonitor();
     xTaskCreatePinnedToCore(HAL::HAL_Update, "Hal Update", HAL_UPDATE_TASK_STACK_SIZE, nullptr, HAL_UPDATE_TASK_PROI,
                             &halUpdateTaskHandle, HAL_UPDATE_TASK_RUNNING_CORE);
     ESP_LOGI("[main]", "hal update task created on core %d", HAL_UPDATE_TASK_RUNNING_CORE);

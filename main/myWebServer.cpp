@@ -12,6 +12,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "App/SettingsFile.h"
 #include "GNSS.h"
 #include "HAL.h"
 #include "Support.h"
@@ -51,8 +52,8 @@ static const char* const text_plain = "text/plain";
 #define PROFILE_UPLOAD      "/profile/upload"
 #define PROFILE_ACTIVATE    "/profile/activate"
 #define PROFILE_DELETE      "/profile/delete"
-#define PROFILE_DIR         "/littlefs/profiles"
-#define PROFILE_ACTIVE_FILE "/littlefs/profiles/active.txt"
+#define PROFILE_DIR         SETTINGS_FILE_PROFILE_DIR
+#define PROFILE_ACTIVE_FILE SETTINGS_FILE_ACTIVE_PROFILE_FILE
 
 //----------------------------------------
 // Locals
@@ -253,24 +254,6 @@ getProfileName(char* value, size_t valueLength) {
 static bool
 setProfileName(const char* value) {
     snprintf(settings.profileName, sizeof(settings.profileName), "%s", value);
-    return true;
-}
-
-static bool
-getMeasurementRateHz(char* value, size_t valueLength) {
-    if (settings.measurementRateMs == 0) {
-        return getDouble(value, valueLength, 0.0, 3);
-    }
-    return getDouble(value, valueLength, static_cast<double>(MILLISECONDS_IN_A_SECOND) / settings.measurementRateMs, 3);
-}
-
-static bool
-setMeasurementRateHz(const char* value) {
-    const double hz = strtod(value, nullptr);
-    if (hz <= 0.0) {
-        return false;
-    }
-    settings.measurementRateMs = static_cast<uint16_t>(lround(static_cast<double>(MILLISECONDS_IN_A_SECOND) / hz));
     return true;
 }
 
@@ -499,7 +482,6 @@ setLastState(const char* value) {
 
 static const WebFieldBinding webFieldBindings[] = {
     {"Profile Configuration", "profileName", getProfileName, setProfileName},
-    {"GNSS Configuration", "measurementRateHz", getMeasurementRateHz, setMeasurementRateHz},
     {"GNSS Configuration", "minCN0", getMinCN0, setMinCN0},
     {"Base Configuration", "baseTypeSurveyIn", getBaseTypeSurveyIn, setBaseTypeSurveyIn},
     {"Base Configuration", "baseTypeFixed", getBaseTypeFixed, setBaseTypeFixed},
@@ -617,24 +599,7 @@ webServerUrlDecode(const char* source, char* destination, size_t destinationLeng
 
 static bool
 webServerProfileNameIsSafe(const char* name) {
-    if ((name == nullptr) || (name[0] == 0)) {
-        return false;
-    }
-
-    const size_t length = strlen(name);
-    if ((length > profileMaxNameLength) || (strcmp(name, ".") == 0) || (strcmp(name, "..") == 0)) {
-        return false;
-    }
-
-    for (size_t index = 0; index < length; index++) {
-        const char c = name[index];
-        const bool valid = isalnum(static_cast<unsigned char>(c)) || (c == '-') || (c == '_') || (c == '.');
-        if (!valid) {
-            return false;
-        }
-    }
-
-    return (strstr(name, "..") == nullptr) && (strchr(name, '/') == nullptr) && (strchr(name, '\\') == nullptr);
+    return settingsFileNameIsSafe(name);
 }
 
 static bool
@@ -656,65 +621,17 @@ webServerGetProfileNameFromQuery(httpd_req_t* req, char* name, size_t nameLength
 
 static bool
 webServerBuildProfilePath(const char* name, char* path, size_t pathLength) {
-    if (!webServerProfileNameIsSafe(name)) {
-        return false;
-    }
-    const int written = snprintf(path, pathLength, "%s/%s", PROFILE_DIR, name);
-    return (written > 0) && (static_cast<size_t>(written) < pathLength);
+    return settingsFileBuildProfilePath(name, path, pathLength);
 }
 
 static bool
 webServerEnsureProfileDir() {
-    if (!online_devices.littlefs) {
-        return false;
-    }
-    if (LittleFS.exists(PROFILE_DIR)) {
-        return true;
-    }
-    return LittleFS.mkdir(PROFILE_DIR);
+    return settingsFileEnsureProfileDir();
 }
 
 static bool
 webServerReadActiveProfile(char* name, size_t nameLength) {
-    name[0] = 0;
-    if (!online_devices.littlefs || !LittleFS.exists(PROFILE_ACTIVE_FILE)) {
-        return false;
-    }
-
-    File file = LittleFS.open(PROFILE_ACTIVE_FILE, "r");
-    if (!file) {
-        return false;
-    }
-
-    const size_t bytes = file.readBytes(name, nameLength - 1);
-    name[bytes] = 0;
-    file.close();
-
-    char* newline = strpbrk(name, "\r\n");
-    if (newline != nullptr) {
-        *newline = 0;
-    }
-    return webServerProfileNameIsSafe(name);
-}
-
-static bool
-webServerWriteActiveProfile(const char* name) {
-    if (!webServerEnsureProfileDir()) {
-        return false;
-    }
-
-    char path[96] = {};
-    if (!webServerBuildProfilePath(name, path, sizeof(path)) || !LittleFS.exists(path)) {
-        return false;
-    }
-
-    File file = LittleFS.open(PROFILE_ACTIVE_FILE, "w");
-    if (!file) {
-        return false;
-    }
-    const size_t written = file.print(name);
-    file.close();
-    return written == strlen(name);
+    return settingsFileReadActiveProfile(name, nameLength);
 }
 
 static const char*
@@ -999,6 +916,7 @@ webServerApplyAction(const char* key, const char* value) {
 
     if (strcmp(key, "exitAndReset") == 0) {
         if (strcmp(value, "true") == 0) {
+            settingsFileSaveIfDirty();
             ESP_LOGI(TAG, "factoryDefaultReset done, restart");
             esp_restart();
         }
@@ -1027,6 +945,7 @@ webServerApplyField(const char* key, const char* value) {
     for (int index = 0; index < webFieldBindingsCount; index++) {
         if (strcmp(key, webFieldBindings[index].id) == 0) {
             if ((webFieldBindings[index].setter != nullptr) && webFieldBindings[index].setter(value)) {
+                settingsFileMarkDirty();
                 ESP_LOGI(TAG, "%s updated: %s = %s", webFieldBindings[index].section, key, value);
                 return true;
             }
@@ -1221,12 +1140,18 @@ webServerHandlerProfileActivate(httpd_req_t* req) {
     if (!webServerGetProfileNameFromQuery(req, name, sizeof(name))) {
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid profile name");
     }
-    if (!webServerWriteActiveProfile(name)) {
+    if (!settingsFileSaveIfDirty()) {
+        return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save current profile");
+    }
+    if (!settingsFileActivateProfile(name)) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to activate profile");
     }
 
     httpd_resp_set_type(req, text_plain);
-    return httpd_resp_sendstr(req, "Profile activated");
+    httpd_resp_sendstr(req, "Profile activated");
+    webServerSendSettings();
+    webServerSendProfileList();
+    return ESP_OK;
 }
 
 static esp_err_t
@@ -1293,6 +1218,9 @@ static esp_err_t
 webServerHandlerProfileUpload(httpd_req_t* req) {
     char name[profileMaxNameLength + 1] = {};
     char path[96] = {};
+    char tempPath[112] = {};
+    char activeProfile[profileMaxNameLength + 1] = {};
+    char validationError[128] = {};
     uint8_t* buffer = nullptr;
     size_t received = 0;
     const char* errorMessage = nullptr;
@@ -1307,6 +1235,11 @@ webServerHandlerProfileUpload(httpd_req_t* req) {
             errorMessage = "Invalid profile name";
             break;
         }
+        const int tempPathLength = snprintf(tempPath, sizeof(tempPath), "%s.tmp", path);
+        if ((tempPathLength <= 0) || (static_cast<size_t>(tempPathLength) >= sizeof(tempPath))) {
+            errorMessage = "Profile path is too long";
+            break;
+        }
         if ((req->content_len == 0) || (req->content_len > profileMaxFileSize)) {
             errorMessage = "Profile file is empty or too large";
             break;
@@ -1318,7 +1251,8 @@ webServerHandlerProfileUpload(httpd_req_t* req) {
             break;
         }
 
-        File file = LittleFS.open(path, "w");
+        LittleFS.remove(tempPath);
+        File file = LittleFS.open(tempPath, "w");
         if (!file) {
             errorMessage = "Failed to open profile for writing";
             break;
@@ -1343,12 +1277,32 @@ webServerHandlerProfileUpload(httpd_req_t* req) {
 
         file.close();
         if (errorMessage != nullptr) {
-            LittleFS.remove(path);
+            LittleFS.remove(tempPath);
+            break;
+        }
+        if (!settingsFileValidate(tempPath, validationError, sizeof(validationError))) {
+            errorMessage = validationError[0] ? validationError : "Profile validation failed";
+            LittleFS.remove(tempPath);
+            break;
+        }
+
+        if (LittleFS.exists(path) && !LittleFS.remove(path)) {
+            errorMessage = "Failed to replace old profile";
+            LittleFS.remove(tempPath);
+            break;
+        }
+        if (!LittleFS.rename(tempPath, path)) {
+            errorMessage = "Failed to commit uploaded profile";
+            LittleFS.remove(tempPath);
             break;
         }
 
         httpd_resp_set_type(req, text_plain);
         httpd_resp_sendstr(req, "Profile uploaded");
+        if (webServerReadActiveProfile(activeProfile, sizeof(activeProfile)) && (strcmp(activeProfile, name) == 0)) {
+            settingsFileApplyActiveProfile();
+            webServerSendSettings();
+        }
         webServerSendField("profileActionStatus", "uploaded");
         webServerSendProfileList();
         rtkFree(buffer, "Profile upload buffer");
@@ -1486,6 +1440,7 @@ webServerHandlerFirmwareUpload(httpd_req_t* req) {
             break;
         }
 
+        settingsFileSaveIfDirty();
         ESP_LOGI(TAG, "Firmware update complete: %u bytes. Restarting", static_cast<unsigned>(firmwareBytes));
         httpd_resp_set_type(req, text_plain);
         httpd_resp_sendstr(req, "Firmware uploaded successfully. Restarting.");

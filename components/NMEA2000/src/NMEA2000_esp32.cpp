@@ -438,6 +438,9 @@ tNMEA2000_esp32::OnTxDone(twai_node_handle_t handle, const twai_tx_done_event_da
     (void)handle;
     tNMEA2000_esp32* self = static_cast<tNMEA2000_esp32*>(user_ctx);
     BaseType_t hp_task_woken = pdFALSE;
+    if (self == nullptr || edata == nullptr) {
+        return false;
+    }
 
     self->TxDoneSuccess = edata->is_tx_success;
     if (edata->is_tx_success) {
@@ -459,6 +462,9 @@ tNMEA2000_esp32::OnRxDone(twai_node_handle_t handle, const twai_rx_done_event_da
     (void)edata;
     tNMEA2000_esp32* self = static_cast<tNMEA2000_esp32*>(user_ctx);
     BaseType_t hp_task_woken = pdFALSE;
+    if (self == nullptr || self->RxQueue == nullptr) {
+        return false;
+    }
 
     tCANFrame frame;
     memset(&frame, 0, sizeof(frame));
@@ -496,6 +502,9 @@ tNMEA2000_esp32::OnError(twai_node_handle_t handle, const twai_error_event_data_
     (void)handle;
     tNMEA2000_esp32* self = static_cast<tNMEA2000_esp32*>(user_ctx);
     BaseType_t hp_task_woken = pdFALSE;
+    if (self == nullptr || edata == nullptr) {
+        return false;
+    }
 
     tCtrlEvent evt;
     memset(&evt, 0, sizeof(evt));
@@ -526,6 +535,9 @@ tNMEA2000_esp32::OnStateChange(twai_node_handle_t handle, const twai_state_chang
     (void)handle;
     tNMEA2000_esp32* self = static_cast<tNMEA2000_esp32*>(user_ctx);
     BaseType_t hp_task_woken = pdFALSE;
+    if (self == nullptr || edata == nullptr || self->CtrlQueue == nullptr) {
+        return false;
+    }
 
     tCtrlEvent evt;
     memset(&evt, 0, sizeof(evt));
