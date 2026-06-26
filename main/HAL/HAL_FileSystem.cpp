@@ -4,11 +4,12 @@
 #include <nvs.h>
 #include <nvs_flash.h>
 #include <string.h>
+#include "App/Config/Config.h"
 #include "HAL.h"
 #include "Support.h"
 #include "mcu_settings.h"
 
-#define MOUNTPOINT "/littlefs"
+#define TAG "[HAL_FileSystem]"
 
 /**
 * @brief Print the partition table of the ESP32
@@ -89,8 +90,8 @@ FileSystem_Init() {
         online_devices.littlefs = false;
         systemPrintln("No LittleFS partition found");
     } else {
-        systemPrintln("LittleFS partition found");
         online_devices.littlefs = true;
+        systemPrintln("LittleFS partition found");
     }
 
     beginFileSystem();

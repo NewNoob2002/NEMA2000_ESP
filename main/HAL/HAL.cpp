@@ -1,5 +1,4 @@
 #include "HAL.h"
-#include "App/SettingsFile.h"
 #include "Bluetooth.h"
 #include "States.h"
 #include "freertos/idf_additions.h"
@@ -136,8 +135,7 @@ HAL_Init() {
 #endif
     DMW_b("FileSystem_Init");
     FileSystem_Init();
-    DMW_b("settingsFileInit");
-    settingsFileInit();
+
     // Init GNSS Module
     DMW_b("gnssInit");
     gnssInit();

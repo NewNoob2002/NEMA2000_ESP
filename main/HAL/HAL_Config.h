@@ -7,6 +7,7 @@
 #define HAL_BT_READ_TASK_STACK_SIZE          (1024 * 5)
 #define HAL_BT_READ_UPDATE_TASK_PROI         (settings.btReadTaskPriority)
 #define HAL_BT_READ_UPDATE_TASK_RUNNING_CORE (settings.btReadTaskCore)
+
 // GNSS Module Config
 #if 1
 #define GNSS_POWER_PIN (gpio_num_t)5
