@@ -120,14 +120,16 @@ class UnicoreGNSSLibrary {
      * @return true 
      * @return false 
      */
-    bool begin(HardwareSerial& serialPort, uint16_t rxBufferSize = 1024);
+    bool begin(HardwareSerial& serialPort, uint16_t rxTaskStackSize = (1024 * 5),
+               uint16_t rxTaskProi = (configMAX_PRIORITIES - 7), const BaseType_t CoreID = 1,
+               uint16_t rxBufferSize = 1024);
     void end();
     bool isConnected() const;
     bool isOnline();
     bool isNmeaFixed() const;
     bool disableOutput();
 
-    bool startRxTask(uint32_t stackSize = 4096, UBaseType_t priority = 3);
+    bool startRxTask(uint32_t stackSize = 4096, UBaseType_t priority = 3, const BaseType_t CoreID = 1);
     void stopRxTask(uint32_t timeoutMs = 1000);
     bool isRxTaskRunning() const;
 

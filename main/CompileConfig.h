@@ -19,6 +19,8 @@
 // #define COMPILE_NTP
 #endif
 
+#define COMPILE_UM980
+
 // #ifndef COMPILE_I2C
 // #define COMPILE_I2C
 // #endif

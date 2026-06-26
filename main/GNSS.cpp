@@ -98,7 +98,8 @@ gnssBegin(HardwareSerial*& pGnssSerial, UnicoreUM980*& pUm980) {
     pUm980->init();
     pUm980->powerOn();
     delay(2000); // Wait for the GNSS to power up
-    if (pUm980->begin(*pGnssSerial)) {
+    if (pUm980->begin(*pGnssSerial, settings.gnssReadTaskStackSize, settings.gnssReadTaskPriority,
+                      settings.gnssReadTaskCore)) {
         if (pUm980->requestVersion(2000) == Unicore_RESULT_RESPONSE_COMMAND_OK) {
             online_devices.gnss = true;
             pUm980->setOnline(true);
@@ -206,12 +207,7 @@ gnssUpdate(UnicoreUM980* gnss) {
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_FIX_RATE)) {
-            const double rateSeconds = static_cast<double>(settings.measurementRateMs) / MILLISECONDS_IN_A_SECOND;
-            if (gnss->setNavigationRate(rateSeconds) == Unicore_RESULT_RESPONSE_COMMAND_OK) {
-                gnssConfigureClear(GNSS_CONFIG_FIX_RATE);
-                gnssConfigure(GNSS_CONFIG_MESSAGE_RATE_NMEA, __FILE__, __LINE__);
-                gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
-            }
+            gnssConfigureUnsupported(GNSS_CONFIG_FIX_RATE);
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_CONSTELLATION)) {

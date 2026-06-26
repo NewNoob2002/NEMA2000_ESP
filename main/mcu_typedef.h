@@ -5,6 +5,10 @@
 #include "CompileConfig.h"
 #include "FreeRTOSConfig.h"
 
+#ifdef COMPILE_UM980
+#include "Unicore_UM980.h"
+#endif
+
 #define PIN_UNDEFINED     0xFF
 #define INCHES_IN_A_METER (float)39.37007874
 #define FEET_IN_A_METER   (float)3.280839895
@@ -286,11 +290,6 @@ typedef struct online_devices_t {
 typedef struct settings_t {
 
     int sizeOfSettings = 0; // sizeOfSettings **must** be the first entry and must be int
-    // int rtkIdentifier = RTK_IDENTIFIER; // rtkIdentifier **must** be the second entry
-
-    //Once we detect the platform or receiver, no need to re-detect
-    //ProductVariant previouslyDetectedPlatform = RTK_UNKNOWN; //Because LFS is started after deviceID, this is mute
-    // gnssReceiverType_e detectedGnssReceiver = GNSS_RECEIVER_UNKNOWN;
 
     // Antenna
     int16_t antennaHeight_mm = 1800;    // Aka Pole length
@@ -313,11 +312,11 @@ typedef struct settings_t {
     double fixedLong = -105.18505761;
     int observationSeconds = 15;             // Default survey in time of 15 seconds
     float observationPositionAccuracy = 5.0; // Default survey in pos accy of 5m
-    float surveyInStartingAccuracy =
-        3.0; // Wait for this horizontal positional accuracy in meters before starting survey in
+    // Wait for this horizontal positional accuracy in meters before starting survey in
+    float surveyInStartingAccuracy = 3.0;
 
     // Battery
-    bool enablePrintBatteryMessages = true;
+    bool enablePrintBatteryMessages = false;
     uint32_t shutdownNoChargeTimeoutMinutes = 0; // If > 0, shut down unit after timeout if not charging
 
     // Bluetooth
@@ -342,23 +341,18 @@ typedef struct settings_t {
     IPAddress ethernetSubnet = {255, 255, 255, 0};
 #endif
     // Firmware
-    uint32_t autoFirmwareCheckMinutes = 24 * 60;
-    bool debugFirmwareUpdate = false;
-    bool enableAutoFirmwareUpdate = false;
+    // uint32_t autoFirmwareCheckMinutes = 24 * 60;
+    // bool debugFirmwareUpdate = false;
+    // bool enableAutoFirmwareUpdate = false;
 
     // GNSS
     // muxConnectionType_e dataPortChannel = MUX_GNSS_UART; // Mux default to GNSS UART
     bool debugGnss = false; // Turn on to display GNSS library debug messages
     bool enablePrintPosition = false;
-    uint16_t measurementRateMs = 250; // Elapsed ms between GNSS measurements. 25ms to 65535ms. Default 4Hz.
 
     // GNSS UART
     uint16_t serialGNSSRxFullThreshold = 50; // RX FIFO full interrupt. Max of ~128. See pinUART2Task().
-    int uartReceiveBufferSize = 1024 * 2;    // This buffer is filled automatically as the UART receives characters
-
-    // HTTP
-    bool debugHttpClientData = false;  // Debug the HTTP Client (ZTP) data flow
-    bool debugHttpClientState = false; // Debug the HTTP Client state machine
+    int uartReceiveBufferSize = 1024 * 3;    // This buffer is filled automatically as the UART receives characters
 
     // Log file
 #if defined(COMPILE_SD_CARD)
@@ -450,8 +444,6 @@ typedef struct settings_t {
     };
 */
     // OS
-    // Core where hardware is started and interrupts are assigned to, 0=core, 1=Arduino
-    uint8_t bluetoothInterruptsCore = 1;
     uint8_t btReadTaskCore = 1; // Core where task should run, 0=core, 1=Arduino
     // Read from BT SPP and Write to GNSS
     uint8_t btReadTaskPriority = configMAX_PRIORITIES - 15;
@@ -461,43 +453,35 @@ typedef struct settings_t {
     bool enablePsram = true; // Control the use on onboard PSRAM. Used for testing behavior when PSRAM is not available.
     bool enableTaskReports = false; // Turn on to display task high water marks
     uint8_t gnssReadTaskCore = 1;   // Core where task should run, 0=core, 1=Arduino
-    uint8_t gnssReadTaskPriority =
-        1; // Read from GNSS and Write to circular buffer (SD, TCP, BT). 3 being the highest, and 0 being the lowest
-    uint8_t gnssUartInterruptsCore =
-        1;                    // Core where hardware is started and interrupts are assigned to, 0=core, 1=Arduino
+        // Read from GNSS and Write to circular buffer (SD, TCP, BT). 3 being the highest, and 0 being the lowest
+    uint8_t gnssReadTaskPriority = configMAX_PRIORITIES - 7;
+    uint16_t gnssReadTaskStackSize = (1024 * 5);
     bool haltOnPanic = false; // Halt after beginVersion if the reset reason was panic
-    uint8_t handleGnssDataTaskCore = 1;     // Core where task should run, 0=core, 1=Arduino
-    uint8_t handleGnssDataTaskPriority = 1; // Read from the circular buffer and dole out to end points (SD, TCP, BT).
-    uint8_t i2cInterruptsCore = 1; // Core where hardware is started and interrupts are assigned to, 0=core, 1=Arduino
     uint8_t measurementScale = MEASUREMENT_UNITS_METERS;
     bool printBootTimes = false; // Print times and deltas during boot
     bool printPartitionTable = false;
     bool printTaskStartStop = true;
-    uint16_t psramMallocLevel =
-        40; // By default, push as much as possible to PSRAM. Needed to do secure WiFi (MQTT) + BT + PPL
+    // By default, push as much as possible to PSRAM. Needed to do secure WiFi (MQTT) + BT + PPL
+    uint16_t psramMallocLevel = 40;
     uint32_t rebootMinutes = 0; // Disabled, reboots after uptime reaches this number of minutes
     int resetCount = 0;
 
-    // Periodic Display
-    // PeriodicDisplay_t periodicDisplay = (PeriodicDisplay_t)0; //Turn off all periodic debug displays by default.
-    uint32_t periodicDisplayInterval = 15 * 1000;
-
     // Point Perfect
-    bool autoKeyRenewal = true;           // Attempt to get keys if we get under 28 days from the expiration date
-    bool debugPpCertificate = false;      // Debug Point Perfect certificate management
-    int geographicRegion = 0;             // Default to US - first entry in Regional_Information_Table
-    uint64_t lastKeyAttempt = 0;          // Epoch time of last attempt at obtaining keys
-    char pointPerfectBrokerHost[50] = ""; // pp.services.u-blox.com
-    char pointPerfectClientID[50] = "";   // Obtained during ZTP
-    char pointPerfectCurrentKey[33] = ""; // 32 hexadecimal digits = 128 bits = 16 Bytes
-    uint64_t pointPerfectCurrentKeyDuration = 0;
-    uint64_t pointPerfectCurrentKeyStart = 0;
-    char pointPerfectDeviceProfileToken[40] = "";
-    char pointPerfectKeyDistributionTopic[20] = ""; // /pp/ubx/0236/ip or /pp/ubx/0236/Lb - from ZTP
-    char pointPerfectNextKey[33] = "";
-    uint64_t pointPerfectNextKeyDuration = 0;
-    uint64_t pointPerfectNextKeyStart = 0;
-    uint16_t pplFixTimeoutS = 180; // Number of seconds of no RTK fix when using PPL before resetting GNSS
+    // bool autoKeyRenewal = true;           // Attempt to get keys if we get under 28 days from the expiration date
+    // bool debugPpCertificate = false;      // Debug Point Perfect certificate management
+    // int geographicRegion = 0;             // Default to US - first entry in Regional_Information_Table
+    // uint64_t lastKeyAttempt = 0;          // Epoch time of last attempt at obtaining keys
+    // char pointPerfectBrokerHost[50] = ""; // pp.services.u-blox.com
+    // char pointPerfectClientID[50] = "";   // Obtained during ZTP
+    // char pointPerfectCurrentKey[33] = ""; // 32 hexadecimal digits = 128 bits = 16 Bytes
+    // uint64_t pointPerfectCurrentKeyDuration = 0;
+    // uint64_t pointPerfectCurrentKeyStart = 0;
+    // char pointPerfectDeviceProfileToken[40] = "";
+    // char pointPerfectKeyDistributionTopic[20] = ""; // /pp/ubx/0236/ip or /pp/ubx/0236/Lb - from ZTP
+    // char pointPerfectNextKey[33] = "";
+    // uint64_t pointPerfectNextKeyDuration = 0;
+    // uint64_t pointPerfectNextKeyStart = 0;
+    // uint16_t pplFixTimeoutS = 180; // Number of seconds of no RTK fix when using PPL before resetting GNSS
     // The correction topics are provided during ZTP (pointperfectTryZtpToken)
     // For IP-only plans, these will be /pp/ip/us, /pp/ip/eu, etc.
     // For L-Band+IP plans, these will be /pp/Lb/us, /pp/Lb/eu, etc.
@@ -512,10 +496,10 @@ typedef struct settings_t {
     char profileName[50] = "";
 
     // Pulse
-    bool enableExternalPulse = true;          // Send pulse once lock is achieved
-    uint64_t externalPulseLength_us = 200000; // us length of pulse, max of 60s = 60 * 1000 * 1000
+    // bool enableExternalPulse = true;          // Send pulse once lock is achieved
+    // uint64_t externalPulseLength_us = 200000; // us length of pulse, max of 60s = 60 * 1000 * 1000
     // pulseEdgeType_e externalPulsePolarity = PULSE_RISING_EDGE; // Pulse rises for pulse length, then falls
-    uint64_t externalPulseTimeBetweenPulse_us = 1000000; // us between pulses, max of 60s = 60 * 1000 * 1000
+    // uint64_t externalPulseTimeBetweenPulse_us = 1000000; // us between pulses, max of 60s = 60 * 1000 * 1000
 
     // Rover operation
     uint8_t dynamicModel = 254; // Default will be applied by checkGNSSArrayDefaults
@@ -543,7 +527,6 @@ typedef struct settings_t {
     // Serial
     // Default to 115200bps. This interface can be a bottleneck at high fix rates but allows the SD buffer to be reduced to 6k.
     uint32_t dataPortBaud = (115200);
-    bool echoUserInput = true;
     bool enableGnssToUsbSerial = false;
     uint32_t radioPortBaud = 57600; // Default to 57600bps to support connection to SiK1000 type telemetry radios
     int16_t serialTimeoutGNSS = 1;  // In ms - used during serialGNSS->begin. Number of ms to pass of no data before
@@ -598,16 +581,16 @@ typedef struct settings_t {
     bool enableImuDebug = false;         // Turn on to display IMU library debug messages
     bool enableTiltCompensation = false; // Allow user to disable tilt compensation on the models that have an IMU
 #ifdef COMPILE_UM980
-    uint8_t um980Constellations[MAX_UM980_CONSTELLATIONS] = {
-        254};                                                // Mark first record with key so defaults will be applied.
-    float um980MessageRatesNMEA[MAX_UM980_NMEA_MSG] = {254}; // Mark first record with key so defaults will be applied.
-    float um980MessageRatesRTCMBase[MAX_UM980_RTCM_MSG] =
-        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-               // rates for RTCM Base. Default to Unicore recommended rates.
-    float um980MessageRatesRTCMRover[MAX_UM980_RTCM_MSG] =
-        {254}; // Mark first record with key so defaults will be applied. Int value for each supported message - Report
-               // rates for RTCM Base. Default to Unicore recommended rates.
-#endif         // COMPILE_UM980
+    Um980ConstellationCommand kUm980ConstellationCommands[MAX_UM980_CONSTELLATIONS] = {};
+    // Mark first record with key so defaults will be applied.
+    Um980MessageConfig um980MessageRatesNMEA[MAX_UM980_NMEA_MSG] = {};
+    // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+    // rates for RTCM Base. Default to Unicore recommended rates.
+    Um980MessageConfig um980MessageRatesRTCMBase[MAX_UM980_RTCM_MSG] = {};
+    // Mark first record with key so defaults will be applied. Int value for each supported message - Report
+    // rates for RTCM Base. Default to Unicore recommended rates.
+    Um980MessageConfig um980MessageRatesRTCMRover[MAX_UM980_RTCM_MSG] = {};
+#endif // COMPILE_UM980
 
     // mosaic
 #ifdef COMPILE_MOSAICX5

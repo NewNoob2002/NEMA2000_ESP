@@ -333,7 +333,8 @@ UnicoreGNSSLibrary::UnicoreGNSSLibrary() = default;
 UnicoreGNSSLibrary::~UnicoreGNSSLibrary() { end(); }
 
 bool
-UnicoreGNSSLibrary::begin(HardwareSerial& serialPort, uint16_t rxBufferSize) {
+UnicoreGNSSLibrary::begin(HardwareSerial& serialPort, uint16_t rxTaskStackSize, uint16_t rxTaskProi,
+                          const BaseType_t CoreID, uint16_t rxBufferSize) {
     UnicoreLogCallback configuredLogCallback = _logCallback;
     void* configuredLogCallbackUserdata = _logCallbackUserdata;
     end();
@@ -364,7 +365,7 @@ UnicoreGNSSLibrary::begin(HardwareSerial& serialPort, uint16_t rxBufferSize) {
         return false;
     }
 
-    if (!startRxTask(1024 * 5, configMAX_PRIORITIES - 6)) {
+    if (!startRxTask(rxTaskStackSize, rxTaskProi, CoreID)) {
         log(UnicoreLogLevel::Error, UNICORE_LOG_TASK, "begin failed: RX task failed");
         end();
         return false;
@@ -469,7 +470,7 @@ UnicoreGNSSLibrary::disableOutput() {
 }
 
 bool
-UnicoreGNSSLibrary::startRxTask(const uint32_t stackSize, const UBaseType_t priority) {
+UnicoreGNSSLibrary::startRxTask(const uint32_t stackSize, const UBaseType_t priority, const BaseType_t CoreID) {
     if (!isConnected()) {
         log(UnicoreLogLevel::Error, UNICORE_LOG_TASK, "RX task start failed: not connected");
         return false;
@@ -481,7 +482,7 @@ UnicoreGNSSLibrary::startRxTask(const uint32_t stackSize, const UBaseType_t prio
 
     _rxTaskShouldRun = true;
     BaseType_t result = pdFAIL;
-    result = xTaskCreatePinnedToCore(rxTaskEntry, "unicore_rx", stackSize, this, priority, &_rxTaskHandle, 1);
+    result = xTaskCreatePinnedToCore(rxTaskEntry, "unicore_rx", stackSize, this, priority, &_rxTaskHandle, CoreID);
 
     if (result != pdPASS) {
         _rxTaskHandle = nullptr;
