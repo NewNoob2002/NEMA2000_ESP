@@ -12,6 +12,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "GNSS.h"
 #include "HAL.h"
 #include "Support.h"
 #include "Unicore_UM980.h"
@@ -997,7 +998,10 @@ webServerApplyAction(const char* key, const char* value) {
     }
 
     if (strcmp(key, "exitAndReset") == 0) {
-        ESP_LOGI(TAG, "TODO action exitAndReset = %s", value);
+        if (strcmp(value, "true") == 0) {
+            ESP_LOGI(TAG, "factoryDefaultReset done, restart");
+            esp_restart();
+        }
         return true;
     }
 
