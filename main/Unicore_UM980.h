@@ -3,12 +3,13 @@
 
 #include <cstdint>
 #include "Unicore_GNSS_Library.h"
-#include "soc/gpio_num.h"
+
+struct settings_t;
 
 struct Um980ConstellationCommand {
     const char* displayName;
     const char* commandName;
-    bool mask;
+    bool enabled;
 };
 
 struct Um980MessageConfig {
@@ -31,8 +32,8 @@ enum class Um980Mode : uint8_t {
 };
 
 inline constexpr Um980ConstellationCommand kUm980ConstellationCommands[] = {
-    {"BeiDou", "BDS", true}, {"Galileo", "GAL", true}, {"GLONASS", "GLO", true},
-    {"GPS", "GPS", true},    {"QZSS", "QZSS", true},
+    {"GPS", "GPS", true},     {"GLONASS", "GLO", true}, {"BeiDou", "BDS", true},
+    {"Galileo", "GAL", true}, {"QZSS", "QZSS", true},
 };
 
 inline constexpr Um980MessageConfig kUm980NmeaMessages[] = {
@@ -83,6 +84,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     void powerOn();
     void powerOff();
     void setOnline(bool online);
+    void applySettings(const settings_t& source);
 
     bool configureReceiver();
     bool prepareRoverMode();

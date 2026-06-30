@@ -136,6 +136,9 @@ HAL_Init() {
     DMW_b("FileSystem_Init");
     FileSystem_Init();
 
+    DMW_b("applyDefaultSettings");
+    applyDefaultSettings();
+
     // Init GNSS Module
     DMW_b("gnssInit");
     gnssInit();

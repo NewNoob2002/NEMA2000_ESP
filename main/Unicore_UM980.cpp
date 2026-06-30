@@ -79,6 +79,30 @@ UnicoreUM980::setOnline(bool online) {
 }
 
 void
+UnicoreUM980::applySettings(const settings_t& source) {
+    for (size_t index = 0; index < MAX_UM980_NMEA_MSG; index++) {
+        if (source.um980MessageRatesNMEA[index].name != nullptr) {
+            _nmeaPeriods[index] = source.um980MessageRatesNMEA[index].defaultPeriodSeconds;
+        }
+    }
+
+    for (size_t index = 0; index < MAX_UM980_RTCM_MSG; index++) {
+        if (source.um980MessageRatesRTCMRover[index].name != nullptr) {
+            _rtcmRoverPeriods[index] = source.um980MessageRatesRTCMRover[index].defaultPeriodSeconds;
+        }
+        if (source.um980MessageRatesRTCMBase[index].name != nullptr) {
+            _rtcmBasePeriods[index] = source.um980MessageRatesRTCMBase[index].defaultPeriodSeconds;
+        }
+    }
+
+    for (size_t index = 0; index < MAX_UM980_CONSTELLATIONS; index++) {
+        if (source.kUm980ConstellationCommands[index].commandName != nullptr) {
+            _constellationEnabled[index] = source.kUm980ConstellationCommands[index].enabled;
+        }
+    }
+}
+
+void
 UnicoreUM980::setConnectCom(const char* com) {
     snprintf(_connectCom, sizeof(_connectCom), "%s", com);
 }
@@ -305,7 +329,9 @@ UnicoreUM980::requestVersion(const uint32_t timeoutMs) {
 }
 
 bool
-UnicoreUM980::applyDefaultConfiguration() {}
+UnicoreUM980::applyDefaultConfiguration() {
+    return true;
+}
 
 void
 UnicoreUM980::ensureBinaryNavigationMessages() {
@@ -565,7 +591,19 @@ UnicoreUM980::applyDynamicModel(const uint8_t modelNumber) {
 
 bool
 UnicoreUM980::applyConstellationConfig() {
-    if (_online) {}
+    if (!_online) {
+        log(UnicoreLogLevel::Warn, UNICORE_LOG_CHILD_CLASS, "Cannot configure constellations while GNSS is offline");
+        return false;
+    }
+
+    UnicoreResult_t result = Unicore_RESULT_RESPONSE_COMMAND_OK;
+    for (size_t index = 0; index < MAX_UM980_CONSTELLATIONS; index++) {
+        const char* commandName = kUm980ConstellationCommands[index].commandName;
+        result =
+            firstError(result, _constellationEnabled[index] ? enableSystem(commandName) : disableSystem(commandName));
+    }
+
+    return result == Unicore_RESULT_RESPONSE_COMMAND_OK;
 }
 
 uint8_t
@@ -610,6 +648,7 @@ UnicoreUM980::setConstellationEnabled(const char* commandName, const bool enable
     for (size_t index = 0; index < MAX_UM980_CONSTELLATIONS; index++) {
         if (strcasecmp(kUm980ConstellationCommands[index].commandName, commandName) == 0) {
             _constellationEnabled[index] = enabled;
+            settings.kUm980ConstellationCommands[index].enabled = enabled;
             return Unicore_RESULT_RESPONSE_COMMAND_OK;
         }
     }

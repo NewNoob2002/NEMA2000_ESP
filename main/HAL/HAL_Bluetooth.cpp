@@ -377,23 +377,22 @@ handleSatelliteTracking(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& r
         }
         response.payload[0] = 0x01;
         response.payload[1] = HAL::gUm980 ? HAL::gUm980->getElev() : settings.minElev;
-        response.payload[4] = 1; // GPS
-        response.payload[5] = 1; // GLONASS
-        response.payload[6] = 1; // BDS
-        response.payload[7] = 1; // Galileo
+        response.payload[4] = settings.kUm980ConstellationCommands[0].enabled; // GPS
+        response.payload[5] = settings.kUm980ConstellationCommands[1].enabled; // GLONASS
+        response.payload[6] = settings.kUm980ConstellationCommands[2].enabled; // BDS
+        response.payload[7] = settings.kUm980ConstellationCommands[3].enabled; // Galileo
         return;
     } else if (requestHeader.messageType == kMsgSetType) {
         bool valid = payload && (payloadLength >= 8);
         if (valid) {
             if (HAL::gUm980) {
                 settings.minElev = payload[1];
+                HAL::gUm980->setConstellationEnabled("GPS", payload[4] != 0);
+                HAL::gUm980->setConstellationEnabled("GLO", payload[5] != 0);
+                HAL::gUm980->setConstellationEnabled("BDS", payload[6] != 0);
+                HAL::gUm980->setConstellationEnabled("GAL", payload[7] != 0);
                 gnssConfigure(GNSS_CONFIG_ELEVATION, __FILE__, __LINE__);
-                // HAL::gUm980->applyElevationMask(settings.minElev);
-                // HAL::gUm980->setConstellationEnabled("GPS", payload[4] != 0);
-                // HAL::gUm980->setConstellationEnabled("GLO", payload[5] != 0);
-                // HAL::gUm980->setConstellationEnabled("BDS", payload[6] != 0);
-                // HAL::gUm980->setConstellationEnabled("GAL", payload[7] != 0);
-                // HAL::gUm980->applyConstellationConfig();
+                gnssConfigure(GNSS_CONFIG_CONSTELLATION, __FILE__, __LINE__);
             }
         }
         ack(response, requestHeader, 0x01);

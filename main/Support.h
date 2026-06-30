@@ -50,3 +50,5 @@ const char* getTimeStamp();
 
 void rtkFree(void* data, const char* text);
 void* rtkMalloc(size_t sizeInBytes, const char* text);
+
+void applyDefaultSettings();

@@ -83,3 +83,19 @@ getHpaUnits(double hpa, char* buffer, int length, int decimals, bool limit) {
     strncpy(buffer, unknown, length);
     return unknown;
 }
+
+void
+applyDefaultSettings() {
+    for (size_t index = 0; index < MAX_UM980_CONSTELLATIONS; index++) {
+        settings.kUm980ConstellationCommands[index] = kUm980ConstellationCommands[index];
+    }
+
+    for (size_t index = 0; index < MAX_UM980_NMEA_MSG; index++) {
+        settings.um980MessageRatesNMEA[index] = kUm980NmeaMessages[index];
+    }
+
+    for (size_t index = 0; index < MAX_UM980_RTCM_MSG; index++) {
+        settings.um980MessageRatesRTCMRover[index] = kUm980RtcmMessages[index];
+        settings.um980MessageRatesRTCMBase[index] = kUm980RtcmMessages[index];
+    }
+}
