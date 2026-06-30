@@ -956,7 +956,7 @@ UnicoreGNSSLibrary::stopAutoReports() {
 bool
 UnicoreGNSSLibrary::initBestnav(float rate) {
     if ((startBinaryBeforeFix == false) && (isNmeaFixed() == false)) {
-        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "bestnav init delayed until fix");
+        log(UnicoreLogLevel::Debug, UNICORE_LOG_COMMAND, "bestnav init delayed until fix");
         return (false);
     }
 
@@ -998,7 +998,7 @@ UnicoreGNSSLibrary::initBestnav(float rate) {
 bool
 UnicoreGNSSLibrary::initBestnavXyz(float rate) {
     if ((startBinaryBeforeFix == false) && (isNmeaFixed() == false)) {
-        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "bestnavxyz init delayed until fix");
+        log(UnicoreLogLevel::Debug, UNICORE_LOG_COMMAND, "bestnavxyz init delayed until fix");
         return (false);
     }
 
@@ -1040,7 +1040,7 @@ UnicoreGNSSLibrary::initBestnavXyz(float rate) {
 bool
 UnicoreGNSSLibrary::initRecTime(float rate) {
     if ((startBinaryBeforeFix == false) && (isNmeaFixed() == false)) {
-        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "rectime init delayed until fix");
+        log(UnicoreLogLevel::Debug, UNICORE_LOG_COMMAND, "rectime init delayed until fix");
         return (false);
     }
     _recTime = new UNICORE_RECTIME_data_t;
@@ -1080,7 +1080,7 @@ UnicoreGNSSLibrary::initRecTime(float rate) {
 bool
 UnicoreGNSSLibrary::initStadop(float rate) {
     if ((startBinaryBeforeFix == false) && (isNmeaFixed() == false)) {
-        log(UnicoreLogLevel::Error, UNICORE_LOG_COMMAND, "stadop init delayed until fix");
+        log(UnicoreLogLevel::Debug, UNICORE_LOG_COMMAND, "stadop init delayed until fix");
         return (false);
     }
 

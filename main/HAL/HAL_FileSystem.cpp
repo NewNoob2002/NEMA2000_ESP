@@ -5,6 +5,7 @@
 #include <nvs_flash.h>
 #include <string.h>
 #include "App/Config/Config.h"
+#include "App/Utils/StorageServiceTest.h"
 #include "HAL.h"
 #include "Support.h"
 #include "mcu_settings.h"
@@ -78,6 +79,7 @@ beginFileSystem() {
             systemPrintln("LittleFS Started");
             systemPrintf("LittleFS used  / total bytes: %d KB / %d KB\n", LittleFS.usedBytes() >> 10,
                          LittleFS.totalBytes() >> 10);
+            storageServiceSaveReadPrintTest();
         }
     }
 }
