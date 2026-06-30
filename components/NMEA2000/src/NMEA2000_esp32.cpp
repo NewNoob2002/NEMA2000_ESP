@@ -214,7 +214,7 @@ tNMEA2000_esp32::CANSendFrame(unsigned long id, unsigned char len, const unsigne
 // ----------------------------------------------------------------------------
 
 bool
-tNMEA2000_esp32::CAN_init() {
+tNMEA2000_esp32::CAN_init(const uint32_t txTaskStackSize,const uint32_t txCtrlStackSize) {
     StopRequested = false;
     BusReady = false;
     TxDoneSuccess = false;
@@ -259,7 +259,6 @@ tNMEA2000_esp32::CAN_init() {
         return false;
     }
 
-    // NMEA2000 只关心 29-bit 扩展帧，且不使用过滤，所有帧都接受
     twai_mask_filter_config_t filter_cfg;
     memset(&filter_cfg, 0, sizeof(filter_cfg));
     filter_cfg.id = 0;
@@ -272,13 +271,13 @@ tNMEA2000_esp32::CAN_init() {
         return false;
     }
 
-    if (xTaskCreate(&tNMEA2000_esp32::TxTaskEntry, "n2k_twai_tx", 2048, this, tskIDLE_PRIORITY + 5, &TxTaskHandle)
+    if (xTaskCreate(&tNMEA2000_esp32::TxTaskEntry, "n2k_twai_tx", txTaskStackSize, this, tskIDLE_PRIORITY + 5, &TxTaskHandle)
         != pdPASS) {
         ESP_LOGE(TAG, "Failed to create TX task");
         return false;
     }
 
-    if (xTaskCreate(&tNMEA2000_esp32::CtrlTaskEntry, "n2k_twai_ctrl", 3072, this, tskIDLE_PRIORITY + 6, &CtrlTaskHandle)
+    if (xTaskCreate(&tNMEA2000_esp32::CtrlTaskEntry, "n2k_twai_ctrl", txCtrlStackSize, this, tskIDLE_PRIORITY + 6, &CtrlTaskHandle)
         != pdPASS) {
         ESP_LOGE(TAG, "Failed to create CTRL task");
         return false;

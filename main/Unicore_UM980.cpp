@@ -1,6 +1,7 @@
 #include "Unicore_UM980.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -303,6 +304,9 @@ UnicoreUM980::requestVersion(const uint32_t timeoutMs) {
     return requestMessage(MSG_VERSION, timeoutMs);
 }
 
+bool
+UnicoreUM980::applyDefaultConfiguration() {}
+
 void
 UnicoreUM980::ensureBinaryNavigationMessages() {
     if ((millis() - _lastBinaryMessageInitAttemptMs) < kBinaryMessageInitRetryMs) {
@@ -559,6 +563,11 @@ UnicoreUM980::applyDynamicModel(const uint8_t modelNumber) {
     return false;
 }
 
+bool
+UnicoreUM980::applyConstellationConfig() {
+    if (_online) {}
+}
+
 uint8_t
 UnicoreUM980::requestModel() {
     if (sendCommandAndWait("MODE", 2000, "#MODE") == Unicore_RESULT_RESPONSE_COMMAND_OK) {
@@ -571,7 +580,11 @@ UnicoreResult_t
 UnicoreUM980::applyElevationMask(const uint8_t elevationDegrees) {
     char command[32];
     snprintf(command, sizeof(command), "%d", elevationDegrees);
-    return disableSystem(command);
+    UnicoreResult_t result = disableSystem(command);
+    if (result == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+        _Elev = elevationDegrees;
+    }
+    return result;
 }
 
 UnicoreResult_t
@@ -586,29 +599,6 @@ UnicoreUM980::applyMultipathMitigation(const bool enable) {
     char command[48] = {};
     snprintf(command, sizeof(command), "CONFIG MULTIPATHMITIGATION %s", enable ? "ENABLE" : "DISABLE");
     return sendCommandAndWait(command, 1000);
-}
-
-UnicoreResult_t
-UnicoreUM980::applyConstellationConfig() {
-    char command[96] = {};
-    snprintf(command, sizeof(command), "CONFIG SIGNALGROUP");
-
-    bool anyEnabled = false;
-    for (size_t index = 0; index < MAX_UM980_CONSTELLATIONS; index++) {
-        if (!_constellationEnabled[index]) {
-            continue;
-        }
-
-        strncat(command, " ", sizeof(command) - strlen(command) - 1);
-        strncat(command, kUm980ConstellationCommands[index].commandName, sizeof(command) - strlen(command) - 1);
-        anyEnabled = true;
-    }
-
-    if (!anyEnabled) {
-        return Unicore_RESULT_WRONG_COMMAND;
-    }
-
-    return sendCommandAndWait(command, 1500);
 }
 
 UnicoreResult_t
@@ -703,6 +693,11 @@ UnicoreUM980::getRtcmMessageNumberByName(const char* msgName) const {
 bool
 UnicoreUM980::isGgaActive() const {
     return getNmeaMessagePeriod("GPGGA") > 0.0f;
+}
+
+uint8_t
+UnicoreUM980::getElev() {
+    return _Elev;
 }
 
 double

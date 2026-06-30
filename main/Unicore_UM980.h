@@ -1,12 +1,14 @@
 #ifndef UNICORE_UM980_H
 #define UNICORE_UM980_H
 
+#include <cstdint>
 #include "Unicore_GNSS_Library.h"
 #include "soc/gpio_num.h"
 
 struct Um980ConstellationCommand {
     const char* displayName;
     const char* commandName;
+    bool mask;
 };
 
 struct Um980MessageConfig {
@@ -29,7 +31,8 @@ enum class Um980Mode : uint8_t {
 };
 
 inline constexpr Um980ConstellationCommand kUm980ConstellationCommands[] = {
-    {"BeiDou", "BDS"}, {"Galileo", "GAL"}, {"GLONASS", "GLO"}, {"GPS", "GPS"}, {"QZSS", "QZSS"},
+    {"BeiDou", "BDS", true}, {"Galileo", "GAL", true}, {"GLONASS", "GLO", true},
+    {"GPS", "GPS", true},    {"QZSS", "QZSS", true},
 };
 
 inline constexpr Um980MessageConfig kUm980NmeaMessages[] = {
@@ -91,12 +94,14 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     UnicoreResult_t requestVersion(uint32_t timeoutMs = 1000);
     void ensureBinaryNavigationMessages();
 
+    bool applyDefaultConfiguration();
+
     bool applyDynamicModel(uint8_t modelNumber);
+    bool applyConstellationConfig();
     UnicoreResult_t setNavigationRate(double secondsBetweenSolutions);
     UnicoreResult_t applyElevationMask(uint8_t elevationDegrees);
     UnicoreResult_t applyMinCno(uint8_t cnoValue);
     UnicoreResult_t applyMultipathMitigation(bool enable);
-    UnicoreResult_t applyConstellationConfig();
     UnicoreResult_t setConstellationEnabled(const char* commandName, bool enabled);
 
     bool applyNmeaMessageConfig();
@@ -118,6 +123,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     int16_t getRtcmMessageNumberByName(const char* msgName) const;
     bool isGgaActive() const;
 
+    uint8_t getElev();
     double getLatitude() const;
     double getLongitude() const;
     double getAltitude() const;
@@ -209,6 +215,7 @@ class UnicoreUM980 : public UnicoreGNSSLibrary {
     float _rtcmRoverPeriods[MAX_UM980_RTCM_MSG] = {};
     float _rtcmBasePeriods[MAX_UM980_RTCM_MSG] = {};
     bool _constellationEnabled[MAX_UM980_CONSTELLATIONS] = {};
+    uint8_t _Elev = 0;
 
     struct {
         bool enabled = false;               // Goes true when we enable NMEA messages

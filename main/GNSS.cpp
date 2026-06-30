@@ -211,7 +211,7 @@ gnssUpdate(UnicoreUM980* gnss) {
         }
 
         if (gnssConfigureRequested(GNSS_CONFIG_CONSTELLATION)) {
-            if (gnss->applyConstellationConfig() == Unicore_RESULT_RESPONSE_COMMAND_OK) {
+            if (gnss->applyConstellationConfig()) {
                 gnssConfigureClear(GNSS_CONFIG_CONSTELLATION);
                 gnssConfigure(GNSS_CONFIG_SAVE, __FILE__, __LINE__); // Request receiver commit this change to NVM
             }

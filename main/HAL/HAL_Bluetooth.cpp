@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 
+#include "GNSS.h"
 #include "HAL_Config.h"
 #include "HardwareSerial.h"
 #include "SparkFun_Extensible_Message_Parser.h"
@@ -375,7 +376,7 @@ handleSatelliteTracking(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& r
             return;
         }
         response.payload[0] = 0x01;
-        response.payload[1] = settings.minElev;
+        response.payload[1] = HAL::gUm980 ? HAL::gUm980->getElev() : settings.minElev;
         response.payload[4] = 1; // GPS
         response.payload[5] = 1; // GLONASS
         response.payload[6] = 1; // BDS
@@ -384,8 +385,9 @@ handleSatelliteTracking(BluetoothResponse& response, const SEMP_CUSTOM_HEADER& r
     } else if (requestHeader.messageType == kMsgSetType) {
         bool valid = payload && (payloadLength >= 8);
         if (valid) {
-            settings.minElev = payload[1];
             if (HAL::gUm980) {
+                settings.minElev = payload[1];
+                gnssConfigure(GNSS_CONFIG_ELEVATION, __FILE__, __LINE__);
                 // HAL::gUm980->applyElevationMask(settings.minElev);
                 // HAL::gUm980->setConstellationEnabled("GPS", payload[4] != 0);
                 // HAL::gUm980->setConstellationEnabled("GLO", payload[5] != 0);

@@ -118,7 +118,7 @@ class tNMEA2000_esp32 : public tNMEA2000 {
     void CtrlTask();
 
     uint32_t SpeedToBitrate() const;
-    bool CAN_init();
+    bool CAN_init(const uint32_t txTaskStackSize = 3072, const uint32_t txCtrlStackSize = 4096);
     void CAN_deinit();
 
   protected:
